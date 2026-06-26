@@ -1,0 +1,1 @@
+Xem `prompts/local_extraction_prompt.txt`. File này được giữ để dễ cấu hình các biến thể prompt tiếng Việt trong tương lai.

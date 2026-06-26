@@ -1,0 +1,18 @@
+local_llm:
+  provider: vllm
+  model_name: Qwen/Qwen3-4B-Instruct
+  base_url: http://127.0.0.1:8001/v1
+  temperature: 0
+  max_tokens: 2048
+  quantization: 4bit_or_8bit_when_supported
+  candidates:
+    - Qwen/Qwen3-4B-Instruct
+    - Qwen/Qwen3-8B-Instruct
+    - vinai/PhoGPT-4B-Chat
+ner:
+  optional_models:
+    - urchade/gliner_multi-v2.1
+    - vinai/phobert-base
+cloud_llm:
+  enabled_by_default: false
+  note: "Chỉ bật qua .env sau khi đã review rủi ro dữ liệu nhạy cảm."

@@ -1,0 +1,37 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+*.egg-info/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# Khong commit du lieu that va ket qua xu ly.
+data/raw_pdfs/
+data/private_pdfs/
+data/images/
+data/processed_images/
+data/processed/
+data/ocr_raw/
+data/ocr_corrected/
+outputs/
+models/
+logs/
+cache/
+work/
+.streamlit/secrets.toml
+court_ocr_gpu_worker/
+*.pdf
+*.sqlite
+*.db
+
+# File tam / upload cuc bo
+*.tmp
+*.log
+~$*

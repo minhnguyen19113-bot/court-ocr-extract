@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vietnam Court OCR Extract</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #fff;
+        --line: #d7dde5;
+        --text: #111827;
+        --muted: #596273;
+        --accent: #0f766e;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+      main { width: min(1180px, calc(100vw - 32px)); margin: 24px auto; display: grid; grid-template-columns: 380px 1fr; gap: 18px; }
+      h1 { margin: 0 0 14px; font-size: 23px; letter-spacing: 0; }
+      form, pre, table { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+      form { padding: 16px; }
+      label { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
+      input, select, button { font: inherit; }
+      input[type="file"], input[type="number"], select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 9px; background: #fff; }
+      .check { display: flex; align-items: center; gap: 8px; }
+      button { width: 100%; border: 0; border-radius: 6px; padding: 11px 14px; color: #fff; background: var(--accent); cursor: pointer; font-weight: 700; }
+      button:disabled { cursor: wait; background: #8a95a3; }
+      pre { min-height: 360px; margin: 0; padding: 14px; overflow: auto; white-space: pre-wrap; line-height: 1.45; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; overflow: hidden; }
+      th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; font-size: 13px; }
+      th { background: #eaf4f3; }
+      .downloads { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+      .downloads a { color: var(--accent); font-weight: 700; }
+      @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1>Vietnam Court OCR Extract</h1>
+        <form id="upload-form">
+          <label>PDF bản án <input name="pdf" type="file" accept="application/pdf" required /></label>
+          <label>OCR tối đa N trang <input name="max_scan_pages" type="number" min="1" max="30" value="7" /></label>
+          <label>DPI
+            <select name="dpi">
+              <option value="300" selected>300</option>
+              <option value="400">400</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+            </select>
+          </label>
+          <label class="check"><input name="stop_on_marker" type="checkbox" value="true" checked /> Dừng khi gặp NỘI DUNG VỤ ÁN</label>
+          <label class="check"><input name="use_local_llm" type="checkbox" value="true" /> Dùng local LLM extraction nếu đã chạy vLLM</label>
+          <label class="check"><input name="use_mock_ocr" type="checkbox" value="true" /> Mock OCR để test giao diện</label>
+          <label class="check"><input name="remove_red_stamp" type="checkbox" value="true" /> Giảm dấu mộc đỏ trên ảnh OCR phụ</label>
+          <label class="check"><input name="debug_bbox" type="checkbox" value="true" /> Xuất overlay bbox</label>
+          <label class="check"><input name="force" type="checkbox" value="true" /> Bỏ cache và chạy lại</label>
+          <button type="submit">Xử lý PDF</button>
+          <div class="downloads" id="downloads"></div>
+        </form>
+      </section>
+      <section>
+        <pre id="result">{}</pre>
+        <div id="table"></div>
+      </section>
+    </main>
+    <script>
+      const form = document.querySelector("#upload-form");
+      const result = document.querySelector("#result");
+      const downloads = document.querySelector("#downloads");
+      const table = document.querySelector("#table");
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const button = form.querySelector("button");
+        button.disabled = true;
+        downloads.innerHTML = "";
+        table.innerHTML = "";
+        result.textContent = "Đang xử lý...";
+        const data = new FormData(form);
+        for (const name of ["stop_on_marker", "use_local_llm", "use_mock_ocr", "remove_red_stamp", "debug_bbox", "force"]) {
+          if (!form[name].checked) data.set(name, "false");
+        }
+        try {
+          const response = await fetch("/api/process", { method: "POST", body: data });
+          const payload = await response.json();
+          result.textContent = JSON.stringify(payload, null, 2);
+          if (payload.excel_download_url) downloads.insertAdjacentHTML("beforeend", `<a href="${payload.excel_download_url}">Tải Excel</a>`);
+          if (payload.json_download_url) downloads.insertAdjacentHTML("beforeend", `<a href="${payload.json_download_url}">Tải JSON</a>`);
+          for (const url of payload.bbox_debug_urls || []) downloads.insertAdjacentHTML("beforeend", `<a href="${url}">Overlay bbox</a>`);
+          renderTable(payload.table_rows || []);
+        } catch (error) {
+          result.textContent = String(error);
+        } finally {
+          button.disabled = false;
+        }
+      });
+      function renderTable(rows) {
+        if (!rows.length) return;
+        const headers = Object.keys(rows[0]);
+        table.innerHTML = `<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${headers.map(h => `<td>${row[h] ?? ""}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      }
+    </script>
+  </body>
+</html>

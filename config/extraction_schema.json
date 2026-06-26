@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "required": ["case_info", "participants", "warnings"],
+  "additionalProperties": false,
+  "properties": {
+    "case_info": {
+      "type": "object",
+      "required": ["loai_an", "so_thu_ly", "ngay_thu_ly", "quan_he_phap_luat", "chu_toa"]
+    },
+    "participants": {
+      "type": "array"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}

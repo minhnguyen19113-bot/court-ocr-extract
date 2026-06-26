@@ -1,0 +1,11 @@
+content_marker:
+  canonical: "NỘI DUNG VỤ ÁN"
+  variants:
+    - "NOI DUNG VU AN"
+    - "NỘI DUNG VỤ ÁN:"
+    - "N0I DUNG VU AN"
+case_fields:
+  docket_number:
+    - "(?:thụ\\s*lý\\s*số|số\\s*thụ\\s*lý)\\s*[:：.]?\\s*([0-9]{1,5}\\s*/\\s*[0-9]{4}\\s*/\\s*[A-ZĐ0-9/-]+)"
+  docket_date:
+    - "ngày\\s+\\d{1,2}\\s+tháng\\s+\\d{1,2}\\s+năm\\s+\\d{4}"

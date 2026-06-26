@@ -1,0 +1,57 @@
+flowchart TD
+    A["PDF input: one file or folder"] --> B["Validate PDF: corrupt, empty, renderable, page count"]
+    B --> C["Create file metadata: file_id, name, page count, status"]
+    C --> D["Early-stop OCR loop"]
+    D --> E["Render next PDF page"]
+    E --> F["Create OCR helper image"]
+    F --> G["Reduce/remove red stamp on helper image only"]
+    G --> H["Preprocess: deskew, contrast, denoise, light balance"]
+    H --> I["Surya OCR or Mock OCR adapter"]
+    I --> J["Save page OCR JSON: text, bbox, confidence, page"]
+    J --> K["Append page text to buffer"]
+    K --> L{"Detect NỘI DUNG VỤ ÁN fuzzy marker?"}
+    L -- "No, under max pages" --> E
+    L -- "No, max pages reached" --> M["Stop, mark review_required, use OCR buffer"]
+    L -- "Yes" --> N["Stop OCR next pages"]
+    N --> O["Keep text before marker only"]
+    M --> P["Normalize/correct OCR text"]
+    O --> P
+    P --> Q["Local LLM extraction: strict JSON, confidence, warnings"]
+    P --> R["Heuristic support: anchors, validation, obvious fields"]
+    P --> S["Optional NER support"]
+    Q --> T["Merge outputs"]
+    R --> T
+    S --> T
+    T --> U["Validate: date, birth year, CCCD/CMND, role, conflicts"]
+    U --> V["Export JSON and Excel"]
+    V --> W["Human review for warnings/low confidence"]
+    W --> X["Improve prompt, model, regex, marker detector"]
+    X --> Y["Optional fine-tune when enough annotated synthetic/approved data exists"]
+
+    subgraph Local["Local control plane"]
+        L1["CLI scripts"]
+        L2["FastAPI backend"]
+        L3["Streamlit demo"]
+    end
+
+    subgraph EzyRuntime["Ezycloudx full runtime"]
+        E1["CLI/FastAPI/Streamlit on GPU instance"]
+        E2["Surya OCR + local LLM"]
+        E3["Excel/JSON export"]
+    end
+
+    subgraph Remote["Ezycloudx remote GPU worker"]
+        R1["/health"]
+        R2["/ocr-page"]
+        R3["/extract"]
+        R4["/cleanup"]
+    end
+
+    Local --> D
+    EzyRuntime --> D
+    Local -- "optional SSH tunnel/private HTTP + token" --> Remote
+    Remote --> I
+    Remote --> Q
+    Remote --> R4
+    J -. "No full sensitive text in default logs" .-> C
+    V -. "No cloud LLM by default" .-> Q

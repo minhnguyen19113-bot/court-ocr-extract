@@ -1,0 +1,16 @@
+excel_columns:
+  - LOẠI ÁN
+  - SỐ THỤ LÝ
+  - NGÀY THỤ LÝ (DD/MM/YYYY)
+  - QUAN HỆ PHÁP LUẬT
+  - TƯ CÁCH TỐ TỤNG
+  - HỌ TÊN ĐƯƠNG SỰ
+  - NĂM SINH
+  - CCCD
+  - ĐỊA CHỈ
+  - HỌ TÊN CHỦ TỌA
+  - GHI CHÚ
+removed_columns:
+  - HỌ TÊN NGƯỜI NHẬP
+  - EMAIL NGƯỜI NHẬP
+  - SỐ ĐIỆN THOẠI

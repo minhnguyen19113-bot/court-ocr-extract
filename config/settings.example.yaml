@@ -1,0 +1,22 @@
+ocr:
+  default_dpi: 300
+  blurry_scan_dpi: 400
+  max_pages_before_content_marker: 7
+  force_full_ocr: false
+  stop_on_section_marker: true
+  section_marker: "NỘI DUNG VỤ ÁN"
+  enable_red_stamp_removal: false
+
+extraction:
+  enable_local_llm_extraction: true
+  enable_cloud_llm_extraction: false
+  enable_gliner: false
+  extract_without_marker: true
+
+runtime:
+  processing_mode: local-only
+  enable_mock_ocr: false
+  enable_mock_local_llm: false
+  debug_sensitive: false
+  persist_ocr_text_artifacts: false
+  persist_sensitive_text_in_json: false

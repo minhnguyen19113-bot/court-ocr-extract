@@ -1,0 +1,17 @@
+mode: remote-gpu-worker
+base_url_env: GPU_WORKER_BASE_URL
+token_env: GPU_WORKER_TOKEN
+timeout_seconds: 180
+retries: 2
+fallback:
+  enabled: true
+  to_mock: false
+apis:
+  - /health
+  - /ocr-page
+  - /extract
+  - /cleanup
+  - /job-status
+storage:
+  remote_temp_only: true
+  cleanup_required_after_batch: true

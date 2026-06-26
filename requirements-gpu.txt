@@ -1,0 +1,9 @@
+-r requirements.txt
+torch
+transformers>=4.45
+accelerate>=0.34
+bitsandbytes>=0.43
+sentencepiece>=0.2
+protobuf>=5
+gliner>=0.2
+vllm>=0.6; platform_system != "Windows"
