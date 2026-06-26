@@ -94,7 +94,9 @@ outputs\json\batch_summary.json
 
 ## Khi nào cần Ollama?
 
-Không bắt buộc ở bước đầu. Nếu chạy không LLM mà Excel thiếu nhiều field hoặc cần bóc tách chính xác hơn, lúc đó mới cài Ollama/Qwen và chạy lại với:
+Không bắt buộc ở bước đầu. Sample không LLM chỉ nên dùng để kiểm tra OCR, marker, cache và luồng Excel/JSON. Nếu Excel thiếu nhiều field hoặc bắt nhầm cụm không phải tên người, đó là giới hạn dự kiến của rule/regex.
+
+Để đánh giá chất lượng bóc tách thật, cài Ollama/Qwen và chạy lại với:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\ezycloudx_run_sample_windows.ps1 -UseLocalLlm

@@ -30,6 +30,15 @@ ADDRESS_STOP_RE = re.compile(
     re.IGNORECASE,
 )
 
+NON_NAME_PHRASE_RE = re.compile(
+    r"\b("
+    r"cÃ³\s+máº·t|váº¯ng\s+máº·t|táº¡i\s+phiÃªn\s+tÃ²a|phiÃªn\s+tÃ²a|"
+    r"Ä‘Æ°á»£c\s+triá»‡u\s+táº­p|bá»‹\s+báº¯t|bá»‹\s+táº¡m\s+giam|bá»‹\s+táº¡m\s+giá»¯|"
+    r"ngÆ°á»i\s+phiÃªn\s+dịch|thÆ°\s+kÃ½|kiá»ƒm\s+sÃ¡t\s+viÃªn"
+    r")\b",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class RoleBlock:
@@ -300,6 +309,8 @@ def _clean_person_name(value: str) -> str:
 
 def _looks_like_person_name(value: str) -> bool:
     if not value or len(value) < 5:
+        return False
+    if NON_NAME_PHRASE_RE.search(value):
         return False
     if any(char.isdigit() for char in value):
         return False

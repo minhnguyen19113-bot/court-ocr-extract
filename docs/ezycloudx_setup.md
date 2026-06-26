@@ -224,7 +224,17 @@ Kiểm tra trong Excel:
 
 Nếu OCR lỗi kỹ thuật, xử lý môi trường GPU/Surya trước.
 
-Nếu OCR ổn nhưng thiếu field, lúc đó mới cân nhắc bật Ollama/local LLM.
+Nếu OCR ổn nhưng thiếu field hoặc bắt nhầm cụm không phải tên người, đó là giới hạn dự kiến của rule-only mode. Lúc này cần bật Ollama/local LLM để đánh giá chất lượng bóc tách thật.
+
+Có thể tạo báo cáo QA không lộ dữ liệu từ máy local hoặc VM:
+
+```powershell
+python -m scripts.qa_batch_output `
+  --summary outputs\json\batch_summary.json `
+  --excel outputs\excel\sample_10.xlsx
+```
+
+Báo cáo này chỉ in số lượng field trống, số dòng cần review, extractor đang dùng và các nhóm cảnh báo; không in họ tên, địa chỉ, CCCD hoặc text OCR.
 
 ## 9. Chạy toàn bộ
 
