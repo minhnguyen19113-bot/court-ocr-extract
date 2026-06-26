@@ -41,18 +41,27 @@ def process_batch(
     skipped: list[str] = []
     failures: list[dict[str, str]] = []
 
-    for pdf_path in pdf_paths:
+    total = len(pdf_paths)
+    for index, pdf_path in enumerate(pdf_paths, start=1):
         file_id = short_hash(sha256_file(pdf_path))
         checkpoint = settings.checkpoint_dir / f"{file_id}.json"
         if checkpoint.exists() and not force:
             skipped.append(file_id)
+            print(f"[batch] skip {index}/{total} file_id={file_id} checkpoint_exists", flush=True)
             continue
         try:
+            print(f"[batch] start {index}/{total} file_id={file_id}", flush=True)
             process_result = process_pdf(pdf_path, force=force, settings=settings, **process_kwargs)
             results.append(process_result.result)
+            pages_ocr = process_result.metadata.pages_ocr if process_result.metadata else "?"
+            print(
+                f"[batch] done {index}/{total} file_id={file_id} pages_ocr={pages_ocr}",
+                flush=True,
+            )
         except Exception as exc:
             LOGGER.exception("Failed processing file_id=%s", file_id)
             failures.append({"file_id": file_id, "error": str(exc)})
+            print(f"[batch] failed {index}/{total} file_id={file_id}: {exc}", flush=True)
 
     output_excel = Path(output_excel) if output_excel else settings.excel_dir / "batch_results.xlsx"
     if results:
@@ -61,6 +70,7 @@ def process_batch(
         except ModuleNotFoundError:
             output_excel = None
 
+    summary_json = settings.json_dir / "batch_summary.json"
     summary = {
         "total": len(pdf_paths),
         "success": len(results),
@@ -68,6 +78,7 @@ def process_batch(
         "failed": len(failures),
         "skipped_file_ids": skipped,
         "combined_excel": str(output_excel) if output_excel else None,
+        "summary_json": str(summary_json),
         "failures": failures,
         "results": [
             redact_sensitive_payload(
@@ -77,5 +88,5 @@ def process_batch(
             for result in results
         ],
     }
-    write_json(settings.json_dir / "batch_summary.json", summary)
+    write_json(summary_json, summary)
     return summary

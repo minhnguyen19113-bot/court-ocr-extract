@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -17,7 +16,6 @@ if str(SRC) not in sys.path:
 
 from court_ocr_extract.config import get_settings
 from court_ocr_extract.pipeline import process_batch
-from court_ocr_extract.privacy import redact_sensitive_payload
 
 
 def main() -> None:
@@ -69,16 +67,30 @@ def main() -> None:
         remove_red_stamp=args.remove_red_stamp,
         use_local_llm=use_local_llm,
     )
-    print(
-        json.dumps(
-            redact_sensitive_payload(
-                summary,
-                include_sensitive=settings.persist_sensitive_json_text or settings.debug_sensitive,
-            ),
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    _print_safe_summary(summary)
+
+
+def _print_safe_summary(summary: dict) -> None:
+    print("")
+    print("Batch finished.")
+    print(f"  total: {summary.get('total', 0)}")
+    print(f"  success: {summary.get('success', 0)}")
+    print(f"  skipped: {summary.get('skipped', 0)}")
+    print(f"  failed: {summary.get('failed', 0)}")
+    print(f"  excel: {summary.get('combined_excel') or 'not_created'}")
+    print(f"  summary_json: {summary.get('summary_json') or 'outputs/json/batch_summary.json'}")
+
+    failures = summary.get("failures") or []
+    if failures:
+        print("  failures:")
+        for item in failures[:10]:
+            file_id = item.get("file_id", "unknown")
+            error = " ".join(str(item.get("error", "")).split())
+            if len(error) > 220:
+                error = error[:217] + "..."
+            print(f"    - file_id={file_id}: {error}")
+        if len(failures) > 10:
+            print(f"    - ... {len(failures) - 10} more failure(s), see summary_json")
 
 
 if __name__ == "__main__":
