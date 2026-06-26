@@ -11,8 +11,8 @@ $ErrorActionPreference = "Stop"
 
 Set-Location (Resolve-Path "$PSScriptRoot\..")
 
-$env:SURYA_INFERENCE_BACKEND = if ($env:SURYA_INFERENCE_BACKEND) { $env:SURYA_INFERENCE_BACKEND } else { "llamacpp" }
-$env:SURYA_INFERENCE_PARALLEL = if ($env:SURYA_INFERENCE_PARALLEL) { $env:SURYA_INFERENCE_PARALLEL } else { "1" }
+. "$PSScriptRoot\ezycloudx_env_windows.ps1"
+Initialize-EzycloudxRuntimeEnv
 
 $ArgsList = @(
     "-m", "scripts.run_batch",
