@@ -21,7 +21,7 @@ data/processed/
 data/ocr_raw/
 data/ocr_corrected/
 outputs/
-models/
+/models/
 logs/
 cache/
 work/
