@@ -50,16 +50,20 @@ class EarlyStopPipeline:
 
         page_limit = page_count if config.force_full_ocr else min(config.max_pages_before_marker, page_count)
         for page_number in range(1, page_limit + 1):
+            print(f"[ocr] page {page_number}/{page_limit} render", flush=True)
             rendered = render_pdf_page(pdf_path, page_number, image_dir, dpi=config.dpi)
+            print(f"[ocr] page {page_number}/{page_limit} preprocess", flush=True)
             processed_path = preprocess_for_ocr(
                 rendered.image_path,
                 processed_dir / rendered.image_path.name,
                 remove_red_stamp=config.remove_red_stamp,
                 intermediate_path=intermediate_dir / rendered.image_path.name,
             )
+            print(f"[ocr] page {page_number}/{page_limit} recognize", flush=True)
             page = self.ocr_adapter.ocr_page(processed_path, page_number=page_number)
             page.image_path = str(rendered.image_path)
             page.processed_image_path = str(processed_path)
+            print(f"[ocr] page {page_number}/{page_limit} recognized", flush=True)
 
             marker_match = detect_marker_in_page(page, marker=self.settings.section_marker)
             if marker_match.found:

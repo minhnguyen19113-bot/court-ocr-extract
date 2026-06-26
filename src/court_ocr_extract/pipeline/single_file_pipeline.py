@@ -47,6 +47,7 @@ def process_pdf(
     stop_on_marker: bool | None = None,
     stop_after_marker: bool | None = None,
     use_local_llm: bool | None = None,
+    require_local_llm: bool = False,
     force: bool | None = None,
     settings: Settings | None = None,
     mock_page_texts: dict[int, str] | None = None,
@@ -117,6 +118,7 @@ def process_pdf(
         output_stem=stem,
         settings=settings,
         use_local_llm=use_local_llm,
+        require_local_llm=require_local_llm,
         marker_found=ocr_document.marker_found,
         marker_text=settings.section_marker if ocr_document.marker_found else None,
         marker_page=ocr_document.marker_page,
@@ -165,6 +167,7 @@ def process_ocr_document(
     marker_found: bool,
     marker_text: str | None,
     marker_page: int | None,
+    require_local_llm: bool = False,
 ) -> ProcessResult:
     return process_ocr_text(
         document.text,
@@ -172,6 +175,7 @@ def process_ocr_document(
         output_stem=output_stem,
         settings=settings,
         use_local_llm=use_local_llm,
+        require_local_llm=require_local_llm,
         marker_found=marker_found,
         marker_text=marker_text,
         marker_page=marker_page,
@@ -191,6 +195,7 @@ def process_ocr_text(
     output_stem: str = "ocr_text",
     settings: Settings | None = None,
     use_local_llm: bool | None = None,
+    require_local_llm: bool = False,
     marker_found: bool | None = None,
     marker_text: str | None = None,
     marker_page: int | None = None,
@@ -231,6 +236,12 @@ def process_ocr_text(
         try:
             primary = LocalLLMExtractor(settings).extract(text_before_marker)
         except Exception as exc:
+            if require_local_llm:
+                raise RuntimeError(
+                    "Local LLM extraction was required but failed. "
+                    "Check Ollama/model configuration before trusting Excel output. "
+                    f"Technical detail: {exc}"
+                ) from exc
             primary = anchor_support_output(text_before_marker)
             primary.method = "rule_support_due_to_local_llm_error"
             primary.warnings.append(

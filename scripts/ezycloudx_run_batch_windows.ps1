@@ -26,6 +26,7 @@ $ArgsList = @(
 
 if ($UseLocalLlm) {
     $ArgsList += "--use-local-llm"
+    $ArgsList += "--require-local-llm"
 } else {
     $ArgsList += "--no-local-llm"
 }

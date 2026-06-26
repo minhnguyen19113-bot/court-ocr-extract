@@ -33,6 +33,11 @@ def main() -> None:
     parser.add_argument("--remove-red-stamp", action="store_true")
     parser.add_argument("--use-local-llm", action="store_true")
     parser.add_argument("--no-local-llm", action="store_true")
+    parser.add_argument(
+        "--require-local-llm",
+        action="store_true",
+        help="Fail a file instead of falling back to rules when local LLM extraction fails.",
+    )
     parser.add_argument("--mock-ocr", action="store_true")
     parser.add_argument("--mock-local-llm", action="store_true")
     parser.add_argument("--force", action="store_true")
@@ -66,6 +71,7 @@ def main() -> None:
         stop_on_marker=args.stop_on_marker or settings.stop_on_section_marker,
         remove_red_stamp=args.remove_red_stamp,
         use_local_llm=use_local_llm,
+        require_local_llm=args.require_local_llm,
     )
     _print_safe_summary(summary)
 
