@@ -20,24 +20,30 @@ Safe synthetic outputs:
 Check page grid, page size, DPI, rotation, blank pages, and cropped edges.
 
 ```powershell
-python -m court_ocr_extract.cli debug-render --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-render --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --output outputs\debug_visual --open
 ```
+
+By default this renders all pages. Use `--pages 1-3` only when a bounded page sample is intentional.
 
 ## Preprocess Review
 
 Compare before/after side by side. Do not enable aggressive enhancement if it removes text strokes or Vietnamese marks.
 
 ```powershell
-python -m court_ocr_extract.cli debug-preprocess --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-preprocess --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --output outputs\debug_visual --open
 ```
+
+By default this preprocesses all rendered pages. Use `--pages 1-3` only when a bounded page sample is intentional.
 
 ## Surya OCR Review
 
 Target review command:
 
 ```powershell
-python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --ocr-backend surya --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --ocr-backend surya --full-document --output outputs\debug_visual --open
 ```
+
+Use `--full-document` for whole-PDF OCR review so the content marker does not stop or truncate the review.
 
 Required review elements:
 

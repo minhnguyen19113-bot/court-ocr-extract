@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-07-07 - Sửa giới hạn trang debug/full-document
+
+- Sửa `parse_page_range()` để `None`, chuỗi rỗng, và `all` nghĩa là toàn bộ trang; không còn default 3 trang đầu.
+- Sửa default `--pages` của debug render/preprocess/red-seal thành toàn bộ trang; muốn giới hạn phải truyền rõ `--pages 1-3`.
+- Thêm `--full-document` và `--max-pages` cho `debug-ocr-review` và `ocr`.
+- `debug-ocr-review --full-document` và `ocr --full-document` truyền `max_pages=None`, `stop_marker=""`.
+- Sửa Surya OCR để `stop_marker=""` không gọi marker detector, không truncate text, không break sớm, và không warning marker missing.
+- Thêm test synthetic cho page range, CLI full-document, Surya full-document marker behavior, và no-fallback guard.
+- Không chạy PDF thật, không inspect dữ liệu thật, không chạy extraction/LLM/Excel.
+
 ## 2026-07-07 - Phase 2A Surya OCR Runtime + Visual OCR Review
 
 - Triển khai code path `SuryaOCRBackend` cho rendered images và output `OCRResult/OCRPage`.

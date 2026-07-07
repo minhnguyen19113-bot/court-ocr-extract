@@ -38,6 +38,53 @@ python -m scripts.check_runtime --ocr-backend surya --extractor local_llm
 python -m scripts.check_extractor --backend local_llm
 ```
 
+## Pilot 1 PDF Full-Document Review
+
+Project Owner đặt đúng 1 PDF cần pilot vào folder `data\raw_pdfs\pilot_one`. Các command debug/render/preprocess mặc định chạy toàn bộ trang nếu không truyền `--pages`; muốn giới hạn thì truyền rõ `--pages 1-3`.
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-render `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --output outputs\debug_visual `
+  --open
+```
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-preprocess `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --output outputs\debug_visual `
+  --open
+```
+
+OCR review toàn bộ file phải dùng `--full-document` để không cắt theo `settings.max_pages_before_marker` và không dừng/truncate tại marker nội dung.
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-ocr-review `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --ocr-backend surya `
+  --full-document `
+  --output outputs\debug_visual `
+  --open
+```
+
+OCR cache toàn bộ file cũng dùng `--full-document`; command này không chạy extraction/LLM/Excel.
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli ocr `
+  --input-dir data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --cache-dir outputs\ocr_cache `
+  --ocr-backend surya `
+  --full-document `
+  --debug-visual
+```
+
 Nếu thiếu Surya:
 
 ```powershell
@@ -49,7 +96,7 @@ Nếu thiếu Surya:
 Command target để review OCR:
 
 ```powershell
-python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 5 --review-sample-size 5 --pages 1-3 --ocr-backend surya --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 5 --review-sample-size 5 --ocr-backend surya --full-document --output outputs\debug_visual --open
 ```
 
 Project Owner chạy command này trên Ezycloudx với PDF thật. Codex không được chạy hoặc inspect real-data outputs.

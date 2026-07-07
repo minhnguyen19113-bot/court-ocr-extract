@@ -65,7 +65,11 @@ def _add_input_review_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--review-sample-size", type=int, default=5)
     parser.add_argument("--review-seed", type=int, default=42)
     parser.add_argument("--review-mode", default="mixed")
-    parser.add_argument("--pages", default="1-3")
+    parser.add_argument(
+        "--pages",
+        default=None,
+        help="Page range such as 1-3 or 2,4,6-8. Default/all means all pages.",
+    )
     parser.add_argument("--output", default="outputs/debug_visual")
     parser.add_argument("--open", action="store_true")
 
@@ -99,6 +103,7 @@ def _add_debug_ocr_review(subparsers) -> None:
     parser = subparsers.add_parser("debug-ocr-review")
     _add_input_review_args(parser)
     parser.add_argument("--ocr-backend", default=None)
+    _add_full_document_args(parser)
     parser.set_defaults(func=cmd_debug_ocr_review)
 
 
@@ -121,7 +126,22 @@ def _add_ocr(subparsers) -> None:
     parser.add_argument("--ocr-backend", default=None)
     parser.add_argument("--fallback-ocr-backend", default="")
     parser.add_argument("--debug-visual", action="store_true")
+    _add_full_document_args(parser)
     parser.set_defaults(func=cmd_ocr)
+
+
+def _add_full_document_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--full-document",
+        action="store_true",
+        help="Process all pages and do not stop/truncate at the content marker.",
+    )
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=None,
+        help="Optional maximum pages to process. Ignored when --full-document is set.",
+    )
 
 
 def _add_preview_extraction(subparsers) -> None:
@@ -285,14 +305,16 @@ def cmd_ocr(args) -> None:
     cases = case_files_for_paths(paths)
     cache_dir = Path(args.cache_dir)
     debug_run_dir = make_run_dir(settings.debug_visual_dir) if args.debug_visual else None
+    max_pages = _resolve_ocr_page_limit(args, settings)
+    stop_marker = _resolve_stop_marker(args, settings)
     records: list[OCRCacheRecord] = []
     for case in track(cases, "OCR cases", total=len(cases)):
         work_dir = debug_run_dir / case.case_id if debug_run_dir else None
         try:
             result = backend.ocr_pdf_prefix(
                 case.path,
-                max_pages=settings.max_pages_before_marker,
-                stop_marker=settings.stop_marker,
+                max_pages=max_pages,
+                stop_marker=stop_marker,
                 debug_visual=bool(debug_run_dir),
                 work_dir=work_dir,
             )
@@ -300,7 +322,13 @@ def cmd_ocr(args) -> None:
             if not args.fallback_ocr_backend:
                 raise
             fallback = get_ocr_backend(args.fallback_ocr_backend, settings)
-            result = fallback.ocr_pdf_prefix(case.path, settings.max_pages_before_marker, settings.stop_marker, bool(debug_run_dir), work_dir)
+            result = fallback.ocr_pdf_prefix(
+                case.path,
+                max_pages=max_pages,
+                stop_marker=stop_marker,
+                debug_visual=bool(debug_run_dir),
+                work_dir=work_dir,
+            )
         record = OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result)
         write_ocr_cache_record(record, cache_dir)
         records.append(record)
@@ -515,11 +543,34 @@ def _run_sample_ocr(args, run_dir: Path) -> list[OCRCacheRecord]:
     if not status.available:
         raise RuntimeError(status.reason)
     cases = _sample_case_files(args)
+    max_pages = _resolve_ocr_page_limit(args, settings)
+    stop_marker = _resolve_stop_marker(args, settings)
     records: list[OCRCacheRecord] = []
     for case in track(cases, "OCR review cases", total=len(cases)):
-        result = backend.ocr_pdf_prefix(case.path, settings.max_pages_before_marker, settings.stop_marker, True, run_dir / case.case_id)
+        result = backend.ocr_pdf_prefix(
+            case.path,
+            max_pages=max_pages,
+            stop_marker=stop_marker,
+            debug_visual=True,
+            work_dir=run_dir / case.case_id,
+        )
         records.append(OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result))
     return records
+
+
+def _resolve_ocr_page_limit(args, settings) -> int | None:
+    if getattr(args, "full_document", False):
+        return None
+    max_pages = getattr(args, "max_pages", None)
+    if max_pages is not None:
+        return max_pages
+    return settings.max_pages_before_marker
+
+
+def _resolve_stop_marker(args, settings) -> str:
+    if getattr(args, "full_document", False):
+        return ""
+    return settings.stop_marker
 
 
 def _sample_records(records: list[OCRCacheRecord], args) -> list[OCRCacheRecord]:

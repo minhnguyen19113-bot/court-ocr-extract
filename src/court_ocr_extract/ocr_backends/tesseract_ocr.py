@@ -39,7 +39,7 @@ class TesseractOCRBackend:
     def ocr_pdf_prefix(
         self,
         pdf_path: Path,
-        max_pages: int,
+        max_pages: int | None,
         stop_marker: str,
         debug_visual: bool = False,
         work_dir: Path | None = None,
@@ -63,8 +63,8 @@ class TesseractOCRBackend:
             rendered_pages = render_pdf_pages(pdf_path, work_dir / "01_rendered", dpi=self.settings.ocr_dpi, max_pages=max_pages)
             for rendered in rendered_pages:
                 text = self._ocr_image(rendered.image_path)
-                marker = find_marker_in_text(text, stop_marker)
-                page_text = marker.before_text if marker.found else text
+                marker = find_marker_in_text(text, stop_marker) if stop_marker else None
+                page_text = marker.before_text if marker and marker.found else text
                 pages.append(
                     OCRPage(
                         page_index=rendered.page_number,
@@ -72,7 +72,7 @@ class TesseractOCRBackend:
                         image_path=str(rendered.image_path) if debug_visual else None,
                     )
                 )
-                if marker.found:
+                if marker and marker.found:
                     marker_found = True
                     marker_page = rendered.page_number
                     break
@@ -82,7 +82,7 @@ class TesseractOCRBackend:
 
         combined_text = "\n\n".join(page.text for page in pages if page.text.strip())
         result_status = "success" if pages else "failed"
-        if pages and not marker_found and len(pages) >= max_pages:
+        if stop_marker and max_pages is not None and pages and not marker_found and len(pages) >= max_pages:
             result_status = "partial"
             warnings.append("Marker not found before max page limit.")
         return OCRResult(

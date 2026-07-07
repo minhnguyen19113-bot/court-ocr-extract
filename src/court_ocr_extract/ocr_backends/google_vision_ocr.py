@@ -22,7 +22,7 @@ class GoogleVisionOCRBackend:
     def ocr_pdf_prefix(
         self,
         pdf_path: Path,
-        max_pages: int,
+        max_pages: int | None,
         stop_marker: str,
         debug_visual: bool = False,
         work_dir: Path | None = None,

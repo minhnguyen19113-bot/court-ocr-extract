@@ -74,6 +74,15 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Không chạy PDF thật và không inspect output thật.
 - Chất lượng OCR thật phải do Project Owner đánh giá trên Ezycloudx.
 
+## Latest Full-Document Debug Fix
+
+- `parse_page_range(None)`, `parse_page_range("")`, và `parse_page_range("all")` trả `None`, nghĩa là toàn bộ trang.
+- `debug-render`, `debug-preprocess`, và `debug-red-seal` mặc định chạy toàn bộ trang khi không truyền `--pages`.
+- `debug-ocr-review` và `ocr` có `--full-document` để truyền `max_pages=None`, `stop_marker=""`.
+- Surya OCR không còn dừng/truncate tại marker `NỘI DUNG VỤ ÁN` khi `stop_marker=""`.
+- Thêm test synthetic cho page range, CLI full-document, và Surya full-document behavior.
+- Không chạy PDF thật, không đọc dữ liệu thật, không chạy extraction/LLM/Excel.
+
 ## Next Gate
 
 Project Owner / ChatGPT nên kiểm tra Surya runtime trên Ezycloudx trước, sau đó quyết định Phase 2B sẽ ưu tiên cải thiện visual QA, pin version `surya-ocr`, hay chuyển sang hardening Local LLM extraction.

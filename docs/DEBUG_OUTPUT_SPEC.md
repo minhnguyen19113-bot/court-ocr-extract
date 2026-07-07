@@ -43,6 +43,11 @@ Must show:
 - page size/DPI
 - warnings for blank, rotated, cropped, or unreadable pages
 
+Default page scope:
+
+- `debug-render` mặc định render toàn bộ trang khi không truyền `--pages`.
+- Muốn giới hạn thì truyền rõ page range, ví dụ `--pages 1-3`.
+
 ## Preprocess View
 
 Must show:
@@ -51,6 +56,11 @@ Must show:
 - transform list
 - non-overwrite guarantee
 - warnings for risky transforms
+
+Default page scope:
+
+- `debug-preprocess` mặc định render/preprocess toàn bộ trang khi không truyền `--pages`.
+- Muốn giới hạn thì truyền rõ page range, ví dụ `--pages 1-3`.
 
 ## OCR View
 
@@ -76,6 +86,12 @@ Layout artifact Surya của Phase 2A:
 ```
 
 Review HTML cần hiển thị original page image, bbox overlay, line table, warnings, và link đến page text/line JSON.
+
+Full-document OCR review:
+
+- `debug-ocr-review --full-document` xử lý toàn bộ trang của PDF đã chọn.
+- Khi bật `--full-document`, backend nhận `max_pages=None` và `stop_marker=""`, nên marker `NỘI DUNG VỤ ÁN` không được làm dừng/truncate OCR review.
+- Nếu cần giới hạn OCR review theo số trang, dùng `--max-pages <n>` khi không bật `--full-document`.
 
 ## VLM View
 

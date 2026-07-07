@@ -41,6 +41,14 @@ Phase 2A notes:
 - Synthetic tests chỉ chứng minh schema/control-flow, không chứng minh chất lượng OCR thật.
 - Nếu thiếu Surya, cài bằng `pip install -e ".[ocr]"` hoặc `pip install surya-ocr`.
 
+Full-document debug review notes:
+
+- `debug-render`, `debug-preprocess`, và `debug-red-seal` mặc định chạy toàn bộ trang nếu không truyền `--pages`.
+- Muốn giới hạn trang review thì truyền rõ `--pages 1-3` hoặc range tương tự.
+- `debug-ocr-review --full-document` truyền `max_pages=None` và `stop_marker=""` vào backend, nên không dừng/truncate tại marker `NỘI DUNG VỤ ÁN`.
+- `ocr --full-document` cũng truyền `max_pages=None` và `stop_marker=""`, chỉ tạo OCR cache/debug visual, không chạy extraction/LLM/Excel.
+- Pilot 1 PDF nên dùng folder `data\raw_pdfs\pilot_one` với `--limit 1` và `--review-sample-size 1`.
+
 ## Important Warnings
 
 - Do not inspect real data directories or outputs.

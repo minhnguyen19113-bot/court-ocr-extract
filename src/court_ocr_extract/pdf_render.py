@@ -12,9 +12,12 @@ class RenderedPage:
     height: int
 
 
-def parse_page_range(value: str | None, *, default_max: int = 3) -> list[int]:
-    if not value:
-        return list(range(1, default_max + 1))
+def parse_page_range(value: str | None) -> list[int] | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value or value.lower() == "all":
+        return None
     pages: set[int] = set()
     for part in value.split(","):
         part = part.strip()

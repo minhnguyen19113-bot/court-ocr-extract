@@ -70,7 +70,7 @@ class SuryaOCRBackend:
     def ocr_pdf_prefix(
         self,
         pdf_path: Path,
-        max_pages: int,
+        max_pages: int | None,
         stop_marker: str,
         debug_visual: bool = False,
         work_dir: Path | None = None,
@@ -99,6 +99,7 @@ class SuryaOCRBackend:
                 debug_visual=debug_visual,
                 work_dir=work_dir,
                 page_numbers=[page.page_number for page in rendered_pages],
+                warn_if_marker_missing=bool(stop_marker and max_pages is not None),
             )
             result.timing["total_seconds"] = time.perf_counter() - start
             return result
@@ -114,6 +115,7 @@ class SuryaOCRBackend:
         debug_visual: bool = False,
         work_dir: Path | None = None,
         page_numbers: list[int] | None = None,
+        warn_if_marker_missing: bool = False,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -138,9 +140,9 @@ class SuryaOCRBackend:
             page_warnings: list[str] = []
             lines = normalize_surya_prediction(prediction, page_number=page_number, warnings=page_warnings)
             page_text = "\n".join(line["text"] for line in lines if line.get("text"))
-            marker = find_marker_in_text(page_text, stop_marker)
-            text_for_cache = marker.before_text if marker.found else page_text
-            if marker.found:
+            marker = find_marker_in_text(page_text, stop_marker) if stop_marker else None
+            text_for_cache = marker.before_text if marker and marker.found else page_text
+            if marker and marker.found:
                 marker_found = True
                 marker_page = page_number
 
@@ -167,12 +169,12 @@ class SuryaOCRBackend:
                 )
             )
             warnings.extend(page_warnings)
-            if marker.found:
+            if marker and marker.found:
                 break
 
         combined_text = "\n\n".join(page.text for page in pages if page.text.strip())
         result_status = "success" if pages else "failed"
-        if pages and not marker_found and len(pages) >= len(image_paths):
+        if warn_if_marker_missing and pages and not marker_found and len(pages) >= len(image_paths):
             result_status = "partial"
             warnings.append("Marker not found before max page limit.")
 

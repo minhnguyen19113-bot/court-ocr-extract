@@ -60,6 +60,11 @@ Do not start without Project Owner / ChatGPT approval.
 
 Do not start without Project Owner / ChatGPT approval.
 
+- [x] Sửa default `--pages` để debug render/preprocess/red-seal chạy toàn bộ trang khi không truyền page range.
+- [x] Thêm `--full-document` và `--max-pages` cho `debug-ocr-review` và `ocr`.
+- [x] Đảm bảo `debug-ocr-review --full-document` và `ocr --full-document` truyền `max_pages=None`, `stop_marker=""`.
+- [x] Đảm bảo Surya OCR không break/truncate tại marker khi `stop_marker=""`.
+- [x] Thêm test synthetic cho page range, CLI full-document, và Surya full-document marker behavior.
 - Chạy/check Surya package và model behavior trên Ezycloudx.
 - Pin hoặc document version `surya-ocr` tương thích nếu cần.
 - Thêm command riêng `ocr-surya-review` nếu reviewer muốn command hẹp hơn `debug-ocr-review`.
