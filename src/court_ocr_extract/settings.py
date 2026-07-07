@@ -35,6 +35,7 @@ class PipelineSettings:
     google_api_key: str = ""
     gemini_ocr_model: str = "gemini-2.5-flash"
     enable_surya_ocr: bool = True
+    surya_langs: str = "vi"
 
     extractor_backend: str = "local_llm"
     enable_local_llm_extraction: bool = True
@@ -85,6 +86,10 @@ class PipelineSettings:
     def excel_dir(self) -> Path:
         return self.output_dir / "excel"
 
+    @property
+    def surya_language_list(self) -> list[str]:
+        return [item.strip() for item in self.surya_langs.split(",") if item.strip()]
+
     def ensure_output_dirs(self) -> None:
         for path in [self.ocr_cache_dir, self.debug_visual_dir, self.excel_dir]:
             path.mkdir(parents=True, exist_ok=True)
@@ -113,6 +118,7 @@ def get_settings() -> PipelineSettings:
         google_api_key=_env("GOOGLE_API_KEY", ""),
         gemini_ocr_model=_env("GEMINI_OCR_MODEL", "gemini-2.5-flash"),
         enable_surya_ocr=_env_bool("ENABLE_SURYA_OCR", True),
+        surya_langs=_env("SURYA_LANGS", "vi"),
         extractor_backend=_env("EXTRACTOR_BACKEND", "local_llm"),
         enable_local_llm_extraction=_env_bool("ENABLE_LOCAL_LLM_EXTRACTION", True),
         local_llm_provider=_env("LOCAL_LLM_PROVIDER", "vllm"),

@@ -17,7 +17,7 @@ For the next Codex session, read these before acting:
 
 ## Current State
 
-Phase 1B cleaned main defaults and canonical decisions. README, `.env.example`, Ezycloudx docs, visual QA docs, workflow docs, run scripts, and `settings.py` now point to Surya target defaults instead of Tesseract defaults.
+Phase 2A đã triển khai đường chạy Surya OCR ở mức code/contract và thêm artifact để review OCR bằng hình ảnh. README, `.env.example`, Ezycloudx docs, visual QA docs, workflow docs, run scripts, và `settings.py` vẫn trỏ về default Surya target thay vì Tesseract.
 
 Canonical decisions:
 
@@ -27,7 +27,16 @@ Canonical decisions:
 - Surya OCR + local LLM is the main candidate.
 - Local VLM is the benchmark path.
 
-Phase 1B has not implemented real Surya, real VLM, production extraction changes, or any deletion.
+Phase 2A đã có wiring Surya OCR ở mức code/contract, nhưng chất lượng OCR thật chưa được validate trên PDF thật trong Codex.
+
+Phase 2A notes:
+
+- `src/court_ocr_extract/ocr_backends/surya_ocr.py` render/đọc image input qua Surya khi package/runtime đã được cài.
+- `--ocr-backend surya` route qua Surya backend.
+- `debug-ocr-review` có thể dùng wiring `surya`, nhưng Codex không được chạy command này trên PDF thật.
+- Surya artifact theo page được ghi dưới `ocr_surya/` khi bật debug visual.
+- Synthetic tests chỉ chứng minh schema/control-flow, không chứng minh chất lượng OCR thật.
+- Nếu thiếu Surya, cài bằng `pip install -e ".[ocr]"` hoặc `pip install surya-ocr`.
 
 ## Important Warnings
 
@@ -35,7 +44,7 @@ Phase 1B has not implemented real Surya, real VLM, production extraction changes
 - Do not run real PDF workflows inside Codex.
 - Do not call cloud APIs by default.
 - Do not use synthetic smoke to judge real quality.
-- Do not clean/delete/archive files until Phase 1B scope is approved.
+- Do not clean/delete/archive files until a later cleanup scope is approved.
 
 ## Quy tắc ngôn ngữ
 
@@ -68,8 +77,8 @@ Template report chuẩn:
 
 Ask Project Owner / ChatGPT to approve one Phase 1C/2 slice:
 
-1. Canonical Surya OCR adapter design and real runtime wiring.
-2. Debug UI bbox/evidence/QA parity.
-3. Canonical extraction package/API selection.
-4. Legacy app/archive plan.
+1. Ezycloudx Surya package/model check and possible `surya-ocr` version pin.
+2. Visual QA improvements after real Surya bbox/text review.
+3. Dedicated `ocr-surya-review` command if needed.
+4. Canonical extraction package/API selection.
 5. Local LLM strict JSON/evidence hardening.

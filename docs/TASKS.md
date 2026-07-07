@@ -41,6 +41,28 @@ Do not start without Project Owner / ChatGPT approval.
 - [x] Record that technical identifiers remain in English when they are standard names.
 - [x] Confirm no pipeline code change, no deletion, and no real-data run for this memory-only update.
 
+## Phase 2A
+
+- [x] Triển khai đường chạy Surya OCR backend ở mức code/contract.
+- [x] Giữ backend name `surya` làm main path và `surya_optional` làm compatibility alias.
+- [x] Thêm kiểm tra Surya availability có hướng dẫn cài đặt.
+- [x] Chuẩn hóa output mocked/Surya OCR vào `OCRPage.lines`.
+- [x] Thêm artifact bbox overlay.
+- [x] Thêm artifact OCR theo page và link trong review HTML.
+- [x] Thêm test synthetic/mocking cho Surya OCR contract và visual review.
+- [x] Giữ Tesseract là legacy only; không fallback sang Tesseract.
+- [x] Không chạy PDF thật hoặc inspect output thật.
+
+## Phase 2B Candidates
+
+Do not start without Project Owner / ChatGPT approval.
+
+- Chạy/check Surya package và model behavior trên Ezycloudx.
+- Pin hoặc document version `surya-ocr` tương thích nếu cần.
+- Thêm command riêng `ocr-surya-review` nếu reviewer muốn command hẹp hơn `debug-ocr-review`.
+- Cải thiện review UI sau khi thấy behavior thật của Surya bbox/text.
+- Chỉ bắt đầu hardening Local LLM strict JSON/evidence sau khi OCR review path được duyệt.
+
 ## Backlog
 
 - Local Qwen runtime hardening with strict JSON, retries, and evidence coverage.

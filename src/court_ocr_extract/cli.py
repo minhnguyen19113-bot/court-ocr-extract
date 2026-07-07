@@ -14,6 +14,7 @@ from court_ocr_extract.extraction_pipeline import extract_from_ocr_cache_records
 from court_ocr_extract.extraction_preview import write_extraction_preview
 from court_ocr_extract.image_preprocess import make_before_after_compare, preprocess_image
 from court_ocr_extract.ocr_backends import get_ocr_backend
+from court_ocr_extract.ocr_backends.base import OCRResult
 from court_ocr_extract.ocr_cache import (
     OCRCacheRecord,
     read_ocr_cache_dir,
@@ -303,11 +304,36 @@ def cmd_ocr(args) -> None:
         record = OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result)
         write_ocr_cache_record(record, cache_dir)
         records.append(record)
+        _print_ocr_case_summary(case.case_id, result, cache_dir, work_dir)
     print("OCR cache finished")
     print(f"PDFs processed: {len(records)}")
     print(f"OCR success: {sum(1 for record in records if record.result.status == 'success')}")
     print(f"Marker found: {sum(1 for record in records if record.result.marker_found)}")
     print(f"OCR cache: {cache_dir}")
+
+
+def _print_ocr_case_summary(case_id: str, result: OCRResult, cache_dir: Path, work_dir: Path | None) -> None:
+    total_lines = sum(len(page.lines) for page in result.pages)
+    low_confidence = 0
+    for page in result.pages:
+        for line in page.lines:
+            confidence = line.get("confidence")
+            if confidence is not None and confidence < 0.5:
+                low_confidence += 1
+    warning_pages = sum(1 for page in result.pages if page.blocks and page.blocks[0].get("warnings"))
+    print(f"Case: {case_id}")
+    print(f"Backend: {result.backend}")
+    print(f"Pages processed: {result.pages_processed}")
+    print(f"Total lines: {total_lines}")
+    print(f"Pages with warnings: {warning_pages}")
+    print(f"Low confidence lines: {low_confidence}")
+    print(f"Marker found: {'yes' if result.marker_found else 'no'}")
+    print(f"Output OCR cache: {cache_dir}")
+    if work_dir:
+        surya_dir = work_dir / "ocr_surya"
+        if surya_dir.exists():
+            print(f"Output debug HTML: {surya_dir / 'index.html'}")
+            print(f"Output bbox directory: {surya_dir}")
 
 
 def cmd_preview_extraction(args) -> None:

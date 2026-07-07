@@ -38,6 +38,22 @@ python -m scripts.check_ocr_backend --backend surya
 python -m scripts.check_extractor --backend local_llm
 ```
 
+Nếu thiếu Surya:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[ocr]"
+# or
+.\.venv\Scripts\python.exe -m pip install surya-ocr
+```
+
+Command target để review OCR:
+
+```powershell
+python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 5 --review-sample-size 5 --pages 1-3 --ocr-backend surya --output outputs\debug_visual --open
+```
+
+Project Owner chạy command này trên Ezycloudx với PDF thật. Codex không được chạy hoặc inspect real-data outputs.
+
 Target pilot:
 
 ```powershell

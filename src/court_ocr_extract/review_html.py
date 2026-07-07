@@ -44,19 +44,82 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
     for record in records:
         page_chunks = []
         for page in record.result.pages:
+            artifact = _artifact_block(page.blocks)
             image_html = ""
             if page.image_path:
                 image_path = Path(page.image_path)
                 if image_path.exists():
                     image_html = f'<img src="{escape(rel_link(image_path, base_dir))}" alt="page {page.page_index}">'
+            overlay_html = ""
+            if artifact and artifact.get("bbox_image_path"):
+                overlay_path = Path(artifact["bbox_image_path"])
+                if overlay_path.exists():
+                    overlay_html = (
+                        f'<img src="{escape(rel_link(overlay_path, base_dir))}" '
+                        f'alt="page {page.page_index} bbox overlay">'
+                    )
+            links = []
+            if artifact:
+                for label, key in [("text", "text_markdown_path"), ("lines json", "lines_json_path")]:
+                    path_value = artifact.get(key)
+                    if path_value and Path(path_value).exists():
+                        links.append(f'<a href="{escape(rel_link(Path(path_value), base_dir))}">{escape(label)}</a>')
+            line_table = _line_table(page.lines)
+            warnings = []
+            warnings.extend(record.result.warnings)
+            if artifact:
+                warnings.extend(str(item) for item in artifact.get("warnings", []))
             numbered_text = "\n".join(
                 f"[{index:03d}] {line}" for index, line in enumerate((page.text or "").splitlines(), start=1)
             )
             page_chunks.append(
-                f"<div class=\"split\"><div>{image_html}</div><pre>{escape(numbered_text)}</pre></div>"
+                "<section>"
+                f"<h3>Page {escape(page.page_index)}</h3>"
+                f"<p>{' | '.join(links)}</p>"
+                f"<p>{escape('; '.join(_dedupe(warnings)))}</p>"
+                f"<div class=\"split\"><div><h4>Original</h4>{image_html}</div>"
+                f"<div><h4>Bbox overlay</h4>{overlay_html}</div></div>"
+                f"<h4>Lines</h4>{line_table}"
+                f"<h4>Page text</h4><pre>{escape(numbered_text)}</pre>"
+                "</section>"
             )
         sections.append(f"<section><h2>{escape(record.case_id)}</h2>{''.join(page_chunks)}</section>")
     return write_html(output_path, "OCR Review", "\n".join(sections))
+
+
+def _artifact_block(blocks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for block in blocks or []:
+        if block.get("type") == "surya_artifacts":
+            return block
+    return None
+
+
+def _line_table(lines: list[dict[str, Any]]) -> str:
+    rows = [
+        "<tr><th>line_id</th><th>text</th><th>bbox</th><th>confidence</th><th>warning</th></tr>"
+    ]
+    for line in lines or []:
+        rows.append(
+            "<tr>"
+            f"<td>{escape(line.get('line_id'))}</td>"
+            f"<td>{escape(line.get('text'))}</td>"
+            f"<td>{escape(line.get('bbox'))}</td>"
+            f"<td>{escape(line.get('confidence'))}</td>"
+            f"<td>{escape('; '.join(str(item) for item in line.get('warnings', [])))}</td>"
+            "</tr>"
+        )
+    return "<table>" + "\n".join(rows) + "</table>"
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    output = []
+    seen = set()
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        output.append(value)
+    return output
 
 
 def write_marker_report(output_path: str | Path, records: list[OCRCacheRecord]) -> Path:

@@ -56,6 +56,15 @@ Debug UI must include:
 - reading order
 - low-confidence filter
 
+Ghi chú triển khai Phase 2A:
+
+- `SuryaOCRBackend` chuẩn hóa line output vào `OCRPage.lines`.
+- Line record dùng `line_id`, `page_number`, `text`, `bbox`, `confidence`, `reading_order`, và `warnings`.
+- Nếu Surya không trả về reading order, line được sort từ trên xuống dưới rồi trái sang phải bằng bbox và ghi `reading_order_fallback_used`.
+- Nếu Surya không trả về confidence, `confidence` giữ giá trị `null`.
+- Debug artifacts chỉ được ghi khi bật debug visual/work directory.
+- Test synthetic/mocking chỉ bao phủ contract; chất lượng thật vẫn cần Project Owner validate.
+
 ## VLM End-to-End
 
 Terminal summary must include:

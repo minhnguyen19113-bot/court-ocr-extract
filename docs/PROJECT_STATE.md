@@ -4,9 +4,9 @@ Last updated: 2026-07-07
 
 ## Current Phase
 
-Phase 1B: CLEAN MAIN DEFAULTS + CANONICAL CONFIG.
+Phase 2A: SURYA OCR RUNTIME + VISUAL OCR REVIEW.
 
-This phase cleaned main/default docs/config/scripts away from Tesseract, selected canonical config/writer decisions, and kept legacy code in place for later review. It does not implement real Surya runtime, real VLM runtime, production extraction changes, real-data pilots, or file deletion.
+Phase này triển khai đường chạy `SuryaOCRBackend` ở mức code/contract và thêm artifact để review OCR bằng hình ảnh. Codex không chạy PDF thật, không gọi cloud API, và chưa chứng minh chất lượng OCR trên dữ liệu thật.
 
 ## Active Direction
 
@@ -28,7 +28,7 @@ Tesseract is legacy only. PaddleOCR is not part of the rebuild path. Cloud OCR/e
 
 ## Current Repo Facts
 
-- Surya appears in dependencies and multiple modules, but the approved Surya main path is not yet fully consolidated or runtime-complete.
+- Surya đã có đường chạy backend ở mức code/contract, nhưng các adapter legacy chưa được hợp nhất toàn bộ và chất lượng OCR thật chưa được Project Owner xác nhận.
 - VLM modules and synthetic smoke tests exist and should be treated as experimental benchmark assets.
 - README, Ezycloudx docs, visual QA docs, run scripts, `.env.example`, and `settings.py` now point to the Surya target/default instead of Tesseract.
 - `src/court_ocr_extract/settings.py` is canonical config for new rebuild work.
@@ -60,6 +60,18 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Did not delete files.
 - Did not run or inspect real data.
 
+## Latest Phase 2A Work
+
+- Triển khai routing `SuryaOCRBackend` cho backend `surya` ở mức code/contract.
+- Thêm kiểm tra import/version Surya có hướng dẫn cài đặt khi thiếu runtime.
+- Thêm đường render PDF thành image trước khi gọi Surya OCR backend.
+- Chuẩn hóa output line của Surya vào `OCRPage.lines` với `line_id`, `text`, `bbox`, `confidence`, `reading_order`, và `warnings`.
+- Thêm artifact theo từng page để review Surya OCR: ảnh gốc, bbox overlay, line JSON, page text markdown, combined text, manifest, và HTML index.
+- Nâng cấp OCR review HTML để hiển thị ảnh gốc, bbox overlay, line table, warnings, và link đến artifact từng page.
+- Thêm test synthetic/mocking cho contract Surya và visual review.
+- Không chạy PDF thật và không inspect output thật.
+- Chất lượng OCR thật phải do Project Owner đánh giá trên Ezycloudx.
+
 ## Next Gate
 
-Project Owner / ChatGPT should review remaining duplicate modules before Phase 1C/2: extraction packages, Excel duplicates, app folders, Surya adapter consolidation, debug UI parity, and Local LLM strictness.
+Project Owner / ChatGPT nên kiểm tra Surya runtime trên Ezycloudx trước, sau đó quyết định Phase 2B sẽ ưu tiên cải thiện visual QA, pin version `surya-ocr`, hay chuyển sang hardening Local LLM extraction.

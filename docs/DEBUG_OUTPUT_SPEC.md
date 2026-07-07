@@ -61,6 +61,22 @@ Must show:
 - line table with `line_id`, bbox, reading order, text, confidence, warnings
 - low-confidence filter
 
+Layout artifact Surya của Phase 2A:
+
+```text
+<run_dir>/<case_id>/ocr_surya/
+  page_001_original.png
+  page_001_bbox.png
+  page_001_lines.json
+  page_001_text.md
+  combined_text.md
+  manifest.json
+  ocr_review.html
+  index.html
+```
+
+Review HTML cần hiển thị original page image, bbox overlay, line table, warnings, và link đến page text/line JSON.
+
 ## VLM View
 
 Must show:
