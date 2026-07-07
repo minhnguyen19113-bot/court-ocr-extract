@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import html
 import io
-import secrets
 import sys
 import zipfile
 from datetime import datetime
@@ -44,9 +43,9 @@ class TransferRequestHandler(BaseHTTPRequestHandler):
             filename = unquote(parsed.path.removeprefix("/download/excel/"))
             self._send_file(get_settings().excel_dir, filename)
             return
-        if parsed.path.startswith("/download/json/"):
-            filename = unquote(parsed.path.removeprefix("/download/json/"))
-            self._send_file(get_settings().json_dir, filename)
+        if parsed.path.startswith("/download/debug/"):
+            filename = unquote(parsed.path.removeprefix("/download/debug/"))
+            self._send_file(get_settings().outputs_dir / "debug_visual", filename)
             return
         self._send_error(HTTPStatus.NOT_FOUND, "Not found.")
 
@@ -127,7 +126,7 @@ class TransferRequestHandler(BaseHTTPRequestHandler):
     <p>Chọn nhiều PDF hoặc một file ZIP chứa PDF. File sẽ được lưu bằng tên tự sinh để tránh lộ tên file thật trong log.</p>
     <input id="files" type="file" accept=".pdf,.zip,application/pdf,application/zip" multiple />
     <button id="upload">Upload</button>
-    <p><a href="/outputs?token={token}">Xem output Excel/JSON</a></p>
+    <p><a href="/outputs?token={token}">Xem output Excel/debug zip</a></p>
     <pre id="log"></pre>
   </main>
   <script>
@@ -161,7 +160,7 @@ class TransferRequestHandler(BaseHTTPRequestHandler):
         settings = get_settings()
         token = quote(self.token)
         excel_links = _links_for(settings.excel_dir, "excel", token)
-        json_links = _links_for(settings.json_dir, "json", token)
+        debug_links = _links_for(settings.outputs_dir / "debug_visual", "debug", token)
         return f"""<!doctype html>
 <html lang="vi">
 <head><meta charset="utf-8" /><title>Court OCR Outputs</title></head>
@@ -170,8 +169,8 @@ class TransferRequestHandler(BaseHTTPRequestHandler):
   <p><a href="/?token={token}">Quay lại upload</a></p>
   <h2>Excel</h2>
   <ul>{excel_links or "<li>Chưa có file Excel.</li>"}</ul>
-  <h2>JSON</h2>
-  <ul>{json_links or "<li>Chưa có file JSON.</li>"}</ul>
+  <h2>Debug visual zip</h2>
+  <ul>{debug_links or "<li>Chưa có file debug zip.</li>"}</ul>
 </body>
 </html>"""
 
@@ -289,7 +288,7 @@ def _extract_pdf_zip(content: bytes, upload_dir: Path) -> list[str]:
 def _links_for(directory: Path, kind: str, token: str) -> str:
     if not directory.exists():
         return ""
-    suffix = ".xlsx" if kind == "excel" else ".json"
+    suffix = ".xlsx" if kind == "excel" else ".zip"
     items = []
     for path in sorted(directory.glob(f"*{suffix}")):
         name = html.escape(path.name)
@@ -300,19 +299,19 @@ def _links_for(directory: Path, kind: str, token: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Temporary PDF/output transfer server for a VM.")
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--token", default=None)
+    parser.add_argument("--token", required=True)
     parser.add_argument("--max-upload-mb", type=int, default=2048)
     args = parser.parse_args()
 
-    token = args.token or secrets.token_urlsafe(12)
+    token = args.token
     TransferRequestHandler.token = token
     TransferRequestHandler.max_upload_bytes = args.max_upload_mb * 1024 * 1024
 
     server = ThreadingHTTPServer((args.host, args.port), TransferRequestHandler)
     print("Transfer server started.")
-    print(f"Open from local browser: http://<VM_PUBLIC_IP>:{args.port}/?token={token}")
+    print(f"Open from local browser: http://{args.host}:{args.port}/?token=<redacted>")
     print("Press Ctrl+C to stop.")
     server.serve_forever()
 

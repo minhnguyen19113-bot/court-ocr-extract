@@ -1,59 +1,52 @@
 # Security Notes
 
-Dữ liệu bản án có thể chứa thông tin cá nhân. Thiết kế mặc định của dự án là local-first và không phát tán dữ liệu ra dịch vụ cloud.
+Dữ liệu bản án có thể chứa thông tin cá nhân. Thiết kế mặc định của dự án là local-first và không phát tán dữ liệu ra dịch vụ cloud nếu chưa bật opt-in rõ ràng.
 
-## Mặc định an toàn
+## Mặc Định An Toàn
 
-- `ENABLE_CLOUD_LLM_EXTRACTION=false`.
+- `ENABLE_CLOUD_OCR=false`.
+- `ENABLE_CLOUD_EXTRACTION=false`.
 - `FORCE_FULL_OCR=false`.
-- `DEBUG_SENSITIVE=false`.
-- `PERSIST_OCR_TEXT_ARTIFACTS=false`.
-- `PERSIST_SENSITIVE_TEXT_IN_JSON=false`.
+- `SAVE_DEBUG_JSON=false`.
 - Không log full OCR text mặc định.
 - Không commit `data/`, `outputs/`, `.env`, `logs/`, `cache/`, `models/`.
 
-## Khi dùng Ezycloudx
+## Real-Data Validation
 
-Ezycloudx vẫn là hạ tầng thuê từ bên ngoài. Chỉ dùng instance như GPU runtime tạm thời:
+Không dùng dữ liệu giả để đánh giá chất lượng OCR/extraction. Chất lượng phải được người dùng kiểm tra trên real-data pilot PDF thật qua visual QA, extraction preview, Excel và QA summary.
+
+Codex không tự mở, đọc, OCR, parse hoặc quote nội dung PDF thật hay derived artifact thật. Người dùng chạy workflow dữ liệu thật trực tiếp trên VM/máy nội bộ.
+
+## Ezycloudx
+
+Ezycloudx vẫn là hạ tầng thuê ngoài. Chỉ dùng instance như runtime tạm thời:
 
 - Không lưu dữ liệu dài hạn trên remote.
 - Không upload output sang dịch vụ thứ ba.
-- Ưu tiên thao tác qua RDP và mở UI/API trong chính VM.
-- Nếu expose API ra ngoài VM thì dùng endpoint private có token.
-- Remote chỉ xử lý file trong workspace tạm thời hoặc temp dir worker.
-- Chạy `/cleanup` hoặc `python -m scripts.cleanup_remote_worker` sau batch.
-- Nếu chạy toàn bộ pipeline trên Ezycloudx, tải Excel/JSON về local rồi xóa `data/` artifacts và `outputs/` nếu không cần giữ.
+- Nếu expose transfer server thì dùng host `127.0.0.1` và Cloudflare tunnel tạm thời có token.
+- Sau batch, tải Excel/debug zip cần thiết rồi dọn `data/` và `outputs/` nếu không cần giữ.
 
 ## Logging
 
 Log mặc định chỉ nên chứa:
 
-- `file_id`
+- `case_id`
 - số trang
 - số trang OCR
 - thời gian xử lý
 - trạng thái
 - lỗi kỹ thuật
 
-Chỉ bật `DEBUG_SENSITIVE=true` khi debug cục bộ, có kiểm soát, và không chia sẻ log.
+Không in họ tên, địa chỉ, CCCD/CMND, full OCR text hoặc tên file PDF thật.
 
-## OCR artifacts
+## Runtime Artifacts
 
-OCR raw JSON, ảnh render, ảnh processed, bbox debug và Excel output đều có thể là derived sensitive artifacts. Chúng nằm trong `data/` hoặc `outputs/` và đã được `.gitignore`.
+OCR cache, ảnh render, ảnh processed, bbox debug, extraction preview và Excel output đều có thể là derived sensitive artifacts. Chúng nằm trong `data/` hoặc `outputs/` và đã được `.gitignore`.
 
-Theo mặc định, artifact JSON/CLI/API payload không nhúng full OCR buffer:
+Synthetic smoke artifacts under `outputs/debug_visual/synthetic_smoke/`, `outputs/extraction_draft/synthetic_smoke/`, `outputs/excel/synthetic_smoke.xlsx`, and `outputs/qa/synthetic_smoke_report.json` are safe to inspect because they are generated from non-real contract fixtures by `python -m scripts.smoke_synthetic_debug`.
 
-- `text_before_marker` được đặt `null`.
-- `corrected_text` được đặt `null`.
-- `metadata.ocr_pages` được bỏ khỏi JSON artifact và đánh dấu `ocr_pages_redacted=true`.
+## Fallback
 
-Bật `PERSIST_OCR_TEXT_ARTIFACTS=true` chỉ khi cần ghi file `.txt` để debug cục bộ. Bật `PERSIST_SENSITIVE_TEXT_IN_JSON=true` hoặc `DEBUG_SENSITIVE=true` chỉ trong phiên debug có kiểm soát, sau đó cleanup dữ liệu.
+Không fallback âm thầm giữa backend/extractor. Fallback OCR chỉ chạy khi người dùng truyền rõ `--fallback-ocr-backend`.
 
-## Remote fallback
-
-Remote GPU worker có fallback cấu hình được:
-
-- `GPU_WORKER_FALLBACK=true` cho phép thử OCR local nếu worker tạm không sẵn sàng.
-- `GPU_WORKER_FALLBACK_TO_MOCK=false` mặc định để tránh vô tình tạo kết quả mock trên dữ liệu thật.
-
-Chỉ bật fallback sang mock khi kiểm thử synthetic.
+Không bật mock/fake fallback trong workflow dữ liệu thật.

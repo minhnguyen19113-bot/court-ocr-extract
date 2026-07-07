@@ -21,6 +21,8 @@ data/processed/
 data/ocr_raw/
 data/ocr_corrected/
 outputs/
+outputs/debug_visual/
+outputs/extraction_draft/
 /models/
 logs/
 cache/
@@ -28,6 +30,10 @@ work/
 .streamlit/secrets.toml
 court_ocr_gpu_worker/
 *.pdf
+*.xlsx
+*.png
+*.jpg
+*.jpeg
 *.sqlite
 *.db
 

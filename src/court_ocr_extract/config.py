@@ -38,9 +38,16 @@ class Settings:
         )
         self.enable_gliner = _env_bool("ENABLE_GLINER", False)
         self.enable_local_llm_correction = _env_bool("ENABLE_LOCAL_LLM_CORRECTION", False)
-        self.enable_mock_ocr = _env_bool("ENABLE_MOCK_OCR", False)
-        self.enable_mock_local_llm = _env_bool("ENABLE_MOCK_LOCAL_LLM", False)
-        self.enable_mock_gliner = _env_bool("ENABLE_MOCK_GLINER", False)
+        self.allow_contract_fixtures = _env_bool("ALLOW_CONTRACT_FIXTURES", False)
+        self.enable_mock_ocr = self.allow_contract_fixtures and _env_bool("ENABLE_MOCK_OCR", False)
+        self.enable_mock_local_llm = self.allow_contract_fixtures and _env_bool(
+            "ENABLE_MOCK_LOCAL_LLM",
+            False,
+        )
+        self.enable_mock_gliner = self.allow_contract_fixtures and _env_bool(
+            "ENABLE_MOCK_GLINER",
+            False,
+        )
         self.debug_keep_images = _env_bool("DEBUG_KEEP_IMAGES", False)
         self.debug_sensitive = _env_bool("DEBUG_SENSITIVE", False)
         self.log_full_text = _env_bool("LOG_FULL_TEXT", False)
@@ -51,6 +58,8 @@ class Settings:
             "LOCAL_LLM_PROVIDER",
             os.getenv("LOCAL_LLM_BACKEND", "vllm"),
         )
+        if self.local_llm_provider == "mock" and not self.allow_contract_fixtures:
+            self.local_llm_provider = "ollama"
         self.local_llm_backend = self.local_llm_provider
         self.local_llm_base_url = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
         self.local_llm_model = os.getenv(
@@ -75,7 +84,10 @@ class Settings:
         self.gpu_worker_timeout_seconds = _env_float("GPU_WORKER_TIMEOUT_SECONDS", 180.0)
         self.gpu_worker_retries = _env_int("GPU_WORKER_RETRIES", 2)
         self.gpu_worker_fallback = _env_bool("GPU_WORKER_FALLBACK", True)
-        self.gpu_worker_fallback_to_mock = _env_bool("GPU_WORKER_FALLBACK_TO_MOCK", False)
+        self.gpu_worker_fallback_to_mock = self.allow_contract_fixtures and _env_bool(
+            "GPU_WORKER_FALLBACK_TO_MOCK",
+            False,
+        )
 
         self.data_dir = PROJECT_ROOT / "data"
         self.outputs_dir = PROJECT_ROOT / "outputs"

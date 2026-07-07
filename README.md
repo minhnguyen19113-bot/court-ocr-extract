@@ -1,140 +1,149 @@
 # Court OCR Extract
 
-Pipeline OCR và bóc tách dữ liệu bản án tòa án Việt Nam theo hướng local-first, early-stop và an toàn dữ liệu.
+Pipeline xử lý PDF bản án/quyết định tòa án Việt Nam theo từng bước có thể kiểm tra bằng mắt:
 
-## Hướng chạy chính hiện tại
+```text
+PDF -> render ảnh -> preprocess optional -> OCR cache -> marker detection
+-> extraction preview -> Excel -> QA từ Excel
+```
 
-Giai đoạn đang ưu tiên là chạy CLI trên Ezycloudx Windows VM:
+Deliverable cuối là file `.xlsx`. JSON chỉ là artifact debug khi bật `--debug-json`.
 
-1. Đưa code lên private Git repo, rồi clone vào VM.
-2. Upload PDF vào VM qua `scripts.transfer_server`, không phụ thuộc copy/paste RDP.
-3. Chạy thử 10 PDF bằng CLI.
-4. Kiểm tra Excel/JSON trong `outputs/`.
-5. Nếu kết quả ổn, chạy toàn bộ batch.
+## Nguyên tắc vận hành
 
-FastAPI/Streamlit tạm thời không phải đường chính. Web demo đã được tách sang dependency optional.
+- Workflow kiểm chứng chất lượng phải dùng PDF thật do bạn trực tiếp upload/chạy trên VM hoặc máy nội bộ.
+- Không dùng dữ liệu giả để kết luận chất lượng OCR/extraction. Unit test trong repo chỉ kiểm tra contract code, schema, control-flow.
+- Codex không tự mở, đọc, OCR, parse hoặc in nội dung PDF thật/derived artifact thật trong quá trình sửa code.
+- Không dùng Git để upload PDF thật.
+- Không in full OCR text, tên người, địa chỉ, CCCD/CMND hoặc tên file PDF thật ra terminal.
+- Không fallback âm thầm giữa OCR backend hoặc extractor.
+- Cloud OCR/extraction tắt mặc định, chỉ chạy khi bật rõ trong `.env`.
+- Không chạy full nếu real-data pilot 10/20 PDF thật chưa được mở visual QA, extraction preview và Excel để chấp nhận.
 
-## Cài đặt trên VM
-
-Trong PowerShell trên VM:
+## Setup Windows VM
 
 ```powershell
+winget install --id Git.Git -e
+winget install --id Python.Python.3.11 -e
+winget install --id Microsoft.VisualStudioCode -e
+winget install --id Ollama.Ollama -e
+
 cd C:\
-git clone https://github.com/<user>/<repo>.git court_ocr
-cd C:\court_ocr
-powershell -ExecutionPolicy Bypass -File .\scripts\ezycloudx_setup_windows.ps1
+git clone https://github.com/<user>/<repo>.git court-ocr-extract
+cd C:\court-ocr-extract
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e .
+Copy-Item .env.example .env -Force
 ```
 
-Nếu thư mục local chưa phải Git repo, chạy `git init` và push lên private repo trước. Xem chi tiết trong `docs/ezycloudx_setup.md`.
-
-Mặc định không cần Ollama. `.env.example` đang để:
-
-```dotenv
-ENABLE_LOCAL_LLM_EXTRACTION=false
-ENABLE_CLOUD_LLM_EXTRACTION=false
-```
-
-## Upload PDF khi RDP không copy được
-
-Trên VM:
+## Upload PDF Thật
 
 ```powershell
-cd C:\court_ocr
-.\.venv\Scripts\Activate.ps1
-python -m scripts.transfer_server --host 0.0.0.0 --port 8765 --token doi-token-rieng
+python -m scripts.transfer_server --host 127.0.0.1 --port 8765 --token <token-rieng>
+cloudflared tunnel --url http://127.0.0.1:8765
 ```
 
-Nếu Windows Firewall chưa mở port:
+Upload PDF/ZIP vào `data\raw_pdfs\uploads\`. Server chỉ cho download Excel và debug visual zip.
+
+## Runtime Checks
 
 ```powershell
-New-NetFirewallRule -DisplayName "Court OCR Transfer 8765" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Allow
+python -m scripts.check_runtime --ocr-backend tesseract --extractor local_llm
+python -m scripts.check_ocr_backend --backend tesseract
+python -m scripts.check_extractor --backend local_llm
 ```
 
-Trên máy local, mở:
+## Synthetic Smoke Debug
 
-```text
-http://<VM_PUBLIC_IP>:8765/?token=doi-token-rieng
-```
-
-Chọn nhiều PDF hoặc một file ZIP chứa PDF. File upload vào VM sẽ được lưu dưới tên tự sinh trong `data/raw_pdfs/uploads`.
-
-## Chạy thử 10 PDF
-
-Trong PowerShell trên VM:
+This smoke command creates safe, non-real artifacts that a reviewer can open before any real-data pilot. It does not prove real-data OCR/extraction quality.
 
 ```powershell
-cd C:\court_ocr
-powershell -ExecutionPolicy Bypass -File .\scripts\ezycloudx_run_sample_windows.ps1
+python -m scripts.smoke_synthetic_debug
 ```
 
-Kết quả chính:
+Outputs:
 
-```text
-outputs\excel\sample_10.xlsx
-outputs\json\batch_summary.json
-```
+- `outputs\debug_visual\synthetic_smoke\index.html`
+- `outputs\debug_visual\synthetic_smoke\manifest.json`
+- `outputs\extraction_draft\synthetic_smoke\draft_internal.jsonl`
+- `outputs\extraction_draft\synthetic_smoke\draft_summary.xlsx`
+- `outputs\excel\synthetic_smoke.xlsx`
+- `outputs\qa\synthetic_smoke_report.json`
 
-Mở lại trang transfer server, vào `Outputs` để tải Excel/JSON về máy local.
+After this passes, the next quality step is still the real-data pilot on VM with a real OCR backend.
 
-## Chạy toàn bộ
-
-Sau khi sample 10 PDF đủ tốt:
+## OCR Cache
 
 ```powershell
-cd C:\court_ocr
-powershell -ExecutionPolicy Bypass -File .\scripts\ezycloudx_run_full_windows.ps1
+python -m court_ocr_extract.cli ocr --input-dir data\raw_pdfs\uploads --limit 10 --cache-dir outputs\ocr_cache --ocr-backend tesseract
 ```
 
-Kết quả chính:
-
-```text
-outputs\excel\full_results.xlsx
-outputs\json\batch_summary.json
-```
-
-## Khi nào cần Ollama?
-
-Không bắt buộc ở bước đầu. Sample không LLM chỉ nên dùng để kiểm tra OCR, marker, cache và luồng Excel/JSON. Nếu Excel thiếu nhiều field hoặc bắt nhầm cụm không phải tên người, đó là giới hạn dự kiến của rule/regex.
-
-Để đánh giá chất lượng bóc tách thật, cài Ollama/Qwen và chạy lại với:
+Fallback chỉ chạy khi bật rõ:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\ezycloudx_run_sample_windows.ps1 -UseLocalLlm
+python -m court_ocr_extract.cli ocr --input-dir data\raw_pdfs\uploads --limit 10 --cache-dir outputs\ocr_cache --ocr-backend google_document_ai --fallback-ocr-backend tesseract
 ```
 
-Khi bật LLM, cấu hình `.env` ví dụ:
-
-```dotenv
-ENABLE_LOCAL_LLM_EXTRACTION=true
-LOCAL_LLM_PROVIDER=ollama
-LOCAL_LLM_MODEL_NAME=qwen3:4b
-LOCAL_LLM_BASE_URL=http://127.0.0.1:11434
-LOCAL_LLM_TEMPERATURE=0
-```
-
-## Cài web demo sau này
-
-Khi pipeline CLI đã ổn và cần quay lại FastAPI/Streamlit:
+## Visual QA Từng Bước Trên PDF Thật
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[web]"
+python -m court_ocr_extract.cli debug-render --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-preprocess --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-red-seal --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --ocr-backend tesseract --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-marker --ocr-cache outputs\ocr_cache --review-sample-size 5 --review-mode mixed --output outputs\debug_visual --open
 ```
 
-FastAPI:
+## Extraction Preview
 
 ```powershell
-uvicorn app_fastapi.main:app --host 0.0.0.0 --port 8000
+python -m court_ocr_extract.cli preview-extraction --ocr-cache outputs\ocr_cache --review-sample-size 5 --review-mode mixed --extractor local_llm --output outputs\debug_visual --open
 ```
 
-Streamlit:
+## Excel Và QA
 
 ```powershell
-streamlit run app_streamlit\main.py --server.address 0.0.0.0 --server.port 8501
+python -m court_ocr_extract.cli extract --ocr-cache outputs\ocr_cache --output outputs\excel\pilot_10.xlsx --extractor local_llm
+python -m scripts.qa_output --excel outputs\excel\pilot_10.xlsx
 ```
 
-## Bảo mật dữ liệu
+Excel có sheet `DATA` và `RUN_SUMMARY`.
 
-- Không commit PDF thật, `.env`, `outputs/`, cache, model hoặc log.
-- Không bật `DEBUG_SENSITIVE=true` khi chạy dữ liệu thật.
-- Không bật cloud LLM mặc định.
-- PDF gốc không bị chỉnh sửa; ảnh trung gian và output có thể xóa sau khi tải Excel/JSON về.
+## Benchmark Trên PDF Thật
+
+```powershell
+python -m court_ocr_extract.cli benchmark-ocr --input-dir data\raw_pdfs\uploads --limit 10 --backends google_document_ai,google_vision,openai_vision,gemini_document,tesseract --output outputs\excel\ocr_benchmark.xlsx --debug-visual --review-sample-size 5 --review-mode mixed
+python -m court_ocr_extract.cli benchmark-extractors --ocr-cache outputs\ocr_cache --input-dir data\raw_pdfs\uploads --limit 10 --extractors local_llm,openai,gemini,direct_vision_openai,direct_vision_gemini --output outputs\excel\extractor_benchmark.xlsx --debug-visual --review-sample-size 5 --review-mode mixed
+```
+
+## Real-Data Pilot Và Full
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_sample_windows.ps1 -OcrBackend tesseract -Extractor local_llm -DebugVisual -ReviewSampleSize 5 -ReviewMode mixed
+```
+
+Chỉ sau khi bạn chấp nhận pilot PDF thật:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_full_windows.ps1 -OcrBackend tesseract -Extractor local_llm -ReviewSampleSize 10 -ReviewMode mixed -AcceptedSample10
+```
+
+## Zip Debug Visual
+
+```powershell
+python -m court_ocr_extract.cli zip-debug-visual --run-id latest --output outputs\debug_visual\latest_debug_visual.zip
+```
+
+## Cần Kiểm Tra Bằng Mắt
+
+- Render đúng DPI, không xoay/cắt mép.
+- Preprocess không làm mất chữ hoặc mất dấu tiếng Việt.
+- Red seal removal chỉ bật khi xem nhiều PDF thật thấy an toàn.
+- OCR review có text khớp ảnh.
+- Marker `NỘI DUNG VỤ ÁN` được phát hiện hợp lý.
+- Extraction preview bên trái đúng cột Excel, bên phải có evidence.
+- Excel không bắt nhầm cụm trạng thái thành họ tên.
+- QA không in dữ liệu nhạy cảm.
+
+Không gọi trạng thái này là production-ready nếu pilot PDF thật chưa được bạn kiểm tra và chấp nhận.
