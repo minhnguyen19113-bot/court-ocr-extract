@@ -9,6 +9,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings:
+    """Legacy compatibility settings.
+
+    `court_ocr_extract.settings.PipelineSettings` is the canonical rebuild config.
+    Keep this module for older app/pipeline imports until Phase 1C/2 consolidation.
+    """
+
     def __init__(self) -> None:
         _load_dotenv(PROJECT_ROOT / ".env")
 
@@ -64,12 +70,12 @@ class Settings:
         self.local_llm_base_url = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
         self.local_llm_model = os.getenv(
             "LOCAL_LLM_MODEL_NAME",
-            os.getenv("LOCAL_LLM_MODEL", "Qwen/Qwen3-4B-Instruct"),
+            os.getenv("LOCAL_LLM_MODEL", "Qwen/Qwen2.5-14B-Instruct"),
         )
         self.local_llm_quantization = os.getenv("LOCAL_LLM_QUANTIZATION", "AWQ")
         self.local_llm_max_new_tokens = _env_int(
             "LOCAL_LLM_MAX_TOKENS",
-            _env_int("LOCAL_LLM_MAX_NEW_TOKENS", 2048),
+            _env_int("LOCAL_LLM_MAX_NEW_TOKENS", 4096),
         )
         self.local_llm_temperature = _env_float("LOCAL_LLM_TEMPERATURE", 0.0)
         self.gliner_model = os.getenv("GLINER_MODEL", "urchade/gliner_multi-v2.1")

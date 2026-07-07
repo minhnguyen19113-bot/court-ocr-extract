@@ -1,0 +1,121 @@
+# Architecture
+
+Last updated: 2026-07-07
+
+## Target Principles
+
+- Local-first processing by default.
+- Every extracted field needs evidence.
+- Debug output is mandatory for render, preprocess, OCR/VLM, extraction, validation, Excel, and QA.
+- No silent fallback between OCR backends or extractor backends.
+- Synthetic tests prove contracts only, not real OCR/extraction quality.
+- Cloud APIs remain disabled unless explicitly enabled for a benchmark.
+
+## Candidate Path A: Surya OCR + Local LLM
+
+This is the main candidate because it is easier to debug than direct VLM extraction.
+
+Flow:
+
+```text
+PDF
+-> render page images
+-> optional preprocess/enhance
+-> Surya OCR
+-> bbox/text/layout/reading order
+-> OCRCacheRecord/text cache
+-> normalize text
+-> section split
+-> rule-based extraction for easy fields
+-> local LLM extraction for hard fields
+-> evidence validation
+-> Excel
+-> QA report
+-> debug UI/human review
+```
+
+Required debug links:
+
+- Page image.
+- OCR line IDs.
+- Bbox coordinates.
+- OCR confidence/layout metadata when available.
+- Evidence for every field.
+- QA warning codes and needs-review status.
+
+## Candidate Path B: VLM End-to-End
+
+This is a benchmark path, not the only main path.
+
+Flow:
+
+```text
+PDF/page image
+-> local VLM reads page directly
+-> strict JSON extraction or OCR-compatible bridge
+-> validation
+-> Excel
+-> QA report
+-> debug UI/human review
+```
+
+VLM output must be validated with the same evidence, hallucination, and QA rules used by the Surya path.
+
+## Current Module Map
+
+Likely main candidates:
+
+- PDF/render: `src/court_ocr_extract/pdf/`, `src/court_ocr_extract/pdf_render.py`
+- Preprocess: `src/court_ocr_extract/preprocess.py`, `src/court_ocr_extract/image_processing/`
+- Surya/OCR cache: `src/court_ocr_extract/ocr/`, `src/court_ocr_extract/ocr_backends/surya_ocr.py`, `src/court_ocr_extract/ocr_cache.py`
+- Local LLM: `src/court_ocr_extract/local_llm/`, `src/court_ocr_extract/extraction/local_llm_extractor.py`
+- Extraction and validation: `src/court_ocr_extract/extraction/`, `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/qa.py`
+- Export: `src/court_ocr_extract/export/`
+- Review UI/debug: `src/court_ocr_extract/visual_debug.py`, `src/court_ocr_extract/review_html.py`, `src/court_ocr_extract/extraction_preview.py`
+- Ezycloudx/remote worker: `src/court_ocr_extract/remote_worker/`, `scripts/ezycloudx_*`
+
+Phase 1B canonical decisions:
+
+- Config: `src/court_ocr_extract/settings.py` is canonical for the rebuild.
+- Compatibility config: `src/court_ocr_extract/config.py` remains for older imports and should not be expanded unless necessary.
+- Excel writer: `src/court_ocr_extract/excel_writer.py` is canonical.
+- Other Excel writers are duplicate/legacy until consolidation.
+
+Legacy or conflict candidates are tracked in `docs/CLEANUP_PLAN.md`.
+
+## Proposed Post-Cleanup Structure
+
+```text
+src/court_ocr_extract/
+  core/
+  render/
+  preprocess/
+  ocr/
+    surya/
+    cache/
+  vlm/
+  extract/
+  validate/
+  export/
+  qa/
+  review_ui/
+  cli/
+
+docs/
+  PROJECT_STATE.md
+  ARCHITECTURE.md
+  DECISIONS.md
+  AGENT_ROLES.md
+  CLEANUP_PLAN.md
+  PIPELINE_SPEC.md
+  DEBUG_OUTPUT_SPEC.md
+
+scripts/
+  check_*.py
+  run_*.ps1
+  smoke_*.py
+  benchmark_*.py
+  guardrail_*.py
+```
+
+No files have been moved into this structure during Phase 1A.

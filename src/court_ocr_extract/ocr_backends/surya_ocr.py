@@ -7,14 +7,14 @@ from court_ocr_extract.settings import PipelineSettings
 
 
 class SuryaOCRBackend:
-    name = "surya_optional"
+    name = "surya"
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
 
     def check_available(self) -> OCRBackendStatus:
         if not self.settings.enable_surya_ocr:
-            return OCRBackendStatus(self.name, False, "ENABLE_SURYA_OCR must be true; Surya is optional.")
+            return OCRBackendStatus(self.name, False, "ENABLE_SURYA_OCR must be true; Surya is the target OCR backend.")
         try:
             import surya  # noqa: F401
         except Exception as exc:
@@ -29,4 +29,4 @@ class SuryaOCRBackend:
         debug_visual: bool = False,
         work_dir: Path | None = None,
     ) -> OCRResult:
-        raise RuntimeError("Surya OCR is optional in this rebuild; wire the installed Surya runtime here after benchmark.")
+        raise RuntimeError("Surya OCR runtime wiring is incomplete; finish Surya integration in a later phase.")

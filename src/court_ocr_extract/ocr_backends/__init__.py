@@ -27,7 +27,7 @@ def get_ocr_backend(name: str | None = None, settings: PipelineSettings | None =
         from court_ocr_extract.ocr_backends.gemini_document_ocr import GeminiDocumentOCRBackend
 
         return GeminiDocumentOCRBackend(settings)
-    if backend_name == "surya_optional":
+    if backend_name in {"surya", "surya_optional"}:
         from court_ocr_extract.ocr_backends.surya_ocr import SuryaOCRBackend
 
         return SuryaOCRBackend(settings)

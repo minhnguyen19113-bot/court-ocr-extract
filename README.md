@@ -1,24 +1,37 @@
 # Court OCR Extract
 
-Pipeline xử lý PDF bản án/quyết định tòa án Việt Nam theo từng bước có thể kiểm tra bằng mắt:
+This repo is in rebuild. It targets step-by-step extraction from Vietnamese court PDFs with mandatory visual QA before any Excel output is trusted.
+
+## Current Direction
+
+Main candidate:
 
 ```text
-PDF -> render ảnh -> preprocess optional -> OCR cache -> marker detection
--> extraction preview -> Excel -> QA từ Excel
+PDF -> render page image -> optional preprocess/enhance -> Surya OCR
+-> OCRCacheRecord/text cache -> normalize/split -> rule extraction
+-> local LLM extraction -> evidence validation -> Excel -> QA report
+-> debug UI/human review
 ```
 
-Deliverable cuối là file `.xlsx`. JSON chỉ là artifact debug khi bật `--debug-json`.
+Benchmark path:
 
-## Nguyên tắc vận hành
+```text
+PDF/page image -> local VLM direct extraction -> validation
+-> Excel -> QA report -> debug UI/human review
+```
 
-- Workflow kiểm chứng chất lượng phải dùng PDF thật do bạn trực tiếp upload/chạy trên VM hoặc máy nội bộ.
-- Không dùng dữ liệu giả để kết luận chất lượng OCR/extraction. Unit test trong repo chỉ kiểm tra contract code, schema, control-flow.
-- Codex không tự mở, đọc, OCR, parse hoặc in nội dung PDF thật/derived artifact thật trong quá trình sửa code.
-- Không dùng Git để upload PDF thật.
-- Không in full OCR text, tên người, địa chỉ, CCCD/CMND hoặc tên file PDF thật ra terminal.
-- Không fallback âm thầm giữa OCR backend hoặc extractor.
-- Cloud OCR/extraction tắt mặc định, chỉ chạy khi bật rõ trong `.env`.
-- Không chạy full nếu real-data pilot 10/20 PDF thật chưa được mở visual QA, extraction preview và Excel để chấp nhận.
+Tesseract is legacy optional only, not the main/default path. PaddleOCR is not used. Cloud OpenAI/Google/Gemini adapters are disabled by default and are opt-in benchmark paths only.
+
+Synthetic smoke checks are contract/control-flow checks. They do not prove real OCR or extraction quality.
+
+## Operating Rules
+
+- The Project Owner runs real-data pilots on Ezycloudx or a local controlled machine.
+- Codex must not open, OCR, parse, summarize, or quote real PDFs or real derived artifacts.
+- Do not upload real PDFs or derived outputs through Git.
+- Do not print full OCR text, names, addresses, ID numbers, or sensitive filenames in logs.
+- Do not silently fallback between OCR backends or extractor backends.
+- Do not run full production batches until a real-data pilot has been visually reviewed and accepted.
 
 ## Setup Windows VM
 
@@ -37,32 +50,36 @@ python -m venv .venv
 Copy-Item .env.example .env -Force
 ```
 
-## Upload PDF Thật
+## Transfer Server
 
 ```powershell
-python -m scripts.transfer_server --host 127.0.0.1 --port 8765 --token <token-rieng>
+python -m scripts.transfer_server --host 127.0.0.1 --port 8765 --token <private-token>
 cloudflared tunnel --url http://127.0.0.1:8765
 ```
 
-Upload PDF/ZIP vào `data\raw_pdfs\uploads\`. Server chỉ cho download Excel và debug visual zip.
+Upload real PDF/ZIP files to `data\raw_pdfs\uploads\` on the VM. The transfer server is for user-controlled runtime only.
 
 ## Runtime Checks
 
+Target Surya + local LLM checks:
+
 ```powershell
-python -m scripts.check_runtime --ocr-backend tesseract --extractor local_llm
-python -m scripts.check_ocr_backend --backend tesseract
+python -m scripts.check_runtime --ocr-backend surya --extractor local_llm
+python -m scripts.check_ocr_backend --backend surya
 python -m scripts.check_extractor --backend local_llm
 ```
 
+Surya runtime wiring/import may still need Phase 2 setup on the VM. If a command reports Surya unavailable, treat that as runtime setup work, not permission to switch the main default.
+
 ## Synthetic Smoke Debug
 
-This smoke command creates safe, non-real artifacts that a reviewer can open before any real-data pilot. It does not prove real-data OCR/extraction quality.
+This command creates safe, non-real artifacts that a reviewer can open before any real-data pilot. It does not prove real-data quality.
 
 ```powershell
 python -m scripts.smoke_synthetic_debug
 ```
 
-Outputs:
+Expected synthetic outputs:
 
 - `outputs\debug_visual\synthetic_smoke\index.html`
 - `outputs\debug_visual\synthetic_smoke\manifest.json`
@@ -71,63 +88,59 @@ Outputs:
 - `outputs\excel\synthetic_smoke.xlsx`
 - `outputs\qa\synthetic_smoke_report.json`
 
-After this passes, the next quality step is still the real-data pilot on VM with a real OCR backend.
+## Target OCR Cache
 
-## OCR Cache
-
-```powershell
-python -m court_ocr_extract.cli ocr --input-dir data\raw_pdfs\uploads --limit 10 --cache-dir outputs\ocr_cache --ocr-backend tesseract
-```
-
-Fallback chỉ chạy khi bật rõ:
+Target command for the Surya path:
 
 ```powershell
-python -m court_ocr_extract.cli ocr --input-dir data\raw_pdfs\uploads --limit 10 --cache-dir outputs\ocr_cache --ocr-backend google_document_ai --fallback-ocr-backend tesseract
+python -m court_ocr_extract.cli ocr --input-dir data\raw_pdfs\uploads --limit 10 --cache-dir outputs\ocr_cache --ocr-backend surya
 ```
 
-## Visual QA Từng Bước Trên PDF Thật
+Fallbacks must be explicit and visible in logs/debug output. Cloud fallbacks are opt-in benchmark work only.
+
+## Target Visual QA
 
 ```powershell
 python -m court_ocr_extract.cli debug-render --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
 python -m court_ocr_extract.cli debug-preprocess --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
-python -m court_ocr_extract.cli debug-red-seal --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --output outputs\debug_visual --open
-python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --ocr-backend tesseract --output outputs\debug_visual --open
-python -m court_ocr_extract.cli debug-marker --ocr-cache outputs\ocr_cache --review-sample-size 5 --review-mode mixed --output outputs\debug_visual --open
+python -m court_ocr_extract.cli debug-ocr-review --input data\raw_pdfs\uploads --limit 20 --review-sample-size 5 --pages 1-3 --ocr-backend surya --output outputs\debug_visual --open
 ```
 
-## Extraction Preview
+Required review views:
+
+- render grid and page metadata
+- preprocess before/after
+- Surya bbox overlay and OCR line text
+- low-confidence lines
+- extraction evidence
+- evidence mismatch warnings
+- Excel and QA summary
+
+## Extraction Preview, Excel, QA
 
 ```powershell
 python -m court_ocr_extract.cli preview-extraction --ocr-cache outputs\ocr_cache --review-sample-size 5 --review-mode mixed --extractor local_llm --output outputs\debug_visual --open
-```
-
-## Excel Và QA
-
-```powershell
 python -m court_ocr_extract.cli extract --ocr-cache outputs\ocr_cache --output outputs\excel\pilot_10.xlsx --extractor local_llm
 python -m scripts.qa_output --excel outputs\excel\pilot_10.xlsx
 ```
 
-Excel có sheet `DATA` và `RUN_SUMMARY`.
+Excel output should include or prepare for source/evidence columns such as `SOURCE_CASE_ID`, `SOURCE_PAGE`, `SOURCE_LINE_IDS`, `OCR_CONFIDENCE`, `EVIDENCE`, `WARNINGS`, and `NEEDS_REVIEW`.
 
-## Benchmark Trên PDF Thật
+## Real-Data Pilot And Full Run
 
-```powershell
-python -m court_ocr_extract.cli benchmark-ocr --input-dir data\raw_pdfs\uploads --limit 10 --backends google_document_ai,google_vision,openai_vision,gemini_document,tesseract --output outputs\excel\ocr_benchmark.xlsx --debug-visual --review-sample-size 5 --review-mode mixed
-python -m court_ocr_extract.cli benchmark-extractors --ocr-cache outputs\ocr_cache --input-dir data\raw_pdfs\uploads --limit 10 --extractors local_llm,openai,gemini,direct_vision_openai,direct_vision_gemini --output outputs\excel\extractor_benchmark.xlsx --debug-visual --review-sample-size 5 --review-mode mixed
-```
-
-## Real-Data Pilot Và Full
+Target pilot command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_sample_windows.ps1 -OcrBackend tesseract -Extractor local_llm -DebugVisual -ReviewSampleSize 5 -ReviewMode mixed
+powershell -ExecutionPolicy Bypass -File .\scripts\run_sample_windows.ps1 -OcrBackend surya -Extractor local_llm -DebugVisual -ReviewSampleSize 5 -ReviewMode mixed
 ```
 
-Chỉ sau khi bạn chấp nhận pilot PDF thật:
+Target full-run command after the Project Owner accepts the pilot:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_full_windows.ps1 -OcrBackend tesseract -Extractor local_llm -ReviewSampleSize 10 -ReviewMode mixed -AcceptedSample10
+powershell -ExecutionPolicy Bypass -File .\scripts\run_full_windows.ps1 -OcrBackend surya -Extractor local_llm -ReviewSampleSize 10 -ReviewMode mixed -AcceptedSample10
 ```
+
+The VLM benchmark path is separate and must produce comparable validation, QA, and debug output before it can be compared fairly with the Surya path.
 
 ## Zip Debug Visual
 
@@ -135,15 +148,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_full_windows.ps1 -OcrBack
 python -m court_ocr_extract.cli zip-debug-visual --run-id latest --output outputs\debug_visual\latest_debug_visual.zip
 ```
 
-## Cần Kiểm Tra Bằng Mắt
+## Manual Acceptance Checklist
 
-- Render đúng DPI, không xoay/cắt mép.
-- Preprocess không làm mất chữ hoặc mất dấu tiếng Việt.
-- Red seal removal chỉ bật khi xem nhiều PDF thật thấy an toàn.
-- OCR review có text khớp ảnh.
-- Marker `NỘI DUNG VỤ ÁN` được phát hiện hợp lý.
-- Extraction preview bên trái đúng cột Excel, bên phải có evidence.
-- Excel không bắt nhầm cụm trạng thái thành họ tên.
-- QA không in dữ liệu nhạy cảm.
+- Render is correct DPI, not rotated, and not cropped.
+- Preprocess does not remove text or Vietnamese marks.
+- Surya OCR text matches page images and bbox overlays.
+- Marker detection is reasonable.
+- Extraction preview matches Excel columns and shows evidence.
+- Excel does not mistake status phrases for names.
+- QA report does not expose sensitive data.
 
-Không gọi trạng thái này là production-ready nếu pilot PDF thật chưa được bạn kiểm tra và chấp nhận.
+Do not call the pipeline production-ready until the Project Owner has reviewed and accepted real-data pilot outputs.

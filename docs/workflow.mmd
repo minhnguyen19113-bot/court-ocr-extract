@@ -1,11 +1,16 @@
 flowchart TD
-    S["Synthetic smoke debug"] --> A["User uploads real court PDFs"]
+    S["Synthetic smoke (contract only)"] --> A["Project Owner uploads real court PDFs"]
     A --> B["Runtime/backend checks"]
-    B --> C["OCR cache with selected backend"]
-    C --> D["Visual QA: render/preprocess/OCR/marker"]
-    D --> E["Extraction preview"]
-    E --> F["Excel DATA + RUN_SUMMARY"]
-    F --> G["QA from Excel"]
-    G --> H{"User accepts real-data pilot?"}
-    H -->|Yes| I["Full run"]
-    H -->|No| J["Fix OCR/extraction/validation and rerun pilot"]
+    B --> C1["Path A: Surya OCR + OCR cache"]
+    B --> C2["Path B: Local VLM benchmark"]
+    C1 --> D1["Visual QA: render/preprocess/bbox/text"]
+    D1 --> E1["Local LLM + rule extraction"]
+    C2 --> E2["VLM JSON/evidence extraction"]
+    E1 --> F["Evidence validation + anti-hallucination checks"]
+    E2 --> F
+    F --> G["Excel DATA + RUN_SUMMARY"]
+    G --> H["QA report"]
+    H --> I{"Project Owner accepts real-data pilot?"}
+    I -->|Yes| J["Full run"]
+    I -->|No| K["Fix OCR/extraction/validation/debug UI and rerun pilot"]
+    L["Legacy optional: Tesseract"] -. "not main/default" .-> C1
