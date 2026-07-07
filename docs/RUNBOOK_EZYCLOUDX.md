@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-07
 
-This is the target rebuild runbook after Phase 1B default cleanup.
+Đây là target rebuild runbook sau Phase 1B default cleanup và Phase 2A Surya adapter fix.
 
 ## Safety
 
@@ -34,7 +34,7 @@ Surya + local LLM target checks:
 
 ```powershell
 python -m scripts.check_runtime --ocr-backend surya --extractor local_llm
-python -m scripts.check_ocr_backend --backend surya
+.\.venv\Scripts\python -m scripts.check_ocr_backend --backend surya
 python -m scripts.check_extractor --backend local_llm
 ```
 
@@ -66,7 +66,7 @@ Target full run after Project Owner acceptance:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_full_windows.ps1 -OcrBackend surya -Extractor local_llm -ReviewSampleSize 10 -ReviewMode mixed -AcceptedSample10
 ```
 
-Surya runtime wiring/import may still need Phase 2 setup on the VM.
+Phase 2A đã wire `SuryaOCRBackend` cho API `surya-ocr 0.20.0` qua `RecognitionPredictor(..., full_page=True)`. Nếu `check_ocr_backend --backend surya` báo unsupported API, giữ nguyên default Surya và cập nhật adapter/version pin; không fallback sang Tesseract.
 
 ## VLM Benchmark
 

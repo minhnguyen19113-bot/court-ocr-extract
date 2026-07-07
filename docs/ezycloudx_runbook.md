@@ -1,6 +1,6 @@
 # Ezycloudx Windows VM Runbook
 
-This runbook reflects Phase 1B defaults. Surya OCR + local LLM is the main candidate. Local VLM is a benchmark path. Tesseract is legacy optional only.
+This runbook reflects Phase 1B defaults plus the Phase 2A Surya adapter fix. Surya OCR + local LLM is the main candidate. Local VLM is a benchmark path. Tesseract is legacy optional only and must not be used as fallback for Surya.
 
 ## 1. Base Setup
 
@@ -45,7 +45,7 @@ Surya + local LLM target:
 
 ```powershell
 python -m scripts.check_runtime --ocr-backend surya --extractor local_llm
-python -m scripts.check_ocr_backend --backend surya
+.\.venv\Scripts\python -m scripts.check_ocr_backend --backend surya
 python -m scripts.check_extractor --backend local_llm
 ```
 
@@ -64,7 +64,7 @@ VLM benchmark target:
 python -m scripts.check_vlm_backend
 ```
 
-Surya runtime wiring/import may still need Phase 2 setup. If Surya is unavailable, record the failure and fix runtime setup rather than changing the main default.
+Phase 2A wires `SuryaOCRBackend` for `surya-ocr 0.20.0` with `RecognitionPredictor(..., full_page=True)`. If Surya is unavailable or the installed API is unsupported, record the exact failure and fix runtime setup/version pin rather than changing the main default or falling back to Tesseract.
 
 ## 4. Real-Data Pilot
 

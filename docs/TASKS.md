@@ -45,11 +45,14 @@ Do not start without Project Owner / ChatGPT approval.
 
 - [x] Triển khai đường chạy Surya OCR backend ở mức code/contract.
 - [x] Giữ backend name `surya` làm main path và `surya_optional` làm compatibility alias.
-- [x] Thêm kiểm tra Surya availability có hướng dẫn cài đặt.
+- [x] Thêm kiểm tra Surya availability/API có hướng dẫn cài đặt.
+- [x] Hỗ trợ API `surya-ocr 0.20.0` bằng `RecognitionPredictor(..., full_page=True)`.
+- [x] Đảm bảo `ocr_pdf_prefix()` không còn placeholder `RuntimeError`.
 - [x] Chuẩn hóa output mocked/Surya OCR vào `OCRPage.lines`.
+- [x] Sắp xếp combined text theo `reading_order` nếu Surya trả về field này.
 - [x] Thêm artifact bbox overlay.
 - [x] Thêm artifact OCR theo page và link trong review HTML.
-- [x] Thêm test synthetic/mocking cho Surya OCR contract và visual review.
+- [x] Thêm test synthetic/mocking cho `ocr_pdf_prefix()`, Surya OCR contract, no-placeholder guard, no-Tesseract fallback guard, và visual review.
 - [x] Giữ Tesseract là legacy only; không fallback sang Tesseract.
 - [x] Không chạy PDF thật hoặc inspect output thật.
 

@@ -63,12 +63,14 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 ## Latest Phase 2A Work
 
 - Triển khai routing `SuryaOCRBackend` cho backend `surya` ở mức code/contract.
-- Thêm kiểm tra import/version Surya có hướng dẫn cài đặt khi thiếu runtime.
+- Thêm kiểm tra import/version/API Surya có hướng dẫn cài đặt khi thiếu runtime.
+- Adapter hiện hỗ trợ API `surya-ocr 0.20.0` qua `RecognitionPredictor(..., full_page=True)` và báo lỗi rõ nếu API cài đặt không được hỗ trợ.
 - Thêm đường render PDF thành image trước khi gọi Surya OCR backend.
 - Chuẩn hóa output line của Surya vào `OCRPage.lines` với `line_id`, `text`, `bbox`, `confidence`, `reading_order`, và `warnings`.
 - Thêm artifact theo từng page để review Surya OCR: ảnh gốc, bbox overlay, line JSON, page text markdown, combined text, manifest, và HTML index.
 - Nâng cấp OCR review HTML để hiển thị ảnh gốc, bbox overlay, line table, warnings, và link đến artifact từng page.
-- Thêm test synthetic/mocking cho contract Surya và visual review.
+- Thêm test synthetic/mocking cho `ocr_pdf_prefix()`, contract Surya, placeholder guard, no-Tesseract fallback guard, và visual review.
+- `src/court_ocr_extract/ocr_backends/surya_ocr.py` không còn placeholder `runtime wiring is incomplete`.
 - Không chạy PDF thật và không inspect output thật.
 - Chất lượng OCR thật phải do Project Owner đánh giá trên Ezycloudx.
 

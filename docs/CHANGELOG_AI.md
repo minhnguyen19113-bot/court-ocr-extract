@@ -3,11 +3,15 @@
 ## 2026-07-07 - Phase 2A Surya OCR Runtime + Visual OCR Review
 
 - Triển khai code path `SuryaOCRBackend` cho rendered images và output `OCRResult/OCRPage`.
-- Thêm kiểm tra Surya import/version availability có install hints.
+- Thay placeholder runtime bằng flow thật `ocr_pdf_prefix()` -> `render_pdf_pages()` -> Surya OCR trên image -> `OCRResult`.
+- Thêm kiểm tra Surya import/version/API availability có install hints.
+- Hỗ trợ API `surya-ocr 0.20.0` qua `RecognitionPredictor(..., full_page=True)`.
+- Nếu API Surya cài đặt không nhận diện được, adapter raise lỗi rõ: `Surya package is installed but this adapter does not support the installed API. Detected ...`.
 - Thêm chuẩn hóa line với `line_id`, bbox, confidence, reading order, và warnings.
+- Sắp xếp combined text theo `reading_order` khi Surya trả về thứ tự đọc.
 - Thêm Surya page artifacts: original image, bbox overlay, line JSON, page text markdown, combined text, manifest, và HTML index.
 - Nâng cấp OCR review HTML với original image, bbox overlay, line table, artifact links, và warnings.
-- Thêm test synthetic/mocking cho Surya OCR contract và visual review.
+- Thêm test synthetic/mocking cho `ocr_pdf_prefix()`, Surya OCR contract, placeholder guard, no-Tesseract fallback guard, và visual review.
 - Không chạy PDF thật.
 - Không inspect artifact OCR/debug/output thật.
 - Không gọi cloud API.

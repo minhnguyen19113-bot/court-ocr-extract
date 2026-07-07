@@ -32,6 +32,6 @@ cloudflared tunnel --url http://127.0.0.1:8765
 powershell -ExecutionPolicy Bypass -File .\scripts\run_sample_windows.ps1 -OcrBackend surya -Extractor local_llm -DebugVisual -ReviewSampleSize 5 -ReviewMode mixed
 ```
 
-Surya is the main target backend. Runtime wiring/import may still need Phase 2 setup on the VM.
+Surya is the main target backend. Phase 2A wires `SuryaOCRBackend` for `surya-ocr 0.20.0` with `RecognitionPredictor(..., full_page=True)`. If the VM has a different unsupported Surya API, keep the failure explicit and do not fallback to Tesseract.
 
 Do not use fake data to decide OCR/extraction quality. The Project Owner runs and reviews real-data pilots outside Codex.

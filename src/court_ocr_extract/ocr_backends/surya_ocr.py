@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
+import inspect
 import json
 import shutil
 import tempfile
 import time
+from dataclasses import dataclass
 from html import unescape
 from importlib import metadata
 from pathlib import Path
@@ -22,6 +25,13 @@ from court_ocr_extract.settings import PipelineSettings
 
 class SuryaRuntimeError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class SuryaAPIDetection:
+    kind: str
+    version: str
+    details: str
 
 
 class SuryaOCRBackend:
@@ -47,9 +57,15 @@ class SuryaOCRBackend:
                 '`pip install -e ".[ocr]"` or `pip install surya-ocr`. '
                 f"Import error: {exc}",
             )
-        version = _surya_version()
-        suffix = f" Version: {version}." if version else ""
-        return OCRBackendStatus(self.name, True, f"Surya package is importable.{suffix}")
+        detection = _detect_supported_surya_api()
+        if detection.kind == "unsupported":
+            return OCRBackendStatus(self.name, False, _unsupported_surya_api_message(detection))
+        suffix = f" Version: {detection.version}." if detection.version else ""
+        return OCRBackendStatus(
+            self.name,
+            True,
+            f"Surya package is importable.{suffix} Adapter API: {detection.kind}.",
+        )
 
     def ocr_pdf_prefix(
         self,
@@ -182,16 +198,22 @@ class SuryaOCRBackend:
         images: list[Image.Image] = []
         try:
             images = [Image.open(path).convert("RGB") for path in image_paths]
-            return _run_surya_modern(images, self.settings.surya_language_list)
-        except Exception as modern_exc:
+            detection = _detect_supported_surya_api()
+            if detection.kind == "unsupported":
+                raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
             try:
-                return _run_surya_legacy(images, self.settings.surya_language_list)
-            except Exception as legacy_exc:
+                return _run_detected_surya_api(
+                    images,
+                    self.settings.surya_language_list,
+                    detection,
+                )
+            except SuryaRuntimeError:
+                raise
+            except Exception as exc:
                 raise SuryaRuntimeError(
-                    "Surya package is importable but the installed API is not wired for this adapter. "
-                    "Update `SuryaOCRBackend` for the installed Surya version. "
-                    f"Modern API error: {modern_exc}; legacy API error: {legacy_exc}"
-                ) from legacy_exc
+                    "Surya OCR runtime failed while using the supported adapter path. "
+                    f"Detected {detection.details}. Original error: {exc}"
+                ) from exc
         finally:
             for image in images:
                 image.close()
@@ -226,7 +248,9 @@ def normalize_surya_prediction(
             }
         )
 
-    if any(record["reading_order"] is None for record in records):
+    if records and all(record["reading_order"] is not None for record in records):
+        records.sort(key=lambda record: int(record["reading_order"]))
+    elif any(record["reading_order"] is None for record in records):
         if all(record.get("bbox") for record in records):
             records.sort(key=lambda record: (float(record["bbox"][1]), float(record["bbox"][0])))
         warnings.append("reading_order_fallback_used")
@@ -313,19 +337,45 @@ def _record_for_review(result: OCRResult, *, case_id: str):
     return OCRCacheRecord(case_id=case_id, source_index=0, pdf_hash=None, result=result)
 
 
-def _run_surya_modern(images: list[Image.Image], languages: list[str]) -> list[Any]:
-    try:
-        from surya.inference import SuryaInferenceManager
-        from surya.recognition import RecognitionPredictor
-    except Exception as exc:
-        raise SuryaRuntimeError(f"Modern Surya API import failed: {exc}") from exc
+def _run_detected_surya_api(
+    images: list[Image.Image],
+    languages: list[str],
+    detection: SuryaAPIDetection,
+) -> list[Any]:
+    if detection.kind == "recognition_full_page":
+        return _run_surya_recognition_full_page(images)
+    if detection.kind == "recognition_with_detection":
+        return _run_surya_recognition_with_detection(images, languages)
+    if detection.kind == "legacy_run_ocr":
+        return _run_surya_legacy(images, languages)
+    raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
 
-    manager = SuryaInferenceManager()
-    predictor = RecognitionPredictor(manager)
+
+def _run_surya_recognition_full_page(images: list[Image.Image]) -> list[Any]:
+    from surya.recognition import RecognitionPredictor
+
+    predictor = RecognitionPredictor()
+    return list(predictor(images, full_page=True))
+
+
+def _run_surya_recognition_with_detection(images: list[Image.Image], languages: list[str]) -> list[Any]:
+    from surya.detection import DetectionPredictor
+    from surya.recognition import RecognitionPredictor
+
+    recognition_predictor = RecognitionPredictor()
+    detection_predictor = DetectionPredictor()
+    lang_lists = [languages for _ in images]
     try:
-        return list(predictor(images))
-    except TypeError:
-        return list(predictor(images, langs=[languages for _ in images]))
+        return list(recognition_predictor(images, lang_lists, detection_predictor))
+    except TypeError as first_exc:
+        try:
+            return list(recognition_predictor(images, detection_predictor, lang_lists))
+        except TypeError as second_exc:
+            raise SuryaRuntimeError(
+                "Surya package is installed but this adapter does not support the installed API. "
+                "Detected recognition/detection API but could not call it. "
+                f"First call error: {first_exc}; second call error: {second_exc}"
+            ) from second_exc
 
 
 def _run_surya_legacy(images: list[Image.Image], languages: list[str]) -> list[Any]:
@@ -355,6 +405,59 @@ def _surya_version() -> str:
             continue
     module = importlib.import_module("surya")
     return str(getattr(module, "__version__", ""))
+
+
+def _detect_supported_surya_api() -> SuryaAPIDetection:
+    version = _surya_version()
+    details: list[str] = [f"surya-ocr version {version or 'unknown'}"]
+
+    try:
+        recognition_module = importlib.import_module("surya.recognition")
+        recognition_predictor = getattr(recognition_module, "RecognitionPredictor", None)
+        if recognition_predictor is None:
+            details.append("surya.recognition.RecognitionPredictor missing")
+        else:
+            signature = inspect.signature(recognition_predictor.__call__)
+            details.append(f"RecognitionPredictor.__call__{signature}")
+            parameters = signature.parameters
+            if "full_page" in parameters:
+                return SuryaAPIDetection("recognition_full_page", version, "; ".join(details))
+            if _module_available("surya.detection") and _signature_may_accept_legacy_langs(signature):
+                return SuryaAPIDetection("recognition_with_detection", version, "; ".join(details))
+    except Exception as exc:
+        details.append(f"surya.recognition inspection failed: {exc}")
+
+    if _module_available("surya.ocr"):
+        try:
+            legacy_module = importlib.import_module("surya.ocr")
+            if getattr(legacy_module, "run_ocr", None) is not None:
+                details.append("surya.ocr.run_ocr present")
+                return SuryaAPIDetection("legacy_run_ocr", version, "; ".join(details))
+        except Exception as exc:
+            details.append(f"surya.ocr inspection failed: {exc}")
+    else:
+        details.append("surya.ocr module missing")
+
+    return SuryaAPIDetection("unsupported", version, "; ".join(details))
+
+
+def _signature_may_accept_legacy_langs(signature: inspect.Signature) -> bool:
+    parameter_names = [name for name in signature.parameters if name != "self"]
+    return len(parameter_names) >= 3 or any(name in parameter_names for name in ("langs", "languages"))
+
+
+def _module_available(module_name: str) -> bool:
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ModuleNotFoundError, ValueError):
+        return False
+
+
+def _unsupported_surya_api_message(detection: SuryaAPIDetection) -> str:
+    return (
+        "Surya package is installed but this adapter does not support the installed API. "
+        f"Detected {detection.details}."
+    )
 
 
 def _get_ocr_items(prediction: Any) -> list[Any]:

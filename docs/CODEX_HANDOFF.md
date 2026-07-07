@@ -31,7 +31,10 @@ Phase 2A đã có wiring Surya OCR ở mức code/contract, nhưng chất lượ
 
 Phase 2A notes:
 
-- `src/court_ocr_extract/ocr_backends/surya_ocr.py` render/đọc image input qua Surya khi package/runtime đã được cài.
+- `src/court_ocr_extract/ocr_backends/surya_ocr.py` không còn placeholder `runtime wiring is incomplete`.
+- `ocr_pdf_prefix()` đã implement flow `pdf_path` -> `render_pdf_pages()` -> Surya OCR trên rendered images -> normalize `OCRResult`.
+- Adapter hỗ trợ API `surya-ocr 0.20.0` bằng `RecognitionPredictor(..., full_page=True)`.
+- Nếu API Surya cài đặt không được hỗ trợ, adapter raise lỗi rõ với prefix `Surya package is installed but this adapter does not support the installed API. Detected ...`.
 - `--ocr-backend surya` route qua Surya backend.
 - `debug-ocr-review` có thể dùng wiring `surya`, nhưng Codex không được chạy command này trên PDF thật.
 - Surya artifact theo page được ghi dưới `ocr_surya/` khi bật debug visual.
@@ -68,7 +71,7 @@ Template report chuẩn:
 
 ## Known Conflicts
 
-- Tesseract remains in code/docs only as legacy optional.
+- Tesseract remains in code/docs only as legacy optional; Surya backend must not fallback to Tesseract.
 - `settings.py` and `config.py` still overlap internally, but `settings.py` is canonical for new work.
 - Multiple extraction, validation, render, OCR, and Excel writer paths overlap.
 - Old app folders exist and need classification before cleanup.
