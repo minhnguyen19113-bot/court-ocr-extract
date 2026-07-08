@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Current Phase
 
@@ -82,6 +82,13 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Surya OCR không còn dừng/truncate tại marker `NỘI DUNG VỤ ÁN` khi `stop_marker=""`.
 - Thêm test synthetic cho page range, CLI full-document, và Surya full-document behavior.
 - Không chạy PDF thật, không đọc dữ liệu thật, không chạy extraction/LLM/Excel.
+
+## Latest Repo Cleanup
+
+- Dọn generated cache local như `__pycache__/` và `.pytest_cache/` trong workspace.
+- Không xóa tracked source/docs legacy vì `docs/CLEANUP_PLAN.md` vẫn phân loại chúng là `legacy_optional`, `duplicate_conflict`, `experimental`, hoặc `unknown_need_review`.
+- Không inspect hoặc dọn `data/`, `outputs/`, `logs/`, `work/`, model files, PDF thật, Excel thật, image thật.
+- `ruff` không chạy được vì chưa được cài trong `.venv`.
 
 ## Next Gate
 

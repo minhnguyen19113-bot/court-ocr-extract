@@ -1,6 +1,6 @@
 # Codex Handoff
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Read First
 
@@ -48,6 +48,12 @@ Full-document debug review notes:
 - `debug-ocr-review --full-document` truyền `max_pages=None` và `stop_marker=""` vào backend, nên không dừng/truncate tại marker `NỘI DUNG VỤ ÁN`.
 - `ocr --full-document` cũng truyền `max_pages=None` và `stop_marker=""`, chỉ tạo OCR cache/debug visual, không chạy extraction/LLM/Excel.
 - Pilot 1 PDF nên dùng folder `data\raw_pdfs\pilot_one` với `--limit 1` và `--review-sample-size 1`.
+
+Repo cleanup notes:
+
+- Generated cache local đã được dọn khỏi workspace.
+- Tracked legacy/duplicate modules chưa bị xóa; chúng vẫn cần canonical owner decision trước khi archive/delete.
+- Không inspect hoặc cleanup protected real-data folders trong Codex.
 
 ## Important Warnings
 

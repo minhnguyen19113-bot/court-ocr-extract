@@ -1,6 +1,6 @@
 # Tasks
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Phase 1A
 
@@ -70,6 +70,14 @@ Do not start without Project Owner / ChatGPT approval.
 - Thêm command riêng `ocr-surya-review` nếu reviewer muốn command hẹp hơn `debug-ocr-review`.
 - Cải thiện review UI sau khi thấy behavior thật của Surya bbox/text.
 - Chỉ bắt đầu hardening Local LLM strict JSON/evidence sau khi OCR review path được duyệt.
+
+## Repo Cleanup
+
+- [x] Audit generated cache trong các root code/docs/tests/app an toàn.
+- [x] Xóa local cache generated (`__pycache__/`, `.pytest_cache/`) khỏi workspace.
+- [x] Xác nhận không có cache Python tracked trong Git.
+- [x] Không xóa tracked legacy/duplicate code khi chưa có canonical owner decision.
+- [x] Không inspect hoặc dọn real-data/protected artifact folders.
 
 ## Backlog
 

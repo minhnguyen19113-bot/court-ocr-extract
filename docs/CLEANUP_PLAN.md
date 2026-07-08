@@ -1,8 +1,8 @@
 # Cleanup Plan
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
-Phase 1B applies main/default cleanup and canonical decisions. It does not delete, archive, or mass-move files.
+Phase 1B applies main/default cleanup and canonical decisions. Repo cleanup on 2026-07-08 deleted local generated cache only; it did not delete, archive, or mass-move tracked source/docs.
 
 ## Categories
 
@@ -14,6 +14,7 @@ Phase 1B applies main/default cleanup and canonical decisions. It does not delet
 - `docs_memory`: repo memory and coordination docs.
 - `tests_keep`: contract/control-flow tests to keep.
 - `config_keep`: config/schema files to keep but possibly consolidate.
+- `generated_junk`: local generated cache/build artifacts that should not be committed and may be deleted during cleanup.
 - `unknown_need_review`: needs human decision before action.
 
 ## Summary Counts
@@ -28,7 +29,8 @@ Phase 1B applies main/default cleanup and canonical decisions. It does not delet
 | docs_memory | 16 |
 | tests_keep | 17 |
 | config_keep | 8 |
-| unknown_need_review | 6 |
+| generated_junk | 1 |
+| unknown_need_review | 5 |
 
 Counts are planning counts by grouped file/folder rows below, not exact file totals.
 
@@ -88,7 +90,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `requirements*.txt`, `pyproject.toml`, `Dockerfile.gpu` | config_keep | Dependency/runtime definitions. | Keep; update defaults after architecture decision. |
 | `.env.example`, `.gitignore` | config_keep | Example env and ignore rules. `.env.example` now points to Surya target and cloud disabled defaults. | Keep, verify no cloud/default conflict. |
 | `.env` | unknown_need_review | Local secret file; do not read. | Never commit; check only by path. |
-| `.venv/`, `.pytest_cache/`, `__pycache__/` | unknown_need_review | Local generated folders. | Ignore, do not edit. |
+| `.venv/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/`, `.mypy_cache/` | generated_junk | Local environment/cache folders; `.venv/` itself is not deleted by Codex, but generated cache folders are safe to clean. | Delete generated cache folders during cleanup; never commit. |
 | `data/`, `outputs/`, `logs/`, `work/`, `models/` | unknown_need_review | Protected or generated/sensitive areas. | Do not inspect in Codex; cleanup by owner only. |
 
 ## Major Conflicts Found
@@ -103,6 +105,13 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - Old app folders: `app/`, `app_fastapi/`, `app_streamlit/`.
 - Run scripts conflicts: sample/full defaults cleaned to Surya target; VLM branch is explicitly not wired into these OCR-cache wrappers.
 
+## Latest Cleanup Audit
+
+- 2026-07-08: Deleted generated local cache folders in safe code/test/app roots.
+- No tracked source/docs files were deleted because current cleanup classifications still show canonical conflicts or legacy/benchmark value.
+- `ruff` audit was attempted but skipped because `ruff` is not installed in `.venv`.
+- Protected real-data/output paths were not inspected or cleaned.
+
 ## No-Delete Rule
 
-Every row above is a candidate classification only. Do not delete or move anything until the Project Owner approves Phase 1B cleanup scope.
+Every tracked source/docs row above is a candidate classification only. Do not delete or move tracked source/docs until the Project Owner approves a specific cleanup scope. Generated local cache folders may be deleted during cleanup.

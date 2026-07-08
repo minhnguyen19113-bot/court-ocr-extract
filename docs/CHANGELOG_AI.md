@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-08 - Repo Cleanup Audit
+
+- Dọn generated cache local trong workspace, gồm `__pycache__/` và `.pytest_cache/`.
+- Xác nhận không có cache Python tracked trong Git.
+- Giữ nguyên tracked legacy/duplicate modules vì chưa có bằng chứng an toàn để xóa mà không ảnh hưởng pipeline.
+- Không inspect hoặc dọn `data/`, `outputs/`, `logs/`, `work/`, PDF thật, image thật, Excel thật, hoặc artifact real-data.
+- `ruff` không chạy được vì package chưa được cài trong `.venv`.
+
 ## 2026-07-07 - Sửa giới hạn trang debug/full-document
 
 - Sửa `parse_page_range()` để `None`, chuỗi rỗng, và `all` nghĩa là toàn bộ trang; không còn default 3 trang đầu.
