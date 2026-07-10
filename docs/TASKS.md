@@ -81,9 +81,21 @@ Do not start without Project Owner / ChatGPT approval.
 - Consolidate Surya OCR adapter path.
 - Define and implement real Surya OCR cache contract.
 - Expand debug UI around bbox/evidence/QA links.
-- TOOLKIT-1 evaluation harness + gold dataset manifest.
 - Phase 3A Local LLM strict JSON/evidence hardening.
 - Bổ sung audit/trace columns vào Excel trong một phase schema riêng nếu được duyệt.
+
+## TOOLKIT-1
+
+- [x] Tạo gold/prediction JSONL manifest validators.
+- [x] Tạo synthetic redacted fixtures; không tạo gold thật.
+- [x] Implement OCR/field/participant/evidence/review aggregate metrics.
+- [x] Tạo safe JSON/Markdown report chỉ chứa numeric metrics.
+- [x] Tạo PII hash/detection/redaction helper nhẹ.
+- [x] Tạo `check_gold_manifest` và `evaluate_gold_manifest` không có real-data default.
+- [x] Thêm guardrail cho `data_private/`, `data/gold/`, manifest ngoài tests và fixture PII.
+- [x] Thêm synthetic manifest/metrics/report/script tests.
+- [x] Cập nhật evaluation/privacy/observability/MLOps/toolkit memory docs.
+- [x] Không chạy PDF/OCR/Excel/model/cloud thật, không stage/commit/push.
 
 ## Memory/Reporting Rules
 

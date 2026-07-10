@@ -1,6 +1,6 @@
 # Observability Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
@@ -36,9 +36,19 @@ Mỗi run production nên có manifest riêng:
 - warning summary.
 - acceptance status.
 
+TOOLKIT-1 prediction manifest bổ sung safe run metadata:
+
+- `run_id`, OCR/extractor backend và version.
+- model/prompt version.
+- page/line/bbox/low-confidence aggregate counts.
+- warning count và `needs_review` aggregate.
+
+Evaluation report chỉ chứa metric số và không chứa expected/predicted raw values, evidence text hoặc sensitive filenames.
+
 ## Future work
 
 - Thêm structured JSONL safe log.
 - Thêm run summary HTML không chứa OCR text đầy đủ.
 - Thêm warning taxonomy ổn định cho QA.
 - Thêm runtime health check cho Surya/local LLM trên Ezycloudx.
+- TOOLKIT-2 nối pipeline output thật với prediction manifest trên môi trường Project Owner kiểm soát.

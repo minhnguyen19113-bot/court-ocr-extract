@@ -1,6 +1,6 @@
 # Privacy Redaction Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
@@ -42,3 +42,19 @@ git status --short
 ```
 
 Nếu có real-data artifact xuất hiện trong status, không commit và cần Project Owner xử lý ngoài Codex.
+
+## Helper TOOLKIT-1
+
+`src/court_ocr_extract/evaluation/privacy.py` cung cấp:
+
+- `hash_value()` cho pseudonymous deterministic ID có optional salt.
+- `looks_like_pii()` cho obvious CCCD/CMND, số điện thoại Việt Nam và email.
+- `redact_common_pii()` cho redaction text nhẹ.
+- `find_pii_paths()` để báo JSON path mà không echo raw value.
+
+Giới hạn bắt buộc:
+
+- Regex không nhận diện tên người và không bảo đảm phát hiện hết địa chỉ/case detail.
+- Hash không tự biến dữ liệu thành anonymous nếu input space nhỏ hoặc salt yếu.
+- Project Owner phải review thủ công trước khi lưu/chia sẻ manifest.
+- Gold/prediction thật không commit; chỉ synthetic fixture được phép trong `tests/fixtures/`.

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from court_ocr_extract.evaluation.privacy import find_pii_paths
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 PROTECTED_PREFIXES = [
+    "data/gold/",
     "data/raw_pdfs/",
     "data/private_pdfs/",
     "data/images/",
@@ -18,6 +22,7 @@ PROTECTED_PREFIXES = [
     "outputs/",
     "logs/",
     "work/",
+    "data_private/",
 ]
 
 ALLOWED_SYNTHETIC_PREFIXES = [
@@ -256,6 +261,26 @@ def find_extraction_test_network_calls(repo_root: Path) -> list[str]:
     )
 
 
+def find_synthetic_manifest_pii(repo_root: Path) -> list[str]:
+    findings: list[str] = []
+    fixture_root = repo_root / "tests/fixtures"
+    if not fixture_root.exists():
+        return findings
+    for path in sorted(fixture_root.glob("*manifest*.jsonl")):
+        count = 0
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except ValueError:
+                continue
+            count += len(find_pii_paths(payload))
+        if count:
+            findings.append(f"{path.relative_to(repo_root).as_posix()}: {count}")
+    return findings
+
+
 def cli_has_bad_pages_default(repo_root: Path) -> bool:
     cli_path = repo_root / "src/court_ocr_extract/cli.py"
     if not cli_path.exists():
@@ -334,6 +359,12 @@ def check_architecture(repo_root: Path = REPO_ROOT) -> ArchitectureGuardrailRepo
         failures.append(
             "Direct network calls detected in tests: "
             + "; ".join(extraction_test_network_calls)
+        )
+    manifest_pii = find_synthetic_manifest_pii(repo_root)
+    if manifest_pii:
+        failures.append(
+            "Obvious PII detected in synthetic evaluation manifests: "
+            + "; ".join(manifest_pii)
         )
 
     if cli_has_bad_pages_default(repo_root):

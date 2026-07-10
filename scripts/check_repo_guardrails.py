@@ -38,6 +38,7 @@ MEMORY_FILES = [
 ]
 
 PROTECTED_PREFIXES = [
+    "data/gold/",
     "data/raw_pdfs/",
     "data/private_pdfs/",
     "data/images/",
@@ -47,6 +48,7 @@ PROTECTED_PREFIXES = [
     "outputs/",
     "logs/",
     "work/",
+    "data_private/",
 ]
 
 ALLOWED_SYNTHETIC_PREFIXES = [
@@ -155,6 +157,13 @@ def classify_sensitive_paths(paths: list[str]) -> Counter[str]:
         protected = next((prefix for prefix in PROTECTED_PREFIXES if normalized.startswith(prefix)), "")
         if protected:
             counts[f"protected:{protected.rstrip('/')}"] += 1
+            continue
+        if (
+            normalized.endswith(".jsonl")
+            and "manifest" in Path(normalized).name
+            and not normalized.startswith("tests/fixtures/")
+        ):
+            counts["evaluation_manifest_outside_tests"] += 1
             continue
         suffix = Path(normalized).suffix
         if suffix in SENSITIVE_EXTENSIONS and not normalized.startswith("tests/fixtures/"):

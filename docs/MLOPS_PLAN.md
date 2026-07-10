@@ -1,6 +1,6 @@
 # MLOps Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
@@ -28,6 +28,10 @@ Quản trị version, runtime, benchmark, và rollback cho Surya OCR, local LLM,
 - Surya OCR + local LLM là main candidate.
 - Local VLM là benchmark path, phải dùng cùng validation/evidence/QA rule.
 - Benchmark chỉ có ý nghĩa khi chạy trên gold/pilot dataset do Project Owner quản trị ngoài Codex.
+
+TOOLKIT-1 prediction manifest đã chuẩn bị các field `ocr_backend_version`, `model_name`, `prompt_version`, `run_id` để so sánh run. Gold split (`pilot`/`validation`/`test`) phải được Project Owner quản trị ổn định ngoài Git.
+
+Mọi baseline metric cần gắn với manifest version/hash và runtime version. Synthetic baseline chỉ kiểm code contract, không được dùng làm model quality baseline.
 
 ## Rollback policy
 

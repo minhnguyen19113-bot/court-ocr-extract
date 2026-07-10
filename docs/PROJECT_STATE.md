@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 ## Current Phase
 
-Phase 1F: CONSOLIDATE DUPLICATE EXTRACTION MODULES.
+TOOLKIT-1: EVALUATION HARNESS + GOLD DATASET MANIFEST.
 
-Phase này hợp nhất extraction backend vào `src/court_ocr_extract/extractors/`, giữ `src/court_ocr_extract/extraction_pipeline.py` làm orchestrator, migrate caller và xóa các duplicate path đã hết caller. Codex không chạy PDF thật, không đọc dữ liệu thật, không gọi model endpoint/cloud API, không chạy full pipeline, không sửa Surya OCR runtime, Excel schema, VLM benchmark, prompt lớn, hoặc Local LLM hardening.
+Phase này thêm manifest schema/validator, aggregate metrics, privacy helper, safe report và synthetic fixtures cho evaluation. Codex không tạo/đọc gold thật, không chạy PDF/OCR/Excel thật, không gọi model endpoint/cloud API, không chạy full pipeline, không sửa Surya runtime, Local LLM logic lớn hoặc Excel schema.
 
 ## Active Direction
 
@@ -35,6 +35,7 @@ Tesseract is legacy only. PaddleOCR is not part of the rebuild path. Cloud OCR/e
 - `src/court_ocr_extract/config.py` remains a legacy compatibility module for older imports.
 - `src/court_ocr_extract/excel_writer.py` là Excel writer canonical duy nhất; `excel.py` và `export/excel_writer.py` đã được xóa trong Phase 1E sau khi migrate caller.
 - Extraction backend overlap đã được xử lý trong Phase 1F; validation modules, Surya adapters, và PDF/render modules vẫn có implementation chồng lấn.
+- Evaluation harness chỉ đọc JSONL path được truyền rõ; report chỉ chứa aggregate numeric metrics, không chứa raw expected/predicted values.
 - Existing tests are contract/control-flow oriented and use synthetic fixtures only.
 - Old app folders `app/`, `app_fastapi/`, and `app_streamlit/` were removed in Phase 1D. Restore path: use Git history before the Phase 1D commit if needed.
 
@@ -131,6 +132,15 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - `scripts.check_extractor` mặc định chạy static configuration check, không gọi endpoint.
 - Thêm synthetic extraction contract tests với fake response; không network/model thật.
 
+## Latest TOOLKIT-1 Work
+
+- Thêm `src/court_ocr_extract/evaluation/` gồm manifest validation, privacy/hash/redaction, metrics và safe report.
+- Thêm gold/prediction JSONL synthetic fixtures trong `tests/fixtures/`; gold thật vẫn nằm ngoài Git/Codex.
+- Thêm `scripts.check_gold_manifest` và `scripts.evaluate_gold_manifest`; không có default path vào `data/` hoặc `outputs/`.
+- Implement OCR, field, participant, evidence, source reference, review và warning aggregate metrics.
+- Guardrail bảo vệ `data_private/`, `data/gold/`, manifest ngoài tests và obvious PII trong synthetic manifests.
+- Synthetic evaluation không chứng minh chất lượng OCR/extraction thật và không thay human review.
+
 ## Next Gate
 
-Project Owner / ChatGPT nên duyệt một hướng tiếp theo: TOOLKIT-1 evaluation harness + gold dataset manifest, Phase 2B Surya visual QA hardening, hoặc Phase 3A Local LLM strict JSON/evidence hardening. Surya/runtime pilot thật vẫn do Project Owner chạy ngoài Codex.
+Project Owner / ChatGPT nên duyệt một hướng tiếp theo: TOOLKIT-2 connect pipeline output to prediction manifest, Phase 2B Surya visual QA hardening, hoặc Phase 3A Local LLM strict JSON/evidence hardening. Real gold evaluation vẫn do Project Owner chạy ngoài Codex.

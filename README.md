@@ -88,6 +88,17 @@ Expected synthetic outputs:
 - `outputs\excel\synthetic_smoke.xlsx`
 - `outputs\qa\synthetic_smoke_report.json`
 
+## Synthetic Evaluation Toolkit
+
+Validate and evaluate only the committed redacted fixtures:
+
+```powershell
+python -m scripts.check_gold_manifest --gold tests\fixtures\gold_manifest_synthetic.jsonl
+python -m scripts.evaluate_gold_manifest --gold tests\fixtures\gold_manifest_synthetic.jsonl --predictions tests\fixtures\prediction_manifest_synthetic.jsonl
+```
+
+Real gold/prediction manifests stay outside Git and Codex. Evaluation output contains aggregate metrics only and does not replace human review.
+
 ## Target OCR Cache
 
 Target command for the Surya path:

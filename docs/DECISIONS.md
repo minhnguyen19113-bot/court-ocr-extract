@@ -30,6 +30,7 @@ Last updated: 2026-07-10
 | D-024 | Accepted | Phase 1D removes old app folders instead of moving them into an archive folder. | Audit found no main `src/`/CLI import dependency; Git history is the restore path and keeping archive folders would keep the repo noisy. |
 | D-025 | Accepted | Phase 1E keeps `src/court_ocr_extract/excel_writer.py` as the sole Excel writer and removes `excel.py` plus `export/excel_writer.py` after caller migration. | Một canonical module loại bỏ logic/header trùng; typed-result behavior được chuyển nguyên vẹn và bảo vệ bằng synthetic contract tests. |
 | D-026 | Accepted | Phase 1F uses `extraction_pipeline.py` as canonical orchestrator and `extractors/` as the only extractor-backend package. | Main CLI đã dùng contract này; chuyển typed compatibility behavior vào canonical package cho phép xóa backend/rule modules trùng mà không rewrite extraction logic lớn. |
+| D-027 | Accepted | Real gold/prediction manifests remain outside Git/Codex; repo evaluation uses only redacted synthetic JSONL fixtures and aggregate reports. | Giảm rủi ro PII, giữ evaluation có thể test tự động, và tách contract verification khỏi real quality acceptance của Project Owner. |
 
 ## Pending Decisions Before Cleanup / Phase 2
 

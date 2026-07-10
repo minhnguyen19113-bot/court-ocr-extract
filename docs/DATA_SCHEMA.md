@@ -121,3 +121,22 @@ Required metrics:
 - `warning_counts`
 
 The report must not include full real OCR text or unnecessary PII.
+
+## Evaluation Manifests
+
+Gold JSONL record:
+
+- Safe IDs: `case_id_hash`, `file_hash`.
+- Document labels: page count, tags, expected section presence/page.
+- Field labels: redacted/hash value, source page/line IDs, redacted evidence, required flag.
+- Participant labels: role, `name_hash`, redacted fields, source references.
+- Human review status.
+
+Prediction JSONL record:
+
+- Run/backend/model/prompt versions.
+- OCR aggregate counts.
+- Predicted sections/fields/participants with evidence/source references.
+- warnings và `needs_review`.
+
+Evaluation report schema là whitelist numeric metrics trong `evaluation.metrics.METRIC_KEYS`; không chứa raw manifest values.

@@ -56,6 +56,8 @@ After Phase 1F, `scripts.check_architecture_guardrails` phải fail nếu canoni
 
 `tests/test_extraction_consolidation.py` dùng fake Local LLM response và synthetic `OCRCacheRecord`; test kiểm `case_id`, fields, evidence, warnings và review helper mà không ghi `outputs/`.
 
+TOOLKIT-1 tests chỉ dùng hai JSONL fixtures đã redact trong `tests/fixtures/` và `tmp_path`. Tests cover manifest validation, PII detection/redaction, perfect/mismatch metrics, participant missing/extra, evidence/source coverage, safe report và CLI. Không test nào đọc `data/`, `data_private/` hoặc `outputs/`.
+
 ## Phase 1C Verification Commands
 
 ```powershell
@@ -105,3 +107,13 @@ git status --short
 ## Test Interpretation
 
 Synthetic passing tests mean the repo contracts still execute. They do not mean the OCR/extraction quality is acceptable on real court PDFs.
+
+## TOOLKIT-1 Verification Commands
+
+```powershell
+.\.venv\Scripts\python -B -m scripts.check_gold_manifest --gold tests\fixtures\gold_manifest_synthetic.jsonl
+.\.venv\Scripts\python -B -m scripts.evaluate_gold_manifest --gold tests\fixtures\gold_manifest_synthetic.jsonl --predictions tests\fixtures\prediction_manifest_synthetic.jsonl
+.\.venv\Scripts\python -B -m pytest -p no:cacheprovider
+```
+
+TOOLKIT-1 chưa có OCR CER/WER và không được dùng để kết luận real quality từ synthetic fixture.

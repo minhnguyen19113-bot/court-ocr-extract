@@ -71,6 +71,16 @@ Phase 1F consolidated extraction modules:
 - `scripts.check_extractor` là static config check, không endpoint request.
 - Restore path: use Git history before the Phase 1F commit.
 
+TOOLKIT-1 added a privacy-aware evaluation foundation:
+
+- Package: `src/court_ocr_extract/evaluation/`.
+- Scripts: `scripts/check_gold_manifest.py`, `scripts/evaluate_gold_manifest.py`.
+- Synthetic fixtures: `tests/fixtures/gold_manifest_synthetic.jsonl`, `prediction_manifest_synthetic.jsonl`.
+- Report chỉ whitelist aggregate numeric metrics, không chứa raw expected/predicted values.
+- `data_private/`, `data/gold/` và manifest ngoài `tests/fixtures/` bị guardrail chặn.
+- Gold thật không commit/không đưa vào Codex; Project Owner review và chạy ngoài Codex.
+- TOOLKIT-1 chưa nối trực tiếp pipeline output thật và chưa tính OCR CER/WER.
+
 Phase 2A đã triển khai đường chạy Surya OCR ở mức code/contract và thêm artifact để review OCR bằng hình ảnh. README, `.env.example`, Ezycloudx docs, visual QA docs, workflow docs, run scripts, và `settings.py` vẫn trỏ về default Surya target thay vì Tesseract.
 
 Canonical decisions:
@@ -79,6 +89,7 @@ Canonical decisions:
 - `src/court_ocr_extract/config.py` is compatibility/legacy.
 - `src/court_ocr_extract/excel_writer.py` là canonical Excel writer duy nhất; không import hai path đã xóa.
 - `src/court_ocr_extract/extraction_pipeline.py` và `src/court_ocr_extract/extractors/` là canonical extraction path.
+- `src/court_ocr_extract/evaluation/` là canonical manifest/metrics/report toolkit.
 - Surya OCR + local LLM is the main candidate.
 - Local VLM is the benchmark path.
 
@@ -149,7 +160,7 @@ Template report chuẩn:
 
 Ask Project Owner / ChatGPT to approve one next slice:
 
-1. TOOLKIT-1: evaluation harness + gold dataset manifest.
+1. TOOLKIT-2: connect pipeline output to prediction manifest.
 2. Phase 2B: Surya visual QA hardening.
 3. Phase 3A: Local LLM strict JSON/evidence hardening.
 4. Một phase Excel schema riêng để thêm audit/trace columns nếu được duyệt.

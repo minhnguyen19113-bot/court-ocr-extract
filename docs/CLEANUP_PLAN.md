@@ -12,6 +12,8 @@ Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_wr
 
 Phase 1F consolidates extractor backends into `src/court_ocr_extract/extractors/`, moves rule parsing under that package, and removes five duplicate/unimported extraction paths after caller migration.
 
+TOOLKIT-1 adds `src/court_ocr_extract/evaluation/`, two CLI scripts và synthetic JSONL fixtures. Đây là `main_candidate` toolkit code; real manifests remain protected outside Git.
+
 ## Categories
 
 - `main_candidate`: likely belongs in the rebuilt main path.
@@ -81,6 +83,8 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `scripts/smoke_vlm_synthetic.py`, `tests/test_vlm_contract.py` | experimental | Synthetic VLM contract only. | Keep; do not use for real quality. |
 | `src/court_ocr_extract/local_llm/` | main_candidate | Local LLM client/parser/prompt builder used by typed compatibility adapter. | Keep; strict JSON/evidence hardening cần Phase 3A. |
 | `src/court_ocr_extract/extraction_pipeline.py`, `src/court_ocr_extract/extractors/` | main_candidate | Canonical orchestrator và backend package sau Phase 1F. | Keep; mọi backend mới phải theo `ExtractorBackend`. |
+| `src/court_ocr_extract/evaluation/`, `scripts/check_gold_manifest.py`, `scripts/evaluate_gold_manifest.py` | main_candidate | TOOLKIT-1 manifest/metrics/privacy/report code. | Keep lightweight; không thêm heavy tracking dependency ở phase này. |
+| `tests/fixtures/*manifest_synthetic.jsonl` | tests_keep | Redacted synthetic evaluation contracts. | Keep; không thay bằng real gold/prediction data. |
 | `src/court_ocr_extract/extraction/merge.py`, `schemas.py`, `__init__.py` | legacy_optional | Typed merge/schema compatibility helpers; không còn sở hữu extractor backend. | Giữ cho legacy typed pipeline; review riêng khi pipeline cũ được retire. |
 | `src/court_ocr_extract/extraction/gliner_extractor.py` | experimental | Optional GLiNER support có behavior riêng. | Giữ experimental; không coi là canonical backend. |
 | `src/court_ocr_extract/extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, `extractor.py`, `llm.py` | removed_in_phase1f | Duplicate/unimported paths đã migrate vào canonical `extractors/`. | Đã xóa; restore bằng Git history trước Phase 1F nếu cần. |

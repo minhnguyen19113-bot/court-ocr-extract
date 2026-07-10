@@ -33,6 +33,9 @@ PDF
 .\.venv\Scripts\python -B -m scripts.repo_inventory
 .\.venv\Scripts\python -B -m scripts.import_graph
 .\.venv\Scripts\python -B -m scripts.check_ocr_backend --backend surya
+.\.venv\Scripts\python -B -m scripts.check_extractor
+.\.venv\Scripts\python -B -m scripts.check_gold_manifest --gold tests\fixtures\gold_manifest_synthetic.jsonl
+.\.venv\Scripts\python -B -m scripts.evaluate_gold_manifest --gold tests\fixtures\gold_manifest_synthetic.jsonl --predictions tests\fixtures\prediction_manifest_synthetic.jsonl
 .\.venv\Scripts\python -B -m pytest -p no:cacheprovider
 ```
 
@@ -52,6 +55,8 @@ Canonical extraction tooling sau Phase 1F:
 | Runtime readiness | Project Owner | Ezycloudx cài Surya/local LLM đúng version và GPU ổn định nếu cần. |
 | OCR pilot | Project Owner | Visual review xác nhận render, bbox, text, confidence usable. |
 | Extraction pilot | Project Owner + Reviewer | Evidence coverage đủ, JSON hợp lệ, warning dễ hiểu. |
+| Evaluation readiness | Codex | Synthetic manifest/metrics/report contracts pass; không dùng kết quả này để duyệt quality thật. |
+| Gold evaluation | Project Owner + Reviewer | Real manifest ở ngoài Git, đã redact/review, report chỉ aggregate metrics. |
 | Excel/QA pilot | Project Owner | Excel đúng schema, không rò PII qua log/report. |
 | Full run | Project Owner | Chỉ chạy sau khi pilot được chấp nhận. |
 
@@ -70,3 +75,4 @@ Canonical extraction tooling sau Phase 1F:
 - Không mở OCR cache/output thật.
 - Không gọi cloud API mặc định.
 - Không dùng synthetic smoke để kết luận quality thật.
+- Không đưa real gold/prediction manifests vào Git hoặc Codex.

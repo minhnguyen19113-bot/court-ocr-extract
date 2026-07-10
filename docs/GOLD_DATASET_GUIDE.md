@@ -1,10 +1,12 @@
 # Gold Dataset Guide
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
 Gold dataset dùng để đánh giá chất lượng thật, nhưng không được đưa vào Codex hoặc Git. Project Owner tạo, lưu, và chạy ngoài Codex trên môi trường kiểm soát.
+
+Real manifest gợi ý: `data_private/gold/gold_manifest.jsonl`. Toàn bộ `data_private/` và `data/gold/` được guardrail coi là protected; không commit và Codex không inspect.
 
 ## Nội dung tối thiểu
 
@@ -43,3 +45,28 @@ Gold dataset dùng để đánh giá chất lượng thật, nhưng không đư�
   "notes": "redacted reviewer note"
 }
 ```
+
+## JSONL contract TOOLKIT-1
+
+Mỗi gold record có các nhóm bắt buộc:
+
+- Safe identity: `case_id_hash`, `file_hash`, `source_type`, `split`.
+- Document: `page_count`, `document_tags`, `expected_sections`.
+- Labels: `expected_fields`, `expected_participants`.
+- Review: `reviewer`, `review_status`, `notes` trong `review`.
+
+Field label dùng `expected_value` đã redact/hash, `source_page`, `source_line_ids`, `evidence_text_redacted`, và `required`. Participant không lưu tên thật; dùng `name_hash`, role, redacted fields và source references.
+
+Prediction record ghi run/backend/model/prompt version, OCR aggregate counts, predicted sections/fields/participants, warnings và `needs_review`.
+
+Fixture được commit:
+
+- `tests/fixtures/gold_manifest_synthetic.jsonl`
+- `tests/fixtures/prediction_manifest_synthetic.jsonl`
+
+Trước khi dùng manifest thật ngoài Codex:
+
+1. Project Owner review thủ công mọi value/evidence/note.
+2. Chạy `scripts.check_gold_manifest` trên môi trường kiểm soát.
+3. Chạy evaluation và chỉ chia sẻ aggregate report đã redact.
+4. Không dùng việc guardrail pass làm bảo đảm manifest đã ẩn danh hoàn toàn.

@@ -1,5 +1,16 @@
 # AI Changelog
 
+## 2026-07-10 - TOOLKIT-1 Evaluation Harness + Gold Dataset Manifest
+
+- Thêm `evaluation/manifest.py`, `metrics.py`, `report.py`, `privacy.py` và package exports.
+- Thêm schema validation nhẹ cho gold/prediction JSONL cùng duplicate case/obvious PII checks.
+- Implement OCR, section, field, participant, evidence, source reference, review và warning metrics.
+- Thêm safe JSON/Markdown report whitelist chỉ numeric metrics.
+- Thêm `scripts.check_gold_manifest` và `scripts.evaluate_gold_manifest` với required paths, không real-data default.
+- Thêm synthetic redacted gold/prediction fixtures và tests cho valid/mismatch/PII/report/CLI behavior.
+- Mở rộng guardrail cho `data_private/`, `data/gold/`, manifest ngoài tests và PII trong fixture.
+- Không tạo/đọc gold thật, không chạy PDF/OCR/Excel thật, không gọi model/cloud, không commit/push.
+
 ## 2026-07-10 - Phase 1F Consolidate Duplicate Extraction Modules
 
 - Chọn `src/court_ocr_extract/extraction_pipeline.py` và `src/court_ocr_extract/extractors/` làm canonical extraction path.
