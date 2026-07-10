@@ -175,6 +175,50 @@ Output:
 - Updated memory files.
 - Next-step summary.
 
+## Architecture Audit Agent
+
+Responsibilities:
+
+- Chạy inventory/import graph/architecture guardrails trong phạm vi an toàn.
+- Tách rõ duplicate/conflict group với safe-to-remove candidate.
+- Không dùng import graph làm bằng chứng xóa file trực tiếp.
+- Không inspect `data/`, `outputs/`, `logs/`, `work/`, hoặc real-data artifacts.
+
+Output:
+
+- `docs/REPO_INVENTORY.md`.
+- `docs/IMPORT_GRAPH.md`.
+- `docs/LEGACY_ARCHIVE_PLAN.md`.
+- Guardrail summary.
+
+## Production Toolkit Agent
+
+Responsibilities:
+
+- Ghi production gates, safe commands, runtime owner boundaries, và pilot readiness checklist.
+- Phân biệt contract tests trong Codex với real-data pilot do Project Owner chạy.
+- Giữ Surya OCR + local LLM là main candidate và VLM là benchmark path.
+
+Output:
+
+- `docs/PRODUCTION_TOOLKIT.md`.
+- `docs/EVALUATION_PLAN.md`.
+- `docs/GOLD_DATASET_GUIDE.md`.
+
+## Privacy / Observability / MLOps Agent
+
+Responsibilities:
+
+- Thiết kế redaction, safe logging, run manifest, metrics, model/runtime versioning.
+- Đảm bảo report/log không in OCR text thật, PII, hoặc sensitive filenames.
+- Đảm bảo cloud API vẫn disabled default và mọi benchmark cloud là explicit opt-in.
+
+Output:
+
+- `docs/PRIVACY_REDACTION_PLAN.md`.
+- `docs/OBSERVABILITY_PLAN.md`.
+- `docs/MLOPS_PLAN.md`.
+
 Yêu cầu ngôn ngữ/report:
 
 - Báo cáo cho Project Owner/ChatGPT phải viết bằng tiếng Việt.
@@ -195,6 +239,8 @@ Before every task:
 - `docs/ARCHITECTURE.md`
 - `docs/PIPELINE_SPEC.md`
 - `docs/CLEANUP_PLAN.md` if cleanup/refactor is involved
+- `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`, and `docs/PRODUCTION_TOOLKIT.md` if architecture audit, cleanup/archive, or production readiness is involved
+- `docs/EVALUATION_PLAN.md`, `docs/GOLD_DATASET_GUIDE.md`, `docs/PRIVACY_REDACTION_PLAN.md`, `docs/OBSERVABILITY_PLAN.md`, and `docs/MLOPS_PLAN.md` if evaluation, privacy, observability, or runtime/model governance is involved
 
 After every task:
 
@@ -204,3 +250,4 @@ After every task:
 - Update `docs/CODEX_HANDOFF.md`.
 - Update `docs/DECISIONS.md` if a decision changed.
 - Update `docs/CLEANUP_PLAN.md` if structure/classification changed.
+- Update relevant Phase 1C blueprint docs if architecture/toolkit/evaluation/privacy/observability/MLOps guidance changed.

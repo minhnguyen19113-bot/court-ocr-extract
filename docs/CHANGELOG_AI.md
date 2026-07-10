@@ -1,5 +1,27 @@
 # AI Changelog
 
+## 2026-07-09 - Phase 1D Old App Folders Cleanup
+
+- Audited old app references with `scripts.import_graph`, `scripts.repo_inventory`, and `git grep`.
+- Confirmed the main `src/court_ocr_extract`/CLI path does not import `app/`, `app_fastapi/`, or `app_streamlit/`.
+- Removed old app folders: `app/`, `app_fastapi/`, and `app_streamlit/`.
+- Removed stale old app launch/doc/template artifacts: `scripts/ezycloudx_run_api.sh`, `scripts/ezycloudx_run_api_windows.ps1`, `docs/streamlit_vs_fastapi.md`, and `templates/upload.html`.
+- Removed old UI-only optional dependencies `streamlit` and `jinja2`; kept FastAPI/uvicorn dependencies for supported remote worker tooling.
+- Updated architecture guardrails/tests so old app run instructions in README/docs/scripts fail.
+- Updated repo memory/docs for restore path: use Git history before Phase 1D if old UI code is needed.
+- Did not run real PDFs, inspect real data, call cloud APIs, or modify Surya OCR, Local LLM extractor, Excel writer, or VLM benchmark modules.
+
+## 2026-07-08 - Phase 1C Architecture Audit + Production Toolkit
+
+- Thêm `scripts/repo_inventory.py` để tạo inventory an toàn, bỏ qua protected real-data/output roots.
+- Thêm `scripts/import_graph.py` để dựng import graph bằng `ast` cho `src/`, `scripts/`, và `tests/`.
+- Thêm `scripts/check_architecture_guardrails.py` để kiểm default/main path, cloud disabled defaults, protected path policy, CLI full-document support, và duplicate/legacy warnings.
+- Thêm tests cho architecture audit scripts.
+- Thêm docs Phase 1C: `REPO_INVENTORY`, `IMPORT_GRAPH`, `LEGACY_ARCHIVE_PLAN`, `PRODUCTION_TOOLKIT`, `EVALUATION_PLAN`, `GOLD_DATASET_GUIDE`, `PRIVACY_REDACTION_PLAN`, `OBSERVABILITY_PLAN`, và `MLOPS_PLAN`.
+- Cập nhật `AGENTS.md`, `AGENT_ROLES.md`, `TESTING.md`, `CLEANUP_PLAN.md`, `PROJECT_STATE.md`, `TASKS.md`, `DECISIONS.md`, và `CODEX_HANDOFF.md`.
+- Không xóa file, không archive/mass-move tracked code, không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API.
+- Không push vì Phase 1C chưa yêu cầu push.
+
 ## 2026-07-08 - Repo Cleanup Audit
 
 - Dọn generated cache local trong workspace, gồm `__pycache__/` và `.pytest_cache/`.

@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 ## Target Principles
 
@@ -73,6 +73,9 @@ Likely main candidates:
 - Export: `src/court_ocr_extract/export/`
 - Review UI/debug: `src/court_ocr_extract/visual_debug.py`, `src/court_ocr_extract/review_html.py`, `src/court_ocr_extract/extraction_preview.py`
 - Ezycloudx/remote worker: `src/court_ocr_extract/remote_worker/`, `scripts/ezycloudx_*`
+- Architecture audit/tooling: `scripts/repo_inventory.py`, `scripts/import_graph.py`, `scripts/check_architecture_guardrails.py`, `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`
+
+Phase 1D removed old UI app folders: `app/`, `app_fastapi/`, and `app_streamlit/`. The current supported operator surface is the CLI/debug-output path plus dedicated transfer/remote-worker tooling; restore old UI code from Git history only if explicitly needed.
 
 Phase 1B canonical decisions:
 

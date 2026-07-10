@@ -1,8 +1,12 @@
 # Cleanup Plan
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 Phase 1B applies main/default cleanup and canonical decisions. Repo cleanup on 2026-07-08 deleted local generated cache only; it did not delete, archive, or mass-move tracked source/docs.
+
+Phase 1C adds architecture inventory, import graph, architecture guardrails, and production toolkit planning docs. It still does not approve deletion, archive, or mass-move of tracked source/docs.
+
+Phase 1D removes old app folders after audit confirms they are not imported by the main CLI package path.
 
 ## Categories
 
@@ -16,21 +20,23 @@ Phase 1B applies main/default cleanup and canonical decisions. Repo cleanup on 2
 - `config_keep`: config/schema files to keep but possibly consolidate.
 - `generated_junk`: local generated cache/build artifacts that should not be committed and may be deleted during cleanup.
 - `unknown_need_review`: needs human decision before action.
+- `removed_in_phase1d`: removed after Phase 1D audit; restore from Git history if needed.
 
 ## Summary Counts
 
 | Category | Count |
 | --- | ---: |
-| main_candidate | 20 |
+| main_candidate | 21 |
 | legacy_optional | 12 |
 | experimental | 6 |
 | duplicate_conflict | 8 |
 | safe_to_remove_candidate | 0 |
-| docs_memory | 16 |
+| docs_memory | 17 |
 | tests_keep | 17 |
 | config_keep | 8 |
 | generated_junk | 1 |
-| unknown_need_review | 5 |
+| unknown_need_review | 4 |
+| removed_in_phase1d | 4 |
 
 Counts are planning counts by grouped file/folder rows below, not exact file totals.
 
@@ -54,6 +60,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `docs/SECURITY_PRIVACY.md` | docs_memory | Privacy and security rules. | Keep. |
 | `docs/CLEANUP_PLAN.md` | docs_memory | Cleanup classification. | Keep. |
 | `docs/AGENT_ROLES.md` | docs_memory | Agent role system. | Keep. |
+| `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`, `docs/PRODUCTION_TOOLKIT.md`, `docs/EVALUATION_PLAN.md`, `docs/GOLD_DATASET_GUIDE.md`, `docs/PRIVACY_REDACTION_PLAN.md`, `docs/OBSERVABILITY_PLAN.md`, `docs/MLOPS_PLAN.md` | docs_memory | Phase 1C architecture audit, repo slimming plan, production toolkit, evaluation, privacy, observability, and MLOps planning. | Keep and update when architecture/runtime decisions change. |
 | `src/court_ocr_extract/pdf/`, `src/court_ocr_extract/pdf_render.py` | duplicate_conflict | Render logic appears split. | Choose canonical render package. |
 | `src/court_ocr_extract/preprocess.py`, `image_preprocess.py`, `image_processing/` | duplicate_conflict | Preprocess/enhance logic overlaps. | Consolidate behind one preprocess API. |
 | `src/court_ocr_extract/ocr/` | main_candidate | Newer OCR adapter/schema package. | Prefer for rebuild after review. |
@@ -80,9 +87,13 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `config/model_config.yaml`, `config/local_model.yaml` | config_keep | Model guidance partly outdated. | Align to Qwen2.5 direction. |
 | `README.md`, `docs/ezycloudx_runbook.md`, `docs/ezycloudx_setup.md`, `docs/visual_qa_guide.md` | docs_memory | Phase 1B cleaned main defaults to Surya/VLM direction. | Keep current; update when runtime wiring changes. |
 | `scripts/run_sample_windows.ps1`, `scripts/run_full_windows.ps1` | main_candidate | Defaults cleaned to Surya target; VLM branch guarded as not wired. | Keep as target pilot/full wrappers. |
-| `scripts/ezycloudx_*` | unknown_need_review | Mixed setup/run scripts. | Review and split setup/check/run commands. |
+| `scripts/repo_inventory.py`, `scripts/import_graph.py`, `scripts/check_architecture_guardrails.py` | main_candidate | Phase 1C safe architecture audit/guardrail tooling. | Keep; run before cleanup/archive decisions. |
+| `scripts/ezycloudx_*` except removed old API launchers | unknown_need_review | Mixed setup/run scripts still need later review. `scripts/ezycloudx_run_api.sh` and `scripts/ezycloudx_run_api_windows.ps1` were removed in Phase 1D because they launched deleted `app_fastapi`. | Review and split setup/check/run commands. |
 | `scripts/debug_5_pdfs_bbox.py` | legacy_optional | Name suggests real PDF debug workflow. | Review for safety before use. |
-| `app/`, `app_fastapi/`, `app_streamlit/` | unknown_need_review | Multiple app folders. | Decide one UI/runtime owner. |
+| `app/`, `app_fastapi/`, `app_streamlit/` | removed_in_phase1d | Old UI/app folders were not imported by main `src/`/CLI path. | Removed; restore from Git history before Phase 1D commit if needed. |
+| `docs/streamlit_vs_fastapi.md` | removed_in_phase1d | Old UI doc instructed running removed app folders. | Removed; main docs now point to CLI/rebuild path. |
+| `templates/upload.html` | removed_in_phase1d | Template was only used by removed `app/main.py`. | Removed; `templates/excel_columns.json` remains config_keep. |
+| `streamlit` and `jinja2` optional web dependencies | removed_in_phase1d | Only old UI folders used them. | Removed from `pyproject.toml`; FastAPI/uvicorn remain for supported remote worker tooling. |
 | `prompts/direct_vision_extraction_prompt.vi.md` | experimental | Direct vision prompt. | Keep for VLM benchmark. |
 | `prompts/*local*`, `prompts/*json*`, `prompts/extraction_prompt.vi.md` | main_candidate | Local extraction prompt assets. | Keep and align with strict evidence JSON. |
 | `tests/*.py` | tests_keep | Contract/control-flow tests. | Keep. |
@@ -102,7 +113,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - Duplicate extractor: `extraction/`, `extractors/`, `extractor.py`, and `extraction_pipeline.py`.
 - Duplicate Excel writer: `excel_writer.py` is canonical; `excel.py` and `export/excel_writer.py` remain duplicate/legacy candidates.
 - Settings/config conflict: `settings.py` is canonical; `config.py` remains compatibility until consolidation.
-- Old app folders: `app/`, `app_fastapi/`, `app_streamlit/`.
+- Old app folders: removed in Phase 1D after no main path import/reference was found.
 - Run scripts conflicts: sample/full defaults cleaned to Surya target; VLM branch is explicitly not wired into these OCR-cache wrappers.
 
 ## Latest Cleanup Audit
@@ -111,6 +122,21 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - No tracked source/docs files were deleted because current cleanup classifications still show canonical conflicts or legacy/benchmark value.
 - `ruff` audit was attempted but skipped because `ruff` is not installed in `.venv`.
 - Protected real-data/output paths were not inspected or cleaned.
+
+## Latest Phase 1C Architecture Audit
+
+- Added safe inventory/import graph/architecture guardrail tooling.
+- Added `docs/LEGACY_ARCHIVE_PLAN.md` as the review gate before any tracked archive/delete action.
+- Current known warnings remain: legacy app folders, duplicate Surya/Excel/validation groups, opt-in cloud adapters, and VLM benchmark path.
+- No tracked source/docs files were deleted, archived, or mass-moved.
+
+## Latest Phase 1D Old App Cleanup
+
+- Removed `app/`, `app_fastapi/`, and `app_streamlit/`.
+- Removed stale old-app launch/doc/template artifacts: `scripts/ezycloudx_run_api.sh`, `scripts/ezycloudx_run_api_windows.ps1`, `docs/streamlit_vs_fastapi.md`, and `templates/upload.html`.
+- Removed `streamlit` and `jinja2` from optional `web` dependencies because they were only used by old app/UI folders.
+- Did not touch Surya OCR backend, Local LLM extractor, Excel writer, VLM benchmark modules, or real-data folders.
+- Restore path: use Git history before the Phase 1D commit if an old app is needed for reference.
 
 ## No-Delete Rule
 

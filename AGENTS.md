@@ -33,6 +33,8 @@ Before every task, Codex must read:
 - `docs/ARCHITECTURE.md`
 - `docs/PIPELINE_SPEC.md`
 - `docs/CLEANUP_PLAN.md` when the task involves cleanup, refactor, moving files, or deleting files
+- `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`, and `docs/PRODUCTION_TOOLKIT.md` when the task involves architecture audit, repo slimming, production readiness, or archive planning
+- `docs/EVALUATION_PLAN.md`, `docs/GOLD_DATASET_GUIDE.md`, `docs/PRIVACY_REDACTION_PLAN.md`, `docs/OBSERVABILITY_PLAN.md`, and `docs/MLOPS_PLAN.md` when the task involves evaluation, privacy, observability, model/runtime governance, or real-data pilot planning
 
 ## Quy tắc ngôn ngữ
 
@@ -76,6 +78,7 @@ After every task, Codex must update:
 - `docs/CODEX_HANDOFF.md`
 - `docs/DECISIONS.md` if a new decision was made
 - `docs/CLEANUP_PLAN.md` if file/folder structure or cleanup classification changed
+- Phase 1C blueprint docs when architecture inventory, archive planning, production toolkit, evaluation, privacy, observability, or MLOps guidance changed
 
 If a task edits code, Codex must also:
 
@@ -83,6 +86,7 @@ If a task edits code, Codex must also:
 - Run the focused tests or checks that match the change.
 - Report exact commands and results.
 - Avoid saying the task is done without test/log/output evidence.
+- Run `python -m scripts.check_architecture_guardrails` when the task touches architecture defaults, repo slimming, OCR/backend selection, cloud/default behavior, protected path policy, or production toolkit docs.
 
 ## Cleanup Approval Rule
 

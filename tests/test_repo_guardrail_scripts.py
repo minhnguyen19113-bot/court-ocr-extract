@@ -27,6 +27,15 @@ MEMORY_FILES = [
     "docs/SECURITY_PRIVACY.md",
     "docs/CLEANUP_PLAN.md",
     "docs/AGENT_ROLES.md",
+    "docs/REPO_INVENTORY.md",
+    "docs/IMPORT_GRAPH.md",
+    "docs/LEGACY_ARCHIVE_PLAN.md",
+    "docs/PRODUCTION_TOOLKIT.md",
+    "docs/EVALUATION_PLAN.md",
+    "docs/GOLD_DATASET_GUIDE.md",
+    "docs/PRIVACY_REDACTION_PLAN.md",
+    "docs/OBSERVABILITY_PLAN.md",
+    "docs/MLOPS_PLAN.md",
 ]
 
 

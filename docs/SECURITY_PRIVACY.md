@@ -45,6 +45,8 @@ Codex must not inspect:
 
 Terminal logs must show metrics and paths only when safe. They must not print full OCR text, full names, addresses, CCCD/CMND, or sensitive filenames.
 
+See `docs/PRIVACY_REDACTION_PLAN.md` for Phase 1C redaction/reporting rules.
+
 ## Git Hygiene
 
 `.gitignore` should continue excluding real data and derived artifacts. `scripts.check_repo_guardrails` should be run before staging or commit.

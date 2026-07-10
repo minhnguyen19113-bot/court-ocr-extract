@@ -1,12 +1,12 @@
 # Project State
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 ## Current Phase
 
-Phase 2A: SURYA OCR RUNTIME + VISUAL OCR REVIEW.
+Phase 1D: OLD APP FOLDERS CLEANUP.
 
-Phase này triển khai đường chạy `SuryaOCRBackend` ở mức code/contract và thêm artifact để review OCR bằng hình ảnh. Codex không chạy PDF thật, không gọi cloud API, và chưa chứng minh chất lượng OCR trên dữ liệu thật.
+Phase này xóa old app/UI folders sau khi audit xác nhận không có import/runtime dependency từ main `src/`/CLI path. Codex không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API, không chạy full pipeline, không sửa Surya OCR backend, không sửa Local LLM extractor, và không sửa Excel writer.
 
 ## Active Direction
 
@@ -36,6 +36,7 @@ Tesseract is legacy only. PaddleOCR is not part of the rebuild path. Cloud OCR/e
 - `src/court_ocr_extract/excel_writer.py` is canonical Excel writer for new rebuild work.
 - Excel writers, extractors, validation modules, and PDF/render modules have duplicate or overlapping implementations.
 - Existing tests are contract/control-flow oriented and use synthetic fixtures only.
+- Old app folders `app/`, `app_fastapi/`, and `app_streamlit/` were removed in Phase 1D. Restore path: use Git history before the Phase 1D commit if needed.
 
 ## Safety Boundary
 
@@ -90,6 +91,26 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Không inspect hoặc dọn `data/`, `outputs/`, `logs/`, `work/`, model files, PDF thật, Excel thật, image thật.
 - `ruff` không chạy được vì chưa được cài trong `.venv`.
 
+## Latest Phase 1C Work
+
+- Thêm `scripts/repo_inventory.py` để tạo inventory an toàn, bỏ qua protected real-data/output roots.
+- Thêm `scripts/import_graph.py` để dựng import graph bằng `ast` cho `src/`, `scripts/`, và `tests/`.
+- Thêm `scripts/check_architecture_guardrails.py` để kiểm Surya/main defaults, cloud disabled defaults, protected path policy, CLI full-document behavior, và duplicate/legacy warnings.
+- Thêm test synthetic/contract cho các script architecture audit mới.
+- Thêm docs Phase 1C: `REPO_INVENTORY`, `IMPORT_GRAPH`, `LEGACY_ARCHIVE_PLAN`, `PRODUCTION_TOOLKIT`, `EVALUATION_PLAN`, `GOLD_DATASET_GUIDE`, `PRIVACY_REDACTION_PLAN`, `OBSERVABILITY_PLAN`, và `MLOPS_PLAN`.
+- Cập nhật `AGENTS.md`, `AGENT_ROLES.md`, `TESTING.md`, `CLEANUP_PLAN.md`, `DECISIONS.md`, `TASKS.md`, `CHANGELOG_AI.md`, và `CODEX_HANDOFF.md`.
+- Không xóa file, không chạy dữ liệu thật, không inspect protected artifacts, không push.
+
+## Latest Phase 1D Work
+
+- Audited old app references with `scripts.import_graph`, `scripts.repo_inventory`, and `git grep`.
+- Confirmed `src/court_ocr_extract` and CLI main path do not import `app/`, `app_fastapi/`, or `app_streamlit/`.
+- Removed old app folders: `app/`, `app_fastapi/`, and `app_streamlit/`.
+- Removed stale old app artifacts: `docs/streamlit_vs_fastapi.md`, `scripts/ezycloudx_run_api.sh`, `scripts/ezycloudx_run_api_windows.ps1`, and `templates/upload.html`.
+- Removed old UI-only optional dependencies `streamlit` and `jinja2`; kept `fastapi`, `uvicorn`, and `python-multipart` for supported remote worker tooling.
+- Updated architecture guardrails to fail if README/docs/scripts reintroduce old app run instructions.
+- Did not touch Surya OCR backend, Local LLM extractor, Excel writer, VLM benchmark modules, or protected real-data paths.
+
 ## Next Gate
 
-Project Owner / ChatGPT nên kiểm tra Surya runtime trên Ezycloudx trước, sau đó quyết định Phase 2B sẽ ưu tiên cải thiện visual QA, pin version `surya-ocr`, hay chuyển sang hardening Local LLM extraction.
+Project Owner / ChatGPT nên duyệt một hướng tiếp theo: Phase 1E consolidate duplicate Excel/export, Phase 1F consolidate duplicate extraction modules, hoặc TOOLKIT-1 evaluation harness + gold dataset manifest. Surya/runtime pilot thật vẫn do Project Owner chạy ngoài Codex.

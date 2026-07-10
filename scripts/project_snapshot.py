@@ -24,6 +24,15 @@ IMPORTANT_DOCS = [
     "docs/SECURITY_PRIVACY.md",
     "docs/CLEANUP_PLAN.md",
     "docs/AGENT_ROLES.md",
+    "docs/REPO_INVENTORY.md",
+    "docs/IMPORT_GRAPH.md",
+    "docs/LEGACY_ARCHIVE_PLAN.md",
+    "docs/PRODUCTION_TOOLKIT.md",
+    "docs/EVALUATION_PLAN.md",
+    "docs/GOLD_DATASET_GUIDE.md",
+    "docs/PRIVACY_REDACTION_PLAN.md",
+    "docs/OBSERVABILITY_PLAN.md",
+    "docs/MLOPS_PLAN.md",
 ]
 
 KEY_MODULES = [
@@ -38,6 +47,9 @@ KEY_MODULES = [
     "src/court_ocr_extract/qa.py",
     "src/court_ocr_extract/visual_debug.py",
     "scripts/check_repo_guardrails.py",
+    "scripts/check_architecture_guardrails.py",
+    "scripts/repo_inventory.py",
+    "scripts/import_graph.py",
 ]
 
 MAIN_DECISIONS = [

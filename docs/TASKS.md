@@ -1,6 +1,6 @@
 # Tasks
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 ## Phase 1A
 
@@ -23,11 +23,36 @@ Last updated: 2026-07-08
 - [x] Update run scripts default backend to Surya target.
 - [x] Keep legacy files in place; no deletion or mass move.
 
-## Phase 1C / Phase 2 Candidates
+## Phase 1C
+
+- [x] Tạo safe repo inventory script và doc.
+- [x] Tạo Python import graph script và doc.
+- [x] Tạo architecture guardrail script.
+- [x] Thêm tests cho architecture audit scripts.
+- [x] Tạo legacy archive/repo slimming plan không xóa file.
+- [x] Tạo production toolkit blueprint.
+- [x] Tạo evaluation plan và gold dataset guide.
+- [x] Tạo privacy redaction, observability, và MLOps plans.
+- [x] Cập nhật `AGENTS.md`, `AGENT_ROLES.md`, `TESTING.md`, memory docs, và cleanup plan.
+- [x] Không chạy PDF thật, không đọc dữ liệu thật, không xóa file, không push khi chưa được yêu cầu.
+
+## Phase 1D
+
+- [x] Audit `app/`, `app_fastapi/`, `app_streamlit/`.
+- [x] Chạy `scripts.import_graph` và `scripts.repo_inventory` trước cleanup.
+- [x] Tìm references bằng `git grep` trong README/docs/scripts/tests/src/pyproject.
+- [x] Xác nhận không có import từ main `src/`/CLI path vào old app folders.
+- [x] Xóa `app/`, `app_fastapi/`, `app_streamlit/`.
+- [x] Xóa stale old app artifacts: `docs/streamlit_vs_fastapi.md`, `scripts/ezycloudx_run_api.sh`, `scripts/ezycloudx_run_api_windows.ps1`, `templates/upload.html`.
+- [x] Gỡ `streamlit` và `jinja2` khỏi optional `web` dependencies.
+- [x] Cập nhật architecture guardrail để bắt old app run instructions quay lại.
+- [x] Không tạo `legacy/`, `archive/`, `old/`, hoặc `deprecated/` folder mới.
+- [x] Không chạy PDF thật, không đọc dữ liệu thật, không sửa Surya OCR backend, Local LLM extractor, Excel writer, hoặc VLM benchmark modules.
+
+## Phase 1E / Phase 2 Candidates
 
 Do not start without Project Owner / ChatGPT approval.
 
-- Archive or move legacy app folders and legacy backends.
 - Consolidate Surya OCR adapter path.
 - Define and implement real Surya OCR cache contract.
 - Expand debug UI around bbox/evidence/QA links.
@@ -85,3 +110,4 @@ Do not start without Project Owner / ChatGPT approval.
 - VLM benchmark harness with comparable QA output.
 - Gold dataset workflow outside Codex for real quality assessment.
 - Ezycloudx runtime checks for GPU, Surya, vLLM/Ollama, and transfer server.
+- Cleanup/archive slice theo `docs/LEGACY_ARCHIVE_PLAN.md` sau khi reviewer duyệt.

@@ -1,6 +1,6 @@
 # Decisions
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 | ID | Status | Decision | Reason |
 | --- | --- | --- | --- |
@@ -23,10 +23,14 @@ Last updated: 2026-07-07
 | D-017 | Accepted | Báo cáo cho Project Owner/ChatGPT phải dùng tiếng Việt và heading tiếng Việt. | Tránh report nửa Anh nửa Việt, giữ giao tiếp thống nhất cho reviewer. |
 | D-018 | Accepted | Tên kỹ thuật chuẩn được giữ nguyên tiếng Anh trong report/docs. | File path, class, function, CLI command, env var, model name, package name, schema field không nên dịch. |
 | D-019 | Accepted | Template chuẩn sau mỗi task là `# BÁO CÁO TASK` với 9 mục tiếng Việt. | Giúp các phiên Codex sau báo cáo nhất quán. |
+| D-020 | Accepted | Phase 1C chỉ tạo architecture audit, repo slimming plan, và production toolkit blueprint; không xóa, archive, mass-move, hoặc push nếu chưa được yêu cầu. | Reviewer cần duyệt từng cleanup/archive slice trước khi thay đổi tracked source/docs. |
+| D-021 | Accepted | Import graph và repo inventory là tín hiệu audit, không phải bằng chứng đủ để xóa file. | Module low-fan-in vẫn có thể là CLI entrypoint, compatibility path, benchmark path, hoặc runtime plugin. |
+| D-022 | Accepted | `scripts.check_architecture_guardrails` là gate bắt buộc khi đụng architecture defaults, repo slimming, OCR/backend selection, cloud/default behavior, hoặc protected path policy. | Giảm nguy cơ quay lại Tesseract/cloud default, default page-limit cũ, hoặc commit real-data artifacts. |
+| D-023 | Accepted | Gold dataset và real-data evaluation do Project Owner quản trị ngoài Codex/Git. | Codex chỉ dùng synthetic fixtures cho contract/control-flow và không đọc dữ liệu thật. |
+| D-024 | Accepted | Phase 1D removes old app folders instead of moving them into an archive folder. | Audit found no main `src/`/CLI import dependency; Git history is the restore path and keeping archive folders would keep the repo noisy. |
 
-## Pending Decisions Before Phase 1C / Phase 2
+## Pending Decisions Before Cleanup / Phase 2
 
-- Whether to archive old app folders before or after Surya main path consolidation.
 - Which extraction package becomes canonical.
 - Which local model target is first for the Ezycloudx VM.
 - Which Surya adapter path becomes canonical.

@@ -1,6 +1,6 @@
 # Codex Handoff
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 ## Read First
 
@@ -14,8 +14,40 @@ For the next Codex session, read these before acting:
 6. `docs/ARCHITECTURE.md`
 7. `docs/PIPELINE_SPEC.md`
 8. `docs/CLEANUP_PLAN.md` if cleanup/refactor is involved
+9. `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`, and `docs/PRODUCTION_TOOLKIT.md` if architecture audit, cleanup/archive, or production readiness is involved
+10. `docs/EVALUATION_PLAN.md`, `docs/GOLD_DATASET_GUIDE.md`, `docs/PRIVACY_REDACTION_PLAN.md`, `docs/OBSERVABILITY_PLAN.md`, and `docs/MLOPS_PLAN.md` if evaluation, privacy, observability, or runtime/model governance is involved
 
 ## Current State
+
+Phase 1C đã thêm architecture audit + repo slimming plan + production toolkit blueprint. Các artifact mới:
+
+- `scripts/repo_inventory.py`
+- `scripts/import_graph.py`
+- `scripts/check_architecture_guardrails.py`
+- `docs/REPO_INVENTORY.md`
+- `docs/IMPORT_GRAPH.md`
+- `docs/LEGACY_ARCHIVE_PLAN.md`
+- `docs/PRODUCTION_TOOLKIT.md`
+- `docs/EVALUATION_PLAN.md`
+- `docs/GOLD_DATASET_GUIDE.md`
+- `docs/PRIVACY_REDACTION_PLAN.md`
+- `docs/OBSERVABILITY_PLAN.md`
+- `docs/MLOPS_PLAN.md`
+
+Phase 1C không xóa file, không archive/mass-move tracked code, không chạy dữ liệu thật, không inspect protected artifacts, và không push khi chưa được yêu cầu.
+
+Phase 1D removed old app/UI folders after audit confirmed no main `src/`/CLI import dependency:
+
+- Removed `app/`
+- Removed `app_fastapi/`
+- Removed `app_streamlit/`
+- Removed `docs/streamlit_vs_fastapi.md`
+- Removed `scripts/ezycloudx_run_api.sh`
+- Removed `scripts/ezycloudx_run_api_windows.ps1`
+- Removed `templates/upload.html`
+- Removed `streamlit` and `jinja2` from optional `web` dependencies
+
+Restore path: use Git history before the Phase 1D commit if an old UI is needed. Do not recreate `legacy/`, `archive/`, `old/`, or `deprecated/` folders for this code unless Project Owner explicitly asks.
 
 Phase 2A đã triển khai đường chạy Surya OCR ở mức code/contract và thêm artifact để review OCR bằng hình ảnh. README, `.env.example`, Ezycloudx docs, visual QA docs, workflow docs, run scripts, và `settings.py` vẫn trỏ về default Surya target thay vì Tesseract.
 
@@ -88,14 +120,14 @@ Template report chuẩn:
 - Tesseract remains in code/docs only as legacy optional; Surya backend must not fallback to Tesseract.
 - `settings.py` and `config.py` still overlap internally, but `settings.py` is canonical for new work.
 - Multiple extraction, validation, render, OCR, and Excel writer paths overlap.
-- Old app folders exist and need classification before cleanup.
+- Old app folders were removed in Phase 1D; do not reintroduce old app run instructions in README/docs/scripts.
 
 ## Suggested Next Step
 
-Ask Project Owner / ChatGPT to approve one Phase 1C/2 slice:
+Ask Project Owner / ChatGPT to approve one next slice:
 
-1. Ezycloudx Surya package/model check and possible `surya-ocr` version pin.
-2. Visual QA improvements after real Surya bbox/text review.
-3. Dedicated `ocr-surya-review` command if needed.
-4. Canonical extraction package/API selection.
-5. Local LLM strict JSON/evidence hardening.
+1. Phase 1E: consolidate duplicate Excel/export.
+2. Phase 1F: consolidate duplicate extraction modules.
+3. TOOLKIT-1: evaluation harness + gold dataset manifest.
+4. Ezycloudx Surya package/model check và possible `surya-ocr` version pin.
+5. Visual QA improvements sau khi Project Owner review Surya bbox/text thật ngoài Codex.
