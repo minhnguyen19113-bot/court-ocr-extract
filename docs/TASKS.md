@@ -146,6 +146,17 @@ Do not start without Project Owner / ChatGPT approval.
 - [ ] Project Owner chạy lại `debug-preprocess --deskew off` trên Ezycloudx và duyệt toàn bộ trang.
 - [ ] Chỉ thử `--deskew safe` sau khi preview mặc định được chấp nhận.
 
+## Red Seal + Text Enhancement Fix
+
+- [x] Kết hợp HSV/Lab/RGB red mask, morphology và component metadata.
+- [x] Thêm `neutralize|inpaint|white_fill` cùng residual/removed metrics.
+- [x] Thêm black-text protection mask và overlap warning.
+- [x] Thêm `text-enhance off|light|medium|strong` và default `light`.
+- [x] Thêm red-removal/text-enhancement guard và staged fallback.
+- [x] Nâng debug artifacts/HTML và synthetic test matrix.
+- [x] Giữ nguyên deskew; không chạy PDF/OCR/model/cloud/full pipeline thật.
+- [ ] Project Owner so sánh ba cấu hình preprocess v2 trên Ezycloudx trước OCR.
+
 ## Repo Cleanup
 
 - [x] Audit generated cache trong các root code/docs/tests/app an toàn.

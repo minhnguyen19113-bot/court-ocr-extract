@@ -124,6 +124,15 @@ Preprocess safety notes:
 - Blank guard fallback về original/previous safe stage và ghi warnings rõ.
 - Không có real PDF/OCR run trong task; Project Owner phải review bản `off` trên Ezycloudx trước khi tiếp tục OCR.
 
+Red seal/text enhancement v2 notes:
+
+- Default CLI: `--red-removal-mode neutralize --text-enhance light`; deskew vẫn `off`.
+- Detector dùng HSV + Lab + RGB; artifacts thêm `black_text_protection_mask.png` và `text_enhanced.png`.
+- Modes: `neutralize` bảo thủ, `inpaint` làm sạch residual hai lượt, `white_fill` chỉ thử nghiệm.
+- Protection mask giữ nét tối; overlap đáng kể ghi `red_mask_overlaps_dark_text`.
+- Text enhancement chạy sau red removal; guard fallback khi dark pixels/foreground bùng nổ hoặc entropy collapse.
+- Project Owner cần so sánh ba run v2 trong runbook; Codex chưa đọc/chạy real PDF/output.
+
 Repo cleanup notes:
 
 - Generated cache local đã được dọn khỏi workspace.
@@ -169,6 +178,6 @@ Template report chuẩn:
 
 Ask Project Owner / ChatGPT to approve one next slice:
 
-1. Project Owner chạy lại full-page `debug-preprocess --deskew off` và duyệt artifacts/warnings.
-2. Nếu bản mặc định đạt, thử riêng `--deskew safe` để so sánh.
+1. Project Owner so sánh `neutralize+light`, `inpaint+light`, `inpaint+medium` theo runbook.
+2. Chọn mode giảm red residual nhưng giữ được black-text protection và dấu tiếng Việt.
 3. Chỉ sau preprocess gate mới tiếp tục Surya visual QA/OCR.

@@ -58,24 +58,46 @@ Project Owner đặt đúng 1 PDF cần pilot vào folder `data\raw_pdfs\pilot_o
   --review-sample-size 1 `
   --deskew off `
   --red-seal-removal on `
+  --red-removal-mode neutralize `
+  --text-enhance light `
   --preprocess-profile conservative `
-  --output outputs\debug_visual `
+  --output outputs\debug_visual_preprocess_v2 `
   --open
 ```
 
-Project Owner phải kiểm tra original/red mask/seal removed/final và warnings của toàn bộ trang trước OCR. Chỉ sau khi bản `off` không blank/mất chữ mới thử `--deskew safe`; không dùng `force` cho pilot production.
+Project Owner phải kiểm tra original/red mask/black-text protection/seal removed/text enhanced/final và warnings của toàn bộ trang trước OCR. Nếu `neutralize` còn red residual, so sánh với `inpaint`:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-preprocess `
   --input data\raw_pdfs\pilot_one `
   --limit 1 `
   --review-sample-size 1 `
-  --deskew safe `
+  --deskew off `
   --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance light `
   --preprocess-profile conservative `
-  --output outputs\debug_visual `
+  --output outputs\debug_visual_preprocess_inpaint `
   --open
 ```
+
+Nếu chữ vẫn mờ sau khi seal đã sạch, thử text medium riêng:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-preprocess `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --deskew off `
+  --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance medium `
+  --preprocess-profile balanced `
+  --output outputs\debug_visual_preprocess_medium `
+  --open
+```
+
+`white_fill`, `text-enhance=strong`, và `deskew=force` chỉ dùng thử nghiệm có visual review; không dùng làm default production.
 
 OCR review toàn bộ file phải dùng `--full-document` để không cắt theo `settings.max_pages_before_marker` và không dừng/truncate tại marker nội dung.
 

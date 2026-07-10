@@ -88,6 +88,12 @@ def _add_debug_preprocess(subparsers) -> None:
     parser.add_argument("--deskew", choices=["off", "safe", "force"], default="off")
     parser.add_argument("--red-seal-removal", choices=["on", "off"], default="on")
     parser.add_argument(
+        "--red-removal-mode",
+        choices=["neutralize", "inpaint", "white_fill"],
+        default="neutralize",
+    )
+    parser.add_argument("--text-enhance", choices=["off", "light", "medium", "strong"], default="light")
+    parser.add_argument(
         "--preprocess-profile",
         choices=["conservative", "balanced", "aggressive"],
         default="conservative",
@@ -249,7 +255,9 @@ def cmd_debug_preprocess(args) -> None:
             after = page_dir / "final_preprocessed.png"
             compare = page_dir / "before_after_compare.png"
             red_mask = page_dir / "red_mask.png"
+            black_text_protection = page_dir / "black_text_protection_mask.png"
             seal_removed = page_dir / "seal_removed.png"
+            text_enhanced = page_dir / "text_enhanced.png"
             metadata_path = page_dir / "metadata.json"
             page_dir.mkdir(parents=True, exist_ok=True)
             metadata: dict[str, Any] = {"page_number": page.page_number}
@@ -259,6 +267,10 @@ def cmd_debug_preprocess(args) -> None:
                 remove_red_seal=args.red_seal_removal == "on",
                 intermediate_path=seal_removed,
                 red_mask_path=red_mask,
+                black_text_protection_path=black_text_protection,
+                red_removal_mode=args.red_removal_mode,
+                text_enhanced_path=text_enhanced,
+                text_enhance_mode=args.text_enhance,
                 deskew_mode=args.deskew,
                 preprocess_profile=args.preprocess_profile,
                 metadata=metadata,
@@ -269,8 +281,12 @@ def cmd_debug_preprocess(args) -> None:
             page_images = [("original", page.image_path)]
             if red_mask.exists():
                 page_images.append(("red_mask", red_mask))
+            if black_text_protection.exists():
+                page_images.append(("black_text_protection_mask", black_text_protection))
             if seal_removed.exists():
                 page_images.append(("seal_removed", seal_removed))
+            if text_enhanced.exists():
+                page_images.append(("text_enhanced", text_enhanced))
             page_images.extend([("final_preprocessed", after), ("before_after_compare", compare)])
             review_pages.append({"metadata": metadata, "images": page_images})
         review_cases.append({"case_id": case.case_id, "pages": review_pages})

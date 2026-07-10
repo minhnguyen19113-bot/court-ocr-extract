@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-10 - Red Seal + Text Enhancement Fix
+
+- Mở rộng red mask thành HSV + Lab + RGB, morphology, component count và residual metrics.
+- Thêm `neutralize`, `inpaint`, `white_fill` cùng black-text protection/overlap warning.
+- Thêm `text-enhance off|light|medium|strong`, staged artifact và dark/foreground guard.
+- Nâng CLI/debug HTML với protection mask, text-enhanced image và metadata mới.
+- Thêm synthetic tests; giữ nguyên deskew và không chạy PDF/OCR/Surya/LLM/cloud/full pipeline thật.
+
 ## 2026-07-10 - Preprocess Safety Fix
 
 - Thay auto-deskew mặc định bằng `off`; thêm `safe`/`force` và metadata angle/confidence/reason.

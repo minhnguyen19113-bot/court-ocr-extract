@@ -32,6 +32,7 @@ Last updated: 2026-07-10
 | D-026 | Accepted | Phase 1F uses `extraction_pipeline.py` as canonical orchestrator and `extractors/` as the only extractor-backend package. | Main CLI đã dùng contract này; chuyển typed compatibility behavior vào canonical package cho phép xóa backend/rule modules trùng mà không rewrite extraction logic lớn. |
 | D-027 | Accepted | Real gold/prediction manifests remain outside Git/Codex; repo evaluation uses only redacted synthetic JSONL fixtures and aggregate reports. | Giảm rủi ro PII, giữ evaluation có thể test tự động, và tách contract verification khỏi real quality acceptance của Project Owner. |
 | D-028 | Accepted | Preprocess mặc định dùng `conservative`, red seal removal trên ảnh màu và `deskew=off`; `safe` phải qua confidence/range/crop/layout guard, mọi transform phải có blank fallback. | Kết quả debug thật cho thấy auto-deskew và threshold cũ có thể làm nghiêng hoặc blank trang; ưu tiên bảo toàn nội dung trước OCR. |
+| D-029 | Accepted | Preprocess v2 mặc định dùng `red_removal_mode=neutralize` và `text_enhance=light`; `white_fill`/`strong` chỉ dùng thử nghiệm, mọi stage có protection/guard/fallback. | Feedback visual thật xác nhận deskew/blank đã ổn nhưng seal còn residual và chữ hơi mờ; cần tăng chất lượng mà không xóa nét đen hoặc tạo noise giả. |
 
 ## Pending Decisions Before Cleanup / Phase 2
 

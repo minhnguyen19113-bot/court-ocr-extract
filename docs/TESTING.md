@@ -60,6 +60,8 @@ TOOLKIT-1 tests chỉ dùng hai JSONL fixtures đã redact trong `tests/fixtures
 
 Preprocess safety tests dùng ảnh RGB synthetic trong `tmp_path` để kiểm red HSV mask/removal, bảo toàn chữ đen, no-seal behavior, color-before-grayscale order, safe deskew, blank fallback và debug HTML. Chúng không mở PDF, không gọi OCR/Surya và không chứng minh ngưỡng phù hợp cho scan thật.
 
+Preprocess v2 tests mở rộng sang HSV/Lab/RGB metadata, `neutralize|inpaint|white_fill`, black-text overlap protection, red residual, text `light`, strong-mode guard, blank/no-seal và mọi debug artifact. Passing tests chỉ chứng minh contract synthetic, không chứng minh chất lượng scan thật.
+
 ## Phase 1C Verification Commands
 
 ```powershell

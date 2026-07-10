@@ -52,14 +52,17 @@ Default page scope:
 
 Must show:
 
-- original, `red_mask`, `seal_removed`, final preprocessed và before/after images
-- `preprocess_profile`, red-pixel metrics, deskew angle/confidence/reason và before/after foreground metrics
+- original, `red_mask`, `black_text_protection_mask`, `seal_removed`, `text_enhanced`, final và before/after images
+- red mask method/components, removal mode/residual/overlap, text-enhance mode, deskew metadata và before/after foreground metrics
 - non-overwrite guarantee
 - warnings và fallback source khi transform bị bỏ qua hoặc blank guard kích hoạt
 
 Safety contract:
 
-- Red seal detection/removal chạy trên ảnh màu trước grayscale.
+- Red seal detection kết hợp HSV + Lab + RGB trên ảnh màu; protection mask giữ nét tối khi seal overlap text.
+- Default là `red_removal_mode=neutralize` và `text_enhance=light`; `white_fill`/`strong` chỉ dành cho thử nghiệm.
+- Thứ tự: red removal -> background normalization -> text enhancement -> optional safe deskew -> final guard/fallback.
+- Red/text guard phải ghi `red_removal_guard_triggered`, `text_enhance_guard_triggered`, `dark_pixel_explosion` hoặc `foreground_loss_too_high` khi áp dụng.
 - `--deskew off` là mặc định; `safe` chỉ xoay trong ngưỡng 0.3-5 độ khi confidence đủ cao và không có crop/multi-column risk.
 - Nếu output mất quá nhiều foreground hoặc gần trắng, dùng original/previous safe stage và ghi `preprocess_blank_guard_triggered` cùng `foreground_loss_too_high`.
 - Mỗi page có `metadata.json`; Project Owner phải review `debug-preprocess` trước khi chạy OCR thật.

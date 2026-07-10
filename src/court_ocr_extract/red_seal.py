@@ -13,8 +13,20 @@ def remove_red_seal_debug(input_path: str | Path, output_dir: str | Path) -> dic
     output_dir.mkdir(parents=True, exist_ok=True)
     before = output_dir / "before.png"
     mask = output_dir / "red_mask.png"
+    protection = output_dir / "black_text_protection_mask.png"
     after = output_dir / "after.png"
     with Image.open(input_path) as image:
         image.convert("RGB").save(before)
-    reduce_red_stamp_with_metadata(input_path, after, mask_path=mask)
-    return {"before": before, "red_mask": mask, "after": after}
+    reduce_red_stamp_with_metadata(
+        input_path,
+        after,
+        mode="neutralize",
+        mask_path=mask,
+        black_text_protection_path=protection,
+    )
+    return {
+        "before": before,
+        "red_mask": mask,
+        "black_text_protection_mask": protection,
+        "after": after,
+    }

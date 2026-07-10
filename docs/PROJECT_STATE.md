@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 ## Current Phase
 
-PREPROCESS SAFETY FIX sau TOOLKIT-1.
+RED SEAL + TEXT ENHANCEMENT FIX sau PREPROCESS SAFETY FIX.
 
-Task này sửa preprocess theo hướng bảo thủ bằng synthetic images: red seal trên ảnh màu, deskew có confidence/guardrail, blank fallback và debug metadata. Codex không đọc/chạy PDF thật, không gọi OCR/Surya/model/cloud, không chạy full pipeline và không sửa Local LLM/Excel/extraction pipeline.
+Task này tối ưu red-seal removal và black-text enhancement bằng synthetic images sau feedback visual thật của Project Owner. Codex không đọc output/PDF thật, không gọi OCR/Surya/Local LLM/cloud, không chạy full pipeline và không sửa deskew, Excel hay extraction pipeline.
 
 ## Active Direction
 
@@ -151,6 +151,16 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Debug review hiển thị original, red mask, seal removed, final, compare, metadata và warnings theo page.
 - Tests chỉ dùng ảnh synthetic; chất lượng và ngưỡng trên scan thật chưa được xác nhận.
 
+## Latest Red Seal + Text Enhancement Fix
+
+- Red detector kết hợp HSV + Lab + RGB, morphology cleanup, component count và residual estimate.
+- Thêm `neutralize`, `inpaint`, `white_fill`; default `neutralize`, còn `inpaint` có residual second pass.
+- Thêm `black_text_protection_mask`, overlap ratio và warning `red_mask_overlaps_dark_text`.
+- Thêm `text_enhance=off|light|medium|strong`; default `light`, chạy sau red removal.
+- Text guard phát hiện foreground loss/dark-pixel explosion/entropy collapse và fallback stage an toàn.
+- Debug per-page có red mask, protection mask, seal removed, text enhanced, final và metadata đầy đủ.
+- Deskew logic/default giữ nguyên; tests chỉ dùng synthetic images.
+
 ## Next Gate
 
-Project Owner cần chạy lại `debug-preprocess` với `deskew off` trên VM và review toàn bộ trang. Chỉ thử `safe` sau khi bản mặc định không blank/mất chữ; chưa tiếp tục OCR trước gate này.
+Project Owner cần so sánh `neutralize+light`, `inpaint+light` và `inpaint+medium` trên VM. Chỉ tiếp tục OCR sau khi red residual giảm đủ, chữ đen rõ hơn và protection/final artifacts không mất nội dung.

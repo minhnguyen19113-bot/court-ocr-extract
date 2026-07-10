@@ -92,8 +92,14 @@ def test_blank_guard_falls_back_to_previous_safe_image(tmp_path, monkeypatch) ->
 def test_preprocess_review_contains_artifacts_and_safety_metadata(tmp_path) -> None:
     original = tmp_path / "original.png"
     final = tmp_path / "final.png"
+    red_mask = tmp_path / "red_mask.png"
+    protection = tmp_path / "black_text_protection_mask.png"
+    seal_removed = tmp_path / "seal_removed.png"
+    text_enhanced = tmp_path / "text_enhanced.png"
     _synthetic_page().save(original)
     _synthetic_page().convert("L").save(final)
+    for artifact in (red_mask, protection, seal_removed, text_enhanced):
+        _synthetic_page().save(artifact)
     output = tmp_path / "review.html"
 
     write_preprocess_review(
@@ -104,9 +110,18 @@ def test_preprocess_review_contains_artifacts_and_safety_metadata(tmp_path) -> N
                 "case_id": "case_synthetic",
                 "pages": [
                     {
-                        "images": [("original", original), ("final_preprocessed", final)],
+                        "images": [
+                            ("original", original),
+                            ("red_mask", red_mask),
+                            ("black_text_protection_mask", protection),
+                            ("seal_removed", seal_removed),
+                            ("text_enhanced", text_enhanced),
+                            ("final_preprocessed", final),
+                        ],
                         "metadata": {
                             "page_number": 1,
+                            "red_removal_mode": "neutralize",
+                            "text_enhance_mode": "light",
                             "deskew_mode": "off",
                             "deskew_applied": False,
                             "deskew_reason": "deskew_disabled",
@@ -120,7 +135,13 @@ def test_preprocess_review_contains_artifacts_and_safety_metadata(tmp_path) -> N
 
     html = output.read_text(encoding="utf-8")
     assert "original" in html
+    assert "red_mask" in html
+    assert "black_text_protection_mask" in html
+    assert "seal_removed" in html
+    assert "text_enhanced" in html
     assert "final_preprocessed" in html
+    assert "neutralize" in html
+    assert "light" in html
     assert "deskew_disabled" in html
     assert "synthetic_warning" in html
 

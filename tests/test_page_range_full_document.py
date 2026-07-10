@@ -81,6 +81,8 @@ def test_debug_preprocess_without_pages_passes_none_to_render(tmp_path, monkeypa
     assert captured == [None]
     assert preprocess_options[0]["deskew_mode"] == "off"
     assert preprocess_options[0]["remove_red_seal"] is True
+    assert preprocess_options[0]["red_removal_mode"] == "neutralize"
+    assert preprocess_options[0]["text_enhance_mode"] == "light"
     assert preprocess_options[0]["preprocess_profile"] == "conservative"
 
 
