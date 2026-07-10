@@ -6,6 +6,7 @@ from scripts.check_architecture_guardrails import (
     check_architecture,
     cli_has_bad_pages_default,
     cli_has_full_document,
+    find_legacy_excel_import_refs,
     find_old_app_main_path_refs,
     format_report,
     is_protected_path,
@@ -28,6 +29,7 @@ def test_repo_inventory_excludes_protected_real_data_roots() -> None:
     assert "work" not in inventory.by_top_folder
     assert inventory.optional_app_dirs == []
     assert "surya_adapter" in inventory.duplicate_groups
+    assert "excel_writer" not in inventory.duplicate_groups
 
 
 def test_import_graph_scans_python_modules_and_reports_internal_edges() -> None:
@@ -74,3 +76,22 @@ def test_architecture_guardrail_flags_old_app_run_instructions(tmp_path: Path) -
     findings = find_old_app_main_path_refs(tmp_path)
 
     assert findings == ["docs/old_ui.md: 1"]
+
+
+def test_architecture_guardrail_flags_legacy_excel_imports(tmp_path: Path) -> None:
+    source = tmp_path / "src/court_ocr_extract/pipeline.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "from court_ocr_extract.export." + "excel_writer import write_excel\n",
+        encoding="utf-8",
+    )
+
+    findings = find_legacy_excel_import_refs(tmp_path)
+
+    assert findings == ["src/court_ocr_extract/pipeline.py: 1"]
+
+
+def test_architecture_guardrail_requires_canonical_excel_writer(tmp_path: Path) -> None:
+    report = check_architecture(tmp_path)
+
+    assert any("Canonical Excel writer is missing" in failure for failure in report.failures)

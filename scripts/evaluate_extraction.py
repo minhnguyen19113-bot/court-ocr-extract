@@ -13,7 +13,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from court_ocr_extract.config import get_settings
-from court_ocr_extract.excel import EXCEL_HEADERS, rows_from_result
+from court_ocr_extract.excel_writer import EXCEL_HEADERS, rows_from_result
 from court_ocr_extract.models import ExtractionResult
 
 

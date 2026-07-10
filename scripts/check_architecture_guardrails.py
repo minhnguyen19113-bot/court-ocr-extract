@@ -58,6 +58,12 @@ MAIN_DEFAULT_ROOTS = [
 PADDLE_MAIN_PATH_ROOTS = ["pyproject.toml", ".env.example", "config", "src"]
 OLD_APP_DOC_ROOTS = ["README.md", "docs"]
 OLD_APP_RUNTIME_ROOTS = ["scripts", "src"]
+CANONICAL_EXCEL_WRITER = "src/court_ocr_extract/excel_writer.py"
+LEGACY_EXCEL_WRITER_PATHS = [
+    "src/court_ocr_extract/excel.py",
+    "src/court_ocr_extract/export/excel_writer.py",
+]
+EXCEL_IMPORT_ROOTS = ["README.md", "docs", "scripts", "src", "tests"]
 
 TESSERACT_DEFAULT_PATTERNS = [
     re.compile(r"\bocr_backend\s*[:=]\s*[\"']?tesseract\b", re.IGNORECASE),
@@ -90,6 +96,17 @@ OLD_APP_RUNTIME_PATTERNS = [
     re.compile(r"\bimport\s+app_fastapi\b", re.IGNORECASE),
     re.compile(r"\bfrom\s+app_streamlit\b", re.IGNORECASE),
     re.compile(r"\bimport\s+app_streamlit\b", re.IGNORECASE),
+]
+
+LEGACY_EXCEL_IMPORT_PATTERNS = [
+    re.compile(
+        r"\bfrom\s+court_ocr_extract\.(?:excel|export\.excel_writer)\s+import\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bimport\s+court_ocr_extract\.(?:excel|export\.excel_writer)\b",
+        re.IGNORECASE,
+    ),
 ]
 
 
@@ -183,6 +200,14 @@ def find_old_app_main_path_refs(repo_root: Path) -> list[str]:
     return findings
 
 
+def find_legacy_excel_import_refs(repo_root: Path) -> list[str]:
+    return count_pattern_matches(
+        repo_root,
+        LEGACY_EXCEL_IMPORT_PATTERNS,
+        EXCEL_IMPORT_ROOTS,
+    )
+
+
 def cli_has_bad_pages_default(repo_root: Path) -> bool:
     cli_path = repo_root / "src/court_ocr_extract/cli.py"
     if not cli_path.exists():
@@ -235,6 +260,14 @@ def check_architecture(repo_root: Path = REPO_ROOT) -> ArchitectureGuardrailRepo
     if old_app_refs:
         failures.append("Old app main-path references: " + "; ".join(old_app_refs))
 
+    if not (repo_root / CANONICAL_EXCEL_WRITER).exists():
+        failures.append(f"Canonical Excel writer is missing: {CANONICAL_EXCEL_WRITER}")
+    legacy_excel_imports = find_legacy_excel_import_refs(repo_root)
+    if legacy_excel_imports:
+        failures.append(
+            "Legacy Excel writer imports detected: " + "; ".join(legacy_excel_imports)
+        )
+
     if cli_has_bad_pages_default(repo_root):
         failures.append("CLI still appears to default --pages to 1-3 or cli.py is missing.")
     if not cli_has_full_document(repo_root):
@@ -245,9 +278,11 @@ def check_architecture(repo_root: Path = REPO_ROOT) -> ArchitectureGuardrailRepo
     for folder in ("app", "app_fastapi", "app_streamlit"):
         if (repo_root / folder).exists():
             warnings.append(f"Legacy app folder still present: {folder}")
+    for path in LEGACY_EXCEL_WRITER_PATHS:
+        if (repo_root / path).exists():
+            warnings.append(f"Legacy Excel compatibility path still present: {path}")
     duplicate_paths = [
         ("Surya adapters", ["src/court_ocr_extract/ocr_backends/surya_ocr.py", "src/court_ocr_extract/ocr_surya.py", "src/court_ocr_extract/ocr/surya_adapter.py"]),
-        ("Excel writers", ["src/court_ocr_extract/excel_writer.py", "src/court_ocr_extract/excel.py", "src/court_ocr_extract/export/excel_writer.py"]),
         ("Validators", ["src/court_ocr_extract/validation.py", "src/court_ocr_extract/validator.py", "src/court_ocr_extract/extraction/validators.py"]),
     ]
     for label, paths in duplicate_paths:

@@ -1,12 +1,14 @@
 # Cleanup Plan
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 Phase 1B applies main/default cleanup and canonical decisions. Repo cleanup on 2026-07-08 deleted local generated cache only; it did not delete, archive, or mass-move tracked source/docs.
 
 Phase 1C adds architecture inventory, import graph, architecture guardrails, and production toolkit planning docs. It still does not approve deletion, archive, or mass-move of tracked source/docs.
 
 Phase 1D removes old app folders after audit confirms they are not imported by the main CLI package path.
+
+Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_writer.py` and removes two duplicate paths after migrating every caller.
 
 ## Categories
 
@@ -21,6 +23,7 @@ Phase 1D removes old app folders after audit confirms they are not imported by t
 - `generated_junk`: local generated cache/build artifacts that should not be committed and may be deleted during cleanup.
 - `unknown_need_review`: needs human decision before action.
 - `removed_in_phase1d`: removed after Phase 1D audit; restore from Git history if needed.
+- `removed_in_phase1e`: removed after Phase 1E caller/import audit; restore from Git history if needed.
 
 ## Summary Counts
 
@@ -29,7 +32,7 @@ Phase 1D removes old app folders after audit confirms they are not imported by t
 | main_candidate | 21 |
 | legacy_optional | 12 |
 | experimental | 6 |
-| duplicate_conflict | 8 |
+| duplicate_conflict | 7 |
 | safe_to_remove_candidate | 0 |
 | docs_memory | 17 |
 | tests_keep | 17 |
@@ -37,6 +40,7 @@ Phase 1D removes old app folders after audit confirms they are not imported by t
 | generated_junk | 1 |
 | unknown_need_review | 4 |
 | removed_in_phase1d | 4 |
+| removed_in_phase1e | 2 |
 
 Counts are planning counts by grouped file/folder rows below, not exact file totals.
 
@@ -76,8 +80,8 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `src/court_ocr_extract/extractors/local_llm_extractor.py` | duplicate_conflict | Older/parallel extractor path. | Compare then consolidate. |
 | `src/court_ocr_extract/extraction/`, `extractor.py`, `extraction_pipeline.py` | duplicate_conflict | Rule/merge/extraction paths overlap. | Choose canonical extraction API. |
 | `src/court_ocr_extract/validation.py`, `validator.py`, `extraction/validators.py` | duplicate_conflict | Validation split across modules. | Choose canonical validation package. |
-| `src/court_ocr_extract/excel_writer.py` | main_candidate | Canonical Excel writer after Phase 1B. | Keep and extend only through approved schema work. |
-| `src/court_ocr_extract/excel.py`, `export/excel_writer.py` | duplicate_conflict | Duplicate/legacy Excel writer paths overlap canonical writer. | Compare then consolidate/archive later. |
+| `src/court_ocr_extract/excel_writer.py` | main_candidate | Canonical Excel writer duy nhất sau Phase 1E; hỗ trợ draft records và typed `ExtractionResult`. | Keep; chỉ mở rộng schema qua phase được duyệt. |
+| `src/court_ocr_extract/excel.py`, `src/court_ocr_extract/export/excel_writer.py` | removed_in_phase1e | Caller đã migrate sang canonical path; không cần compatibility wrapper. | Đã xóa; restore bằng Git history trước Phase 1E nếu cần. |
 | `src/court_ocr_extract/qa.py`, `scripts/qa_output.py`, `scripts/qa_batch_output.py` | main_candidate | QA output pieces exist. | Keep and align report schema. |
 | `src/court_ocr_extract/visual_debug.py`, `review_html.py`, `evidence_viewer.py`, `extraction_preview.py` | main_candidate | Debug/review UI pieces. | Keep and connect bbox/evidence views. |
 | `src/court_ocr_extract/remote_worker/`, `transfer.py`, `scripts/transfer_server.py` | main_candidate | Ezycloudx/remote worker support. | Keep, review fallback policy. |
@@ -111,7 +115,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - VLM: useful benchmark modules exist, but they must not become unvalidated main path by accident.
 - Cloud adapters: OpenAI/Gemini/Google OCR/extraction adapters exist and must remain opt-in.
 - Duplicate extractor: `extraction/`, `extractors/`, `extractor.py`, and `extraction_pipeline.py`.
-- Duplicate Excel writer: `excel_writer.py` is canonical; `excel.py` and `export/excel_writer.py` remain duplicate/legacy candidates.
+- Duplicate Excel writer: resolved in Phase 1E; `excel_writer.py` là canonical duy nhất, hai path cũ đã xóa.
 - Settings/config conflict: `settings.py` is canonical; `config.py` remains compatibility until consolidation.
 - Old app folders: removed in Phase 1D after no main path import/reference was found.
 - Run scripts conflicts: sample/full defaults cleaned to Surya target; VLM branch is explicitly not wired into these OCR-cache wrappers.
@@ -127,7 +131,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 
 - Added safe inventory/import graph/architecture guardrail tooling.
 - Added `docs/LEGACY_ARCHIVE_PLAN.md` as the review gate before any tracked archive/delete action.
-- Current known warnings remain: legacy app folders, duplicate Surya/Excel/validation groups, opt-in cloud adapters, and VLM benchmark path.
+- Trước Phase 1D/1E, warnings gồm old app và duplicate Excel; hai nhóm này đã được xử lý. Warnings còn lại gồm duplicate Surya/validation, opt-in cloud adapters, và VLM benchmark path.
 - No tracked source/docs files were deleted, archived, or mass-moved.
 
 ## Latest Phase 1D Old App Cleanup
@@ -138,6 +142,14 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - Did not touch Surya OCR backend, Local LLM extractor, Excel writer, VLM benchmark modules, or real-data folders.
 - Restore path: use Git history before the Phase 1D commit if an old app is needed for reference.
 
+## Latest Phase 1E Excel/Export Consolidation
+
+- Migrate mọi runtime/test caller từ `court_ocr_extract.excel` và `court_ocr_extract.export.excel_writer` sang `court_ocr_extract.excel_writer`.
+- Chuyển typed `ExtractionResult` mapping/writing vào canonical writer, giữ nguyên header và sheet contract hiện hữu.
+- Xóa `src/court_ocr_extract/excel.py` và `src/court_ocr_extract/export/excel_writer.py`; không tạo wrapper vì không còn caller.
+- Architecture guardrail fail nếu canonical writer thiếu hoặc legacy import quay lại; path compatibility còn tồn tại sẽ phát warning.
+- Restore path: use Git history before the Phase 1E commit.
+
 ## No-Delete Rule
 
-Every tracked source/docs row above is a candidate classification only. Do not delete or move tracked source/docs until the Project Owner approves a specific cleanup scope. Generated local cache folders may be deleted during cleanup.
+Ngoài các cleanup slice Phase 1D và Phase 1E đã được Project Owner phê duyệt rõ, mọi tracked source/docs row còn lại chỉ là candidate classification. Không xóa hoặc move thêm tracked source/docs nếu chưa có approval riêng. Generated local cache folders có thể được dọn trong cleanup an toàn.

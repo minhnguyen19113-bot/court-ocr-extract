@@ -1,4 +1,4 @@
-from court_ocr_extract.excel import rows_from_result
+from court_ocr_extract.excel_writer import rows_from_result
 from court_ocr_extract.extractor import extract_rule_based
 from court_ocr_extract.normalizer import find_noi_dung_marker
 from court_ocr_extract.validator import validate_extraction

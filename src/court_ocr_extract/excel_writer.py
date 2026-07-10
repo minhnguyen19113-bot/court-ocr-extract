@@ -7,6 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from court_ocr_extract.models import ExtractionResult, Participant
 from court_ocr_extract.validation import row_needs_review
 
 
@@ -55,6 +56,32 @@ def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, A
     return rows
 
 
+def rows_from_result(result: ExtractionResult) -> list[dict[str, str | None]]:
+    participants = result.participants or [
+        Participant(ghi_chu="Không nhận diện được người tham gia tố tụng")
+    ]
+    rows: list[dict[str, str | None]] = []
+    common_note = "; ".join(result.warnings)
+    for participant in participants:
+        note = "; ".join(item for item in [participant.ghi_chu, common_note] if item)
+        rows.append(
+            {
+                "LOẠI ÁN": result.case_info.loai_an,
+                "SỐ THỤ LÝ": result.case_info.so_thu_ly,
+                "NGÀY THỤ LÝ (DD/MM/YYYY)": result.case_info.ngay_thu_ly,
+                "QUAN HỆ PHÁP LUẬT": result.case_info.quan_he_phap_luat,
+                "TƯ CÁCH TỐ TỤNG": participant.tu_cach_to_tung,
+                "HỌ TÊN ĐƯƠNG SỰ": participant.ho_ten,
+                "NĂM SINH": participant.nam_sinh,
+                "CCCD": participant.cccd,
+                "ĐỊA CHỈ": participant.dia_chi,
+                "HỌ TÊN CHỦ TỌA": result.case_info.chu_toa,
+                "GHI CHÚ": note or None,
+            }
+        )
+    return rows
+
+
 def write_excel(
     draft_records: list[dict[str, Any]],
     output_path: str | Path,
@@ -79,6 +106,24 @@ def write_excel(
     summary_sheet.column_dimensions["A"].width = 34
     summary_sheet.column_dimensions["B"].width = 42
 
+    workbook.save(output_path)
+    return output_path
+
+
+def write_excel_from_results(
+    results: list[ExtractionResult],
+    output_path: str | Path,
+) -> Path:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook = Workbook()
+    data_sheet = workbook.active
+    data_sheet.title = "Trich xuat"
+    data_sheet.append(EXCEL_HEADERS)
+    for result in results:
+        for row in rows_from_result(result):
+            data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
+    _format_data_sheet(data_sheet)
     workbook.save(output_path)
     return output_path
 

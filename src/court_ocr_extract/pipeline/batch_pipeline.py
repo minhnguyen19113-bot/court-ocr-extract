@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from court_ocr_extract.config import Settings, get_settings
-from court_ocr_extract.export.excel_writer import write_excel_from_results
+from court_ocr_extract.excel_writer import write_excel_from_results
 from court_ocr_extract.file_utils import sha256_file, short_hash, write_json
 from court_ocr_extract.models import ExtractionResult, model_to_dict
 from court_ocr_extract.pipeline.single_file_pipeline import process_pdf

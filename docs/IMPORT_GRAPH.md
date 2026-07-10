@@ -1,6 +1,6 @@
 # Import Graph
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
@@ -39,6 +39,17 @@ Sau khi xóa old app folders, import graph của `src/`, `scripts/`, và `tests/
 - Unimported src modules: 9.
 
 Không có module `src/court_ocr_extract` import `app/`, `app_fastapi/`, hoặc `app_streamlit/`.
+
+## Snapshot Phase 1E
+
+Sau khi migrate caller và xóa hai duplicate Excel writer paths:
+
+- Python modules scanned: 148.
+- Internal import edges: 271.
+- Parse errors: 0.
+- Unimported src modules: 9.
+- Không còn import `court_ocr_extract.excel` hoặc `court_ocr_extract.export.excel_writer` trong `src/`, `scripts/`, hoặc `tests/`.
+- Pipeline, evaluation script, và tests dùng `court_ocr_extract.excel_writer`.
 
 Các module low-fan-in/unimported hiện là tín hiệu audit, chưa phải bằng chứng để xóa:
 

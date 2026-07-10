@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Target Principles
 
@@ -70,19 +70,19 @@ Likely main candidates:
 - Surya/OCR cache: `src/court_ocr_extract/ocr/`, `src/court_ocr_extract/ocr_backends/surya_ocr.py`, `src/court_ocr_extract/ocr_cache.py`
 - Local LLM: `src/court_ocr_extract/local_llm/`, `src/court_ocr_extract/extraction/local_llm_extractor.py`
 - Extraction and validation: `src/court_ocr_extract/extraction/`, `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/qa.py`
-- Export: `src/court_ocr_extract/export/`
+- Excel export: canonical `src/court_ocr_extract/excel_writer.py`; JSON helper vẫn ở `src/court_ocr_extract/export/json_writer.py`.
 - Review UI/debug: `src/court_ocr_extract/visual_debug.py`, `src/court_ocr_extract/review_html.py`, `src/court_ocr_extract/extraction_preview.py`
 - Ezycloudx/remote worker: `src/court_ocr_extract/remote_worker/`, `scripts/ezycloudx_*`
 - Architecture audit/tooling: `scripts/repo_inventory.py`, `scripts/import_graph.py`, `scripts/check_architecture_guardrails.py`, `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`
 
 Phase 1D removed old UI app folders: `app/`, `app_fastapi/`, and `app_streamlit/`. The current supported operator surface is the CLI/debug-output path plus dedicated transfer/remote-worker tooling; restore old UI code from Git history only if explicitly needed.
 
-Phase 1B canonical decisions:
+Phase 1B/1E canonical decisions:
 
 - Config: `src/court_ocr_extract/settings.py` is canonical for the rebuild.
 - Compatibility config: `src/court_ocr_extract/config.py` remains for older imports and should not be expanded unless necessary.
-- Excel writer: `src/court_ocr_extract/excel_writer.py` is canonical.
-- Other Excel writers are duplicate/legacy until consolidation.
+- Excel writer: `src/court_ocr_extract/excel_writer.py` là canonical path duy nhất.
+- Phase 1E đã migrate caller và xóa `src/court_ocr_extract/excel.py` cùng `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
 
 Legacy or conflict candidates are tracked in `docs/CLEANUP_PLAN.md`.
 

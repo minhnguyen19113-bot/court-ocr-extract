@@ -1,6 +1,6 @@
 # Data Schema
 
-Last updated: 2026-07-07
+Last updated: 2026-07-10
 
 This document records target schema expectations for rebuild planning. It does not change runtime behavior.
 
@@ -71,6 +71,25 @@ Target Excel/export row metadata:
 - `NEEDS_REVIEW`
 
 Domain fields should remain defined in `config/fields.yaml` or the canonical schema chosen in Phase 1B.
+
+Phase 1E giữ nguyên workbook contract hiện tại của canonical `src/court_ocr_extract/excel_writer.py`:
+
+- Draft-record API `write_excel()` tạo sheet `DATA` và `RUN_SUMMARY`.
+- Typed-result API `write_excel_from_results()` tạo sheet `Trich xuat` để giữ tương thích hành vi của caller đã migrate.
+- Cả hai API dùng cùng 11 domain headers trong `EXCEL_HEADERS`.
+
+Các cột audit/trace mục tiêu bên trên chưa có trong 11 headers hiện tại:
+
+- `SOURCE_CASE_ID`
+- `SOURCE_PAGE`
+- `SOURCE_LINE_IDS`
+- `OCR_CONFIDENCE`
+- `EXTRACTION_CONFIDENCE`
+- `EVIDENCE`
+- `WARNINGS`
+- `NEEDS_REVIEW`
+
+Phase 1E không ép thay đổi schema lớn. Việc bổ sung các cột này cần một phase schema riêng với migration/QA rõ ràng.
 
 ## QA Report
 

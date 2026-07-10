@@ -1,6 +1,6 @@
 # Testing
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Allowed In Codex
 
@@ -48,7 +48,26 @@ After Phase 1B, `scripts.check_repo_guardrails` should pass unless a new real-da
 
 After Phase 1D, `scripts.check_architecture_guardrails` should also fail if README/docs/scripts reintroduce executable run instructions for the removed `app_fastapi` or `app_streamlit` apps.
 
+After Phase 1E, `scripts.check_architecture_guardrails` phải fail nếu canonical `src/court_ocr_extract/excel_writer.py` bị thiếu hoặc import `court_ocr_extract.excel`/`court_ocr_extract.export.excel_writer` quay lại. Path compatibility cũ còn tồn tại sẽ tạo warning.
+
+`tests/test_excel_writer_contract.py` chỉ tạo workbook synthetic trong `tmp_path`, mở lại bằng `openpyxl`, và kiểm sheet/header hiện tại. Test này không đọc hoặc ghi Excel real-data trong `outputs/`.
+
 ## Phase 1C Verification Commands
+
+```powershell
+.\.venv\Scripts\python -B -m compileall src scripts -q
+.\.venv\Scripts\python -B -m scripts.project_snapshot
+.\.venv\Scripts\python -B -m scripts.check_repo_guardrails
+.\.venv\Scripts\python -B -m scripts.check_architecture_guardrails
+.\.venv\Scripts\python -B -m scripts.repo_inventory
+.\.venv\Scripts\python -B -m scripts.import_graph
+.\.venv\Scripts\python -B -m scripts.check_ocr_backend --backend surya
+.\.venv\Scripts\python -B -m pytest -p no:cacheprovider
+git diff --check
+git status --short
+```
+
+## Phase 1E Verification Commands
 
 ```powershell
 .\.venv\Scripts\python -B -m compileall src scripts -q

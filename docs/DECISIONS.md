@@ -1,6 +1,6 @@
 # Decisions
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 | ID | Status | Decision | Reason |
 | --- | --- | --- | --- |
@@ -28,6 +28,7 @@ Last updated: 2026-07-09
 | D-022 | Accepted | `scripts.check_architecture_guardrails` là gate bắt buộc khi đụng architecture defaults, repo slimming, OCR/backend selection, cloud/default behavior, hoặc protected path policy. | Giảm nguy cơ quay lại Tesseract/cloud default, default page-limit cũ, hoặc commit real-data artifacts. |
 | D-023 | Accepted | Gold dataset và real-data evaluation do Project Owner quản trị ngoài Codex/Git. | Codex chỉ dùng synthetic fixtures cho contract/control-flow và không đọc dữ liệu thật. |
 | D-024 | Accepted | Phase 1D removes old app folders instead of moving them into an archive folder. | Audit found no main `src/`/CLI import dependency; Git history is the restore path and keeping archive folders would keep the repo noisy. |
+| D-025 | Accepted | Phase 1E keeps `src/court_ocr_extract/excel_writer.py` as the sole Excel writer and removes `excel.py` plus `export/excel_writer.py` after caller migration. | Một canonical module loại bỏ logic/header trùng; typed-result behavior được chuyển nguyên vẹn và bảo vệ bằng synthetic contract tests. |
 
 ## Pending Decisions Before Cleanup / Phase 2
 

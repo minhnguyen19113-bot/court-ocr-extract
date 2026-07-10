@@ -59,11 +59,6 @@ DUPLICATE_GROUPS = {
         "src/court_ocr_extract/validator.py",
         "src/court_ocr_extract/extraction/validators.py",
     ],
-    "excel_writer": [
-        "src/court_ocr_extract/excel_writer.py",
-        "src/court_ocr_extract/excel.py",
-        "src/court_ocr_extract/export/excel_writer.py",
-    ],
 }
 
 LEGACY_PATHS = {

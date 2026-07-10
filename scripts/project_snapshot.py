@@ -43,7 +43,7 @@ KEY_MODULES = [
     "src/court_ocr_extract/local_llm/json_parser.py",
     "src/court_ocr_extract/extraction/local_llm_extractor.py",
     "src/court_ocr_extract/extraction/validators.py",
-    "src/court_ocr_extract/export/excel_writer.py",
+    "src/court_ocr_extract/excel_writer.py",
     "src/court_ocr_extract/qa.py",
     "src/court_ocr_extract/visual_debug.py",
     "scripts/check_repo_guardrails.py",

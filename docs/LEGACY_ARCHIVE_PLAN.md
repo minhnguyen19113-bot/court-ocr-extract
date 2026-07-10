@@ -1,6 +1,6 @@
 # Legacy Archive Plan
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Nguyên tắc
 
@@ -22,7 +22,7 @@ Mọi action archive/delete sau này cần:
 | C | Render/preprocess trùng | Chọn render/preprocess API duy nhất. | Debug render/preprocess synthetic tests pass. |
 | D | Extraction package trùng | Chọn `extraction/` hoặc `extractors/` làm canonical. | Local LLM contract tests pass. |
 | E | Validation/QA trùng | Hợp nhất validation warning/evidence schema. | QA/extraction tests pass. |
-| F | Excel/export trùng | Giữ `excel_writer.py`, archive wrapper trùng nếu không còn caller. | Excel mapping/writer tests pass. |
+| F | Excel/export trùng | Completed Phase 1E: giữ `excel_writer.py`, migrate caller, xóa `excel.py` và `export/excel_writer.py`. | Synthetic Excel contract tests và architecture guardrail pass. |
 | G | Cloud/legacy backends | Giữ opt-in adapter hoặc archive vào legacy namespace. | Guardrail xác nhận cloud disabled default. |
 
 ## Nhóm không được xóa trong Phase 1C
@@ -37,7 +37,7 @@ Mọi action archive/delete sau này cần:
 | Nhóm | Lý do | Điều kiện trước khi archive |
 | --- | --- | --- |
 | `app/`, `app_fastapi/`, `app_streamlit/` | Removed in Phase 1D. | Không còn action archive; restore bằng Git history nếu cần. |
-| Wrapper Excel trùng | `excel_writer.py` đã là canonical. | Import graph không còn caller runtime. |
+| Wrapper Excel trùng | Removed in Phase 1E; không cần wrapper vì mọi caller đã migrate. | Restore bằng Git history trước Phase 1E nếu phát hiện external dependency ngoài repo. |
 | Adapter Surya cũ | `ocr_backends/surya_ocr.py` đang là runtime chính. | Có migration path hoặc shim ổn định. |
 | Config compatibility cũ | `settings.py` là canonical. | Không còn import quan trọng từ `config.py`. |
 
@@ -57,6 +57,16 @@ Also removed stale old-app launch/doc artifacts:
 - `templates/upload.html`
 
 No `legacy/`, `archive/`, `old/`, or `deprecated/` folder was created. Restore path: use Git history before the Phase 1D commit if an old UI is needed for reference.
+
+## Phase 1E Result
+
+Phase 1E consolidated Excel/export without creating an archive folder:
+
+- Canonical: `src/court_ocr_extract/excel_writer.py`.
+- Removed: `src/court_ocr_extract/excel.py`.
+- Removed: `src/court_ocr_extract/export/excel_writer.py`.
+- Compatibility wrapper: none required after repo-wide caller migration.
+- Restore path: use Git history before the Phase 1E commit.
 
 ## Kiểm tra bắt buộc trước archive
 

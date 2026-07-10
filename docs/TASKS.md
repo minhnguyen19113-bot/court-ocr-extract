@@ -1,6 +1,6 @@
 # Tasks
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Phase 1A
 
@@ -49,7 +49,19 @@ Last updated: 2026-07-09
 - [x] Không tạo `legacy/`, `archive/`, `old/`, hoặc `deprecated/` folder mới.
 - [x] Không chạy PDF thật, không đọc dữ liệu thật, không sửa Surya OCR backend, Local LLM extractor, Excel writer, hoặc VLM benchmark modules.
 
-## Phase 1E / Phase 2 Candidates
+## Phase 1E
+
+- [x] Audit mọi file/reference Excel/export trong safe roots.
+- [x] Xác nhận `src/court_ocr_extract/excel_writer.py` là canonical writer.
+- [x] Migrate typed `ExtractionResult` mapping/writing vào canonical writer.
+- [x] Chuyển pipeline, evaluation script, và tests sang canonical import.
+- [x] Xóa `src/court_ocr_extract/excel.py` và `src/court_ocr_extract/export/excel_writer.py` sau khi không còn caller.
+- [x] Thêm synthetic `.xlsx` contract tests bằng `tmp_path` + `openpyxl`.
+- [x] Thêm architecture guardrail cho canonical writer và legacy import.
+- [x] Cập nhật inventory/import graph/memory/schema/testing docs.
+- [x] Không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API, không push.
+
+## Phase 1F / Phase 2 Candidates
 
 Do not start without Project Owner / ChatGPT approval.
 
@@ -57,7 +69,7 @@ Do not start without Project Owner / ChatGPT approval.
 - Define and implement real Surya OCR cache contract.
 - Expand debug UI around bbox/evidence/QA links.
 - Choose canonical extraction package/API.
-- Consolidate duplicate Excel/export wrappers.
+- Bổ sung audit/trace columns vào Excel trong một phase schema riêng nếu được duyệt.
 
 ## Memory/Reporting Rules
 

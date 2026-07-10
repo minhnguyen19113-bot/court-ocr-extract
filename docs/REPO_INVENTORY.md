@@ -1,6 +1,6 @@
 # Repo Inventory
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
@@ -31,6 +31,15 @@ Script nguồn: `python -m scripts.repo_inventory`.
 - Root keep files: 5.
 - Optional app dirs: none.
 
+## Snapshot Phase 1E
+
+- Safe files scanned: 228.
+- Code files: 159.
+- Docs/prompt files: 47.
+- Config files: 9.
+- Root keep files: 5.
+- Excel writer duplicate group: none.
+
 ## Nhóm chính đang giữ
 
 | Nhóm | Trạng thái | Ghi chú |
@@ -38,7 +47,7 @@ Script nguồn: `python -m scripts.repo_inventory`.
 | `src/court_ocr_extract/settings.py` | canonical | Config rebuild chính. |
 | `src/court_ocr_extract/ocr_backends/surya_ocr.py` | main candidate | Surya runtime path hiện tại. |
 | `src/court_ocr_extract/ocr_cache.py` | main candidate | Contract OCR cache. |
-| `src/court_ocr_extract/excel_writer.py` | canonical | Excel writer chính sau Phase 1B. |
+| `src/court_ocr_extract/excel_writer.py` | canonical | Excel writer duy nhất sau Phase 1E; chứa draft-record và typed-result APIs. |
 | `src/court_ocr_extract/local_llm/` | main candidate | Local LLM client/parser/prompt builder. |
 | `src/court_ocr_extract/visual_debug.py`, `review_html.py` | main candidate | Visual QA/debug UI. |
 | `scripts/project_snapshot.py`, `check_repo_guardrails.py` | guardrail tooling | Memory/safety checks. |
@@ -52,7 +61,6 @@ Script nguồn: `python -m scripts.repo_inventory`.
 | Surya adapter | `ocr_backends/surya_ocr.py`, `ocr_surya.py`, `ocr/surya_adapter.py` | Giữ `ocr_backends/surya_ocr.py` làm runtime chính hay chuyển vào package `ocr/`. |
 | Local LLM extractor | `extraction/local_llm_extractor.py`, `extractors/local_llm_extractor.py` | Chọn package extraction canonical. |
 | Validation | `validation.py`, `validator.py`, `extraction/validators.py` | Hợp nhất warning/evidence rules. |
-| Excel writer | `excel_writer.py`, `excel.py`, `export/excel_writer.py` | Giữ `excel_writer.py`, archive wrapper trùng sau test. |
 
 ## Nhóm legacy/optional
 
@@ -61,6 +69,12 @@ Script nguồn: `python -m scripts.repo_inventory`.
 - Cloud/direct extractors: `openai_extractor.py`, `gemini_extractor.py`, `direct_vision_extractor.py`; không bật mặc định.
 - `app/`, `app_fastapi/`, `app_streamlit/`: removed in Phase 1D after audit found no main `src/`/CLI import dependency. Restore path: use Git history before the Phase 1D commit if needed.
 
-## Kết luận Phase 1C
+## Nhóm đã xử lý trong Phase 1E
 
-Repo chưa đủ điều kiện xóa tracked code hàng loạt. Trạng thái đúng cho phase này là: ghi inventory, thêm import graph, thêm guardrail kiến trúc, và chuẩn bị `docs/LEGACY_ARCHIVE_PLAN.md` để Project Owner/ChatGPT duyệt từng nhóm.
+| Nhóm | Canonical | Path đã xóa | Restore path |
+| --- | --- | --- | --- |
+| Excel writer | `src/court_ocr_extract/excel_writer.py` | `src/court_ocr_extract/excel.py`, `src/court_ocr_extract/export/excel_writer.py` | Git history trước Phase 1E commit. |
+
+## Kết luận hiện tại
+
+Phase 1E đã xử lý riêng nhóm Excel/export sau approval và audit caller. Repo vẫn chưa đủ điều kiện xóa tracked code hàng loạt ở các nhóm Surya, extraction, validation, render/preprocess; các nhóm này tiếp tục cần approval và test riêng.

@@ -1,5 +1,17 @@
 # AI Changelog
 
+## 2026-07-10 - Phase 1E Consolidate Duplicate Excel / Export Paths
+
+- Audited Excel/export filenames, imports, docs references, import graph, và safe repo inventory.
+- Giữ `src/court_ocr_extract/excel_writer.py` làm canonical Excel writer duy nhất.
+- Chuyển `rows_from_result()` và `write_excel_from_results()` từ duplicate writer vào canonical module.
+- Chuyển pipeline, evaluation script, và tests sang canonical import path.
+- Xóa `src/court_ocr_extract/excel.py` và `src/court_ocr_extract/export/excel_writer.py`; restore path là Git history trước Phase 1E.
+- Thêm synthetic workbook contract tests cho draft records và typed `ExtractionResult`.
+- Cập nhật architecture guardrail để fail khi canonical writer thiếu hoặc legacy Excel import quay lại.
+- Không thay đổi 11 domain headers; 8 audit/trace columns mục tiêu vẫn cần phase schema riêng.
+- Không chạy PDF thật, không đọc dữ liệu thật/Excel thật, không gọi cloud API, và không push.
+
 ## 2026-07-09 - Phase 1D Old App Folders Cleanup
 
 - Audited old app references with `scripts.import_graph`, `scripts.repo_inventory`, and `git grep`.

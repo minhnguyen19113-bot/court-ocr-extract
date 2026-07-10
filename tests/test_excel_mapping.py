@@ -1,4 +1,4 @@
-from court_ocr_extract.export.excel_writer import EXCEL_HEADERS
+from court_ocr_extract.excel_writer import EXCEL_HEADERS
 
 
 def test_excel_mapping_contains_requested_columns_only():

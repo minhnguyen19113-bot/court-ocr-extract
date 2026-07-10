@@ -1,4 +1,4 @@
-from court_ocr_extract.export.excel_writer import rows_from_result
+from court_ocr_extract.excel_writer import rows_from_result
 from court_ocr_extract.models import CaseInfo, ExtractionResult, Participant
 
 

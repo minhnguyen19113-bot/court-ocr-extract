@@ -1,12 +1,12 @@
 # Project State
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Current Phase
 
-Phase 1D: OLD APP FOLDERS CLEANUP.
+Phase 1E: CONSOLIDATE DUPLICATE EXCEL / EXPORT PATHS.
 
-Phase này xóa old app/UI folders sau khi audit xác nhận không có import/runtime dependency từ main `src/`/CLI path. Codex không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API, không chạy full pipeline, không sửa Surya OCR backend, không sửa Local LLM extractor, và không sửa Excel writer.
+Phase này hợp nhất Excel/export vào `src/court_ocr_extract/excel_writer.py`, chuyển caller sang canonical path, xóa hai duplicate path đã hết caller, và thêm synthetic contract tests. Codex không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API, không chạy full pipeline, không sửa Surya OCR backend, Local LLM extractor, hoặc extraction logic lớn.
 
 ## Active Direction
 
@@ -33,8 +33,8 @@ Tesseract is legacy only. PaddleOCR is not part of the rebuild path. Cloud OCR/e
 - README, Ezycloudx docs, visual QA docs, run scripts, `.env.example`, and `settings.py` now point to the Surya target/default instead of Tesseract.
 - `src/court_ocr_extract/settings.py` is canonical config for new rebuild work.
 - `src/court_ocr_extract/config.py` remains a legacy compatibility module for older imports.
-- `src/court_ocr_extract/excel_writer.py` is canonical Excel writer for new rebuild work.
-- Excel writers, extractors, validation modules, and PDF/render modules have duplicate or overlapping implementations.
+- `src/court_ocr_extract/excel_writer.py` là Excel writer canonical duy nhất; `excel.py` và `export/excel_writer.py` đã được xóa trong Phase 1E sau khi migrate caller.
+- Extractors, validation modules, Surya adapters, và PDF/render modules vẫn có implementation chồng lấn.
 - Existing tests are contract/control-flow oriented and use synthetic fixtures only.
 - Old app folders `app/`, `app_fastapi/`, and `app_streamlit/` were removed in Phase 1D. Restore path: use Git history before the Phase 1D commit if needed.
 
@@ -111,6 +111,16 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Updated architecture guardrails to fail if README/docs/scripts reintroduce old app run instructions.
 - Did not touch Surya OCR backend, Local LLM extractor, Excel writer, VLM benchmark modules, or protected real-data paths.
 
+## Latest Phase 1E Work
+
+- Hợp nhất `rows_from_result()` và `write_excel_from_results()` vào canonical `src/court_ocr_extract/excel_writer.py`.
+- Chuyển pipeline, evaluation script, và tests khỏi `court_ocr_extract.excel`/`court_ocr_extract.export.excel_writer` sang canonical module.
+- Xóa `src/court_ocr_extract/excel.py` và `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
+- Giữ nguyên 11 domain headers và hai workbook contract hiện hữu: draft records dùng `DATA` + `RUN_SUMMARY`, typed `ExtractionResult` dùng `Trich xuat`.
+- Thêm synthetic workbook contract tests và architecture guardrail cho canonical path/legacy imports.
+- Các cột audit/trace mục tiêu chưa được thêm trong phase này; cần một phase schema riêng nếu Project Owner duyệt.
+- Không chạy PDF thật, không đọc Excel thật, không gọi cloud API, và không push.
+
 ## Next Gate
 
-Project Owner / ChatGPT nên duyệt một hướng tiếp theo: Phase 1E consolidate duplicate Excel/export, Phase 1F consolidate duplicate extraction modules, hoặc TOOLKIT-1 evaluation harness + gold dataset manifest. Surya/runtime pilot thật vẫn do Project Owner chạy ngoài Codex.
+Project Owner / ChatGPT nên duyệt một hướng tiếp theo: Phase 1F consolidate duplicate extraction modules, TOOLKIT-1 evaluation harness + gold dataset manifest, hoặc Phase 2B Surya visual QA hardening. Surya/runtime pilot thật vẫn do Project Owner chạy ngoài Codex.

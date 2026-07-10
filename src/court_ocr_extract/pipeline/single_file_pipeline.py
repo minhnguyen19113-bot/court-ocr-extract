@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from court_ocr_extract.config import Settings, get_settings
-from court_ocr_extract.export.excel_writer import write_excel
+from court_ocr_extract.excel_writer import write_excel_from_results
 from court_ocr_extract.extraction.gliner_extractor import GLiNERExtractor
 from court_ocr_extract.extraction.local_llm_extractor import LocalLLMExtractor
 from court_ocr_extract.extraction.merge import merge_extractor_outputs
@@ -281,7 +281,7 @@ def process_ocr_text(
     )
     excel_path = settings.excel_dir / f"{output_stem}.xlsx"
     try:
-        write_excel(extraction, excel_path)
+        write_excel_from_results([extraction], excel_path)
     except ModuleNotFoundError:
         excel_path = None
 
