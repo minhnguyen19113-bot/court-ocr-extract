@@ -125,3 +125,6 @@ Synthetic passing tests mean the repo contracts still execute. They do not mean 
 ```
 
 TOOLKIT-1 chưa có OCR CER/WER và không được dùng để kết luận real quality từ synthetic fixture.
+## Surya runtime va stamp suppression
+
+Synthetic tests cover Docker resolver override, Windows Docker Desktop discovery, diagnostics khong GPU mac dinh, stamp mask/suppression, protected dark text, post-OCR filter, raw/filtered/excluded artifacts va preprocessed OCR path. Passing tests khong thay the visual review OCR that tren Ezycloudx.

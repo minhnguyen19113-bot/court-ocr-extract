@@ -144,3 +144,6 @@ Must show:
 - Do not include full real OCR text in terminal logs.
 - Do not include sensitive filenames in logs.
 - Debug outputs from real data are derived sensitive artifacts and must stay out of Git.
+## OCR stamp review
+
+Moi page co the co stamp suppression mask, OCR input stamp suppressed, raw/filtered/excluded lines JSON, raw/text markdown va metadata. OCR review HTML hien thi mode, line counts, excluded reason va overlap de kiem false removal.

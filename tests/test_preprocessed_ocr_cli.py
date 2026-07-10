@@ -20,6 +20,10 @@ MODE_3_ARGS = [
     "medium",
     "--preprocess-profile",
     "balanced",
+    "--stamp-suppression",
+    "balanced",
+    "--ocr-stamp-filter",
+    "balanced",
 ]
 
 
@@ -55,6 +59,8 @@ def test_debug_ocr_review_passes_mode3_preprocess_options(tmp_path, monkeypatch)
         "red_removal_mode": "inpaint",
         "text_enhance": "medium",
         "preprocess_profile": "balanced",
+        "stamp_suppression": "balanced",
+        "ocr_stamp_filter": "balanced",
     }
 
 

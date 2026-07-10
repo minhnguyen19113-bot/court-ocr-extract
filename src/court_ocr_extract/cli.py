@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,9 @@ from court_ocr_extract.extractors import get_extractor_backend
 from court_ocr_extract.extraction_pipeline import extract_from_ocr_cache_records, review_candidates_from_drafts
 from court_ocr_extract.extraction_preview import write_extraction_preview
 from court_ocr_extract.image_preprocess import make_before_after_compare, preprocess_image
+from court_ocr_extract.image_processing.stamp_suppression import suppress_stamp_for_ocr
 from court_ocr_extract.ocr_backends import get_ocr_backend
+from court_ocr_extract.ocr_backends.surya_runtime import check_docker_cli
 from court_ocr_extract.ocr_backends.base import OCRResult
 from court_ocr_extract.ocr_cache import (
     OCRCacheRecord,
@@ -98,6 +101,11 @@ def _add_debug_preprocess(subparsers) -> None:
         choices=["conservative", "balanced", "aggressive"],
         default="conservative",
     )
+    parser.add_argument(
+        "--stamp-suppression",
+        choices=["off", "conservative", "balanced", "aggressive"],
+        default="balanced",
+    )
     parser.set_defaults(func=cmd_debug_preprocess)
 
 
@@ -176,6 +184,18 @@ def _add_ocr_preprocess_args(parser: argparse.ArgumentParser) -> None:
         choices=["conservative", "balanced", "aggressive"],
         default="conservative",
     )
+    parser.add_argument(
+        "--stamp-suppression",
+        choices=["off", "conservative", "balanced", "aggressive"],
+        default="balanced",
+    )
+    parser.add_argument(
+        "--ocr-stamp-filter",
+        choices=["off", "conservative", "balanced", "aggressive"],
+        default="balanced",
+    )
+    parser.add_argument("--surya-docker-binary", default=None)
+    parser.add_argument("--check-surya-runtime", action="store_true")
 
 
 def _add_preview_extraction(subparsers) -> None:
@@ -277,6 +297,8 @@ def cmd_debug_preprocess(args) -> None:
             black_text_protection = page_dir / "black_text_protection_mask.png"
             seal_removed = page_dir / "seal_removed.png"
             text_enhanced = page_dir / "text_enhanced.png"
+            stamp_suppression_mask = page_dir / "stamp_suppression_mask.png"
+            ocr_input_suppressed = page_dir / "ocr_input_stamp_suppressed.png"
             metadata_path = page_dir / "metadata.json"
             page_dir.mkdir(parents=True, exist_ok=True)
             metadata: dict[str, Any] = {"page_number": page.page_number}
@@ -294,6 +316,16 @@ def cmd_debug_preprocess(args) -> None:
                 preprocess_profile=args.preprocess_profile,
                 metadata=metadata,
             )
+            metadata.update(
+                suppress_stamp_for_ocr(
+                    after,
+                    red_mask,
+                    black_text_protection,
+                    ocr_input_suppressed,
+                    stamp_suppression_mask,
+                    mode=args.stamp_suppression,
+                )
+            )
             metadata["page_number"] = page.page_number
             metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             make_before_after_compare(page.image_path, after, compare)
@@ -306,6 +338,10 @@ def cmd_debug_preprocess(args) -> None:
                 page_images.append(("seal_removed", seal_removed))
             if text_enhanced.exists():
                 page_images.append(("text_enhanced", text_enhanced))
+            if stamp_suppression_mask.exists():
+                page_images.append(("stamp_suppression_mask", stamp_suppression_mask))
+            if ocr_input_suppressed.exists():
+                page_images.append(("ocr_input_stamp_suppressed", ocr_input_suppressed))
             page_images.extend([("final_preprocessed", after), ("before_after_compare", compare)])
             review_pages.append({"metadata": metadata, "images": page_images})
         review_cases.append({"case_id": case.case_id, "pages": review_pages})
@@ -634,6 +670,17 @@ def _run_sample_ocr(args, run_dir: Path) -> list[OCRCacheRecord]:
 def _resolve_ocr_page_limit(args, settings) -> int | None:
     if getattr(args, "full_document", False):
         return None
+    page_spec = getattr(args, "pages", None)
+    if page_spec:
+        pages = parse_page_range(page_spec)
+        if pages:
+            expected = list(range(1, max(pages) + 1))
+            if pages != expected:
+                raise ValueError(
+                    "OCR review currently supports --pages only as a prefix starting at page 1 "
+                    "(for example: --pages 1 or --pages 1-3)."
+                )
+            return max(pages)
     max_pages = getattr(args, "max_pages", None)
     if max_pages is not None:
         return max_pages
@@ -641,6 +688,12 @@ def _resolve_ocr_page_limit(args, settings) -> int | None:
 
 
 def _ocr_preprocess_options(args) -> dict[str, Any] | None:
+    if getattr(args, "surya_docker_binary", None):
+        os.environ["SURYA_DOCKER_BINARY"] = args.surya_docker_binary
+    if getattr(args, "check_surya_runtime", False):
+        docker = check_docker_cli()
+        if not docker["available"]:
+            raise RuntimeError(f"Surya Docker runtime check failed: {docker['error']}")
     if not getattr(args, "use_preprocessed", False):
         return None
     return {
@@ -649,6 +702,8 @@ def _ocr_preprocess_options(args) -> dict[str, Any] | None:
         "red_removal_mode": args.red_removal_mode,
         "text_enhance": args.text_enhance,
         "preprocess_profile": args.preprocess_profile,
+        "stamp_suppression": args.stamp_suppression,
+        "ocr_stamp_filter": args.ocr_stamp_filter,
     }
 
 

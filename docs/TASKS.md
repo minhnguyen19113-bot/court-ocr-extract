@@ -1,5 +1,15 @@
 # Tasks
 
+## SURYA WINDOWS RUNTIME + OCR STAMP SUPPRESSION V3
+
+- [x] Codify Windows Docker resolver va runtime diagnostics.
+- [x] Them stamp suppression mask/output va bao ve dark text.
+- [x] Them post-OCR filter, raw/filtered/excluded line artifacts va metadata.
+- [x] Sua artifact link cho sibling stage directory.
+- [x] Them synthetic tests cho resolver, suppression, filter va preprocessed OCR path.
+- [x] Khong auto-correct ten nguoi/dia danh/noi dung bang heuristic.
+- [ ] Project Owner review balanced/aggressive tren Ezycloudx voi PDF that.
+
 Last updated: 2026-07-10
 
 ## Phase 1A

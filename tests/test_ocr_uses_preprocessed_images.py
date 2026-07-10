@@ -18,6 +18,8 @@ MODE_3 = {
     "red_removal_mode": "inpaint",
     "text_enhance": "medium",
     "preprocess_profile": "balanced",
+    "stamp_suppression": "balanced",
+    "ocr_stamp_filter": "balanced",
 }
 
 
@@ -65,18 +67,26 @@ def test_surya_receives_final_preprocessed_image_and_writes_artifacts(tmp_path, 
 
     preprocess_dir = work_dir / "preprocess"
     ocr_dir = work_dir / "ocr_surya"
-    assert captured_images == [preprocess_dir / "page_001_final_preprocessed.png"]
+    assert captured_images == [preprocess_dir / "page_001_ocr_input_stamp_suppressed.png"]
     assert captured_images[0] != rendered
     assert captured_options[0]["deskew_mode"] == "off"
     assert captured_options[0]["red_removal_mode"] == "inpaint"
     assert captured_options[0]["text_enhance_mode"] == "medium"
     assert captured_options[0]["preprocess_profile"] == "balanced"
-    assert result.metadata == {"ocr_input_source": "preprocessed", **MODE_3, "preprocess_warnings": []}
+    assert result.metadata["ocr_input_source"] == "preprocessed"
+    assert result.metadata["stamp_suppression"] == "balanced"
+    assert result.metadata["ocr_stamp_filter"] == "balanced"
+    assert result.metadata["raw_line_count"] == 1
+    assert result.metadata["filtered_line_count"] == 1
+    assert result.metadata["excluded_stamp_line_count"] == 0
     assert (preprocess_dir / "page_001_original.png").exists()
     assert (preprocess_dir / "page_001_red_mask.png").exists()
     assert (preprocess_dir / "page_001_black_text_protection_mask.png").exists()
     assert (preprocess_dir / "page_001_seal_removed.png").exists()
     assert (preprocess_dir / "page_001_text_enhanced.png").exists()
+    assert (preprocess_dir / "page_001_final_preprocessed.png").exists()
+    assert (preprocess_dir / "page_001_stamp_suppression_mask.png").exists()
+    assert (preprocess_dir / "page_001_ocr_input_stamp_suppressed.png").exists()
     assert (preprocess_dir / "page_001_metadata.json").exists()
     assert (ocr_dir / "page_001_ocr_input.png").exists()
     manifest = json.loads((ocr_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -114,7 +124,11 @@ def test_surya_without_preprocess_uses_rendered_original(tmp_path, monkeypatch) 
     )
 
     assert captured == [rendered]
-    assert result.metadata == {"ocr_input_source": "rendered_original"}
+    assert result.metadata["ocr_input_source"] == "rendered_original"
+    assert result.metadata["raw_line_count"] == 1
+    assert result.metadata["filtered_line_count"] == 1
+    assert result.metadata["excluded_stamp_line_count"] == 0
+    assert result.metadata["ocr_review_needed"] is False
 
 
 def test_preprocess_failure_still_uses_named_final_safe_copy(tmp_path, monkeypatch) -> None:
@@ -143,8 +157,9 @@ def test_preprocess_failure_still_uses_named_final_safe_copy(tmp_path, monkeypat
         preprocess_options=MODE_3,
     )
 
-    assert captured[0].name == "page_001_final_preprocessed.png"
+    assert captured[0].name == "page_001_ocr_input_stamp_suppressed.png"
     assert captured[0].exists()
+    assert (captured[0].parent / "page_001_final_preprocessed.png").exists()
     assert any("preprocess_failed_using_rendered_safe_copy" in warning for warning in result.warnings)
 
 

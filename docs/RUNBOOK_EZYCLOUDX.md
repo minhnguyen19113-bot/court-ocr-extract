@@ -211,3 +211,13 @@ The VLM benchmark path must stay separate until it produces comparable validatio
 - Low OCR confidence.
 - Debug UI artifact missing.
 - Transfer server exposure and cleanup.
+## Kiem tra Surya Windows runtime
+
+Khong sua `.venv\Lib\site-packages` thu cong. Project tu resolve Docker qua `SURYA_DOCKER_BINARY`, `DOCKER_BINARY`, PATH hoac Docker Desktop path.
+
+```powershell
+.\.venv\Scripts\python.exe -B -m scripts.check_surya_runtime_backend
+.\.venv\Scripts\python.exe -B -m scripts.check_surya_runtime_backend --check-gpu-container
+```
+
+OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, excluded lines, suppression mask va OCR input trong HTML review. Neu balanced con doc dau moc, review aggressive rieng; khong auto-correct ten nguoi hay noi dung bang heuristic.

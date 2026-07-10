@@ -1,5 +1,9 @@
 # Pipeline Spec
 
+## Stamp suppression contract
+
+Khi dung preprocessed input, tao `stamp_suppression_mask` va `ocr_input_stamp_suppressed`; post-OCR filter giu raw lines, filtered lines va excluded lines co `reason`, `stamp_overlap_ratio`, `dark_text_overlap_ratio`. Khong hard-code noi dung dau moc va khong fallback sang OCR backend khac.
+
 Last updated: 2026-07-10
 
 This is the target rebuild spec. Phase 1B cleaned defaults to match this spec but did not implement real runtime changes.

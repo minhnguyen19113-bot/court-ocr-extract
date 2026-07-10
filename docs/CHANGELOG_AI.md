@@ -154,3 +154,9 @@
 - No real PDFs, OCR text, derived real-data outputs, or sensitive artifacts were inspected.
 - No production pipeline behavior was intentionally changed.
 - No files were deleted.
+## 2026-07-10 - SURYA WINDOWS RUNTIME + OCR STAMP SUPPRESSION V3
+
+- Them resolver Docker runtime cho Windows va script diagnostics Surya.
+- Them stamp suppression/filter theo mask, overlap metadata, raw/filtered/excluded artifacts.
+- Sua relative link trong OCR review khi artifact nam ngoai `ocr_surya/`.
+- Bo sung synthetic tests; khong chay du lieu/PDF/OCR inference that.

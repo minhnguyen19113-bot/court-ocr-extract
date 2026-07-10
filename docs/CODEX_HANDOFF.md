@@ -198,3 +198,8 @@ Ask Project Owner / ChatGPT to approve one next slice:
 1. Project Owner pull, uninstall drifted Surya và reinstall `.[dev,ocr]`.
 2. Xác nhận `check_ocr_backend` in installed/supported `0.20.0`.
 3. Sau đó mới chạy lại `debug-ocr-review --use-preprocessed` Mode 3.
+## Ban giao moi nhat
+
+Task hien tai da hoan thien contract cho Windows Surya runtime va stamp suppression V3. Dung `--stamp-suppression balanced` va `--ocr-stamp-filter balanced` khi co `--use-preprocessed`; dung aggressive chi sau visual review.
+
+Codex chua chay PDF that, chua goi Surya inference/Local LLM/cloud API, va khong commit/push. Project Owner can kiem balanced output, excluded stamp lines, raw-vs-filtered text va false removal tren Ezycloudx.

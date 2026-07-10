@@ -123,13 +123,31 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                     )
             links = []
             if artifact:
-                for label, key in [("text", "text_markdown_path"), ("lines json", "lines_json_path")]:
+                for label, key in [
+                    ("text", "text_markdown_path"),
+                    ("lines json", "lines_json_path"),
+                    ("raw text", "raw_text_markdown_path"),
+                    ("filtered lines", "filtered_lines_json_path"),
+                    ("raw lines", "raw_lines_json_path"),
+                    ("excluded stamp lines", "excluded_stamp_lines_json_path"),
+                ]:
                     path_value = artifact.get(key)
+                    if path_value and Path(path_value).exists():
+                        links.append(f'<a href="{escape(rel_link(Path(path_value), base_dir))}">{escape(label)}</a>')
+                input_metadata = artifact.get("ocr_input_metadata", {})
+                for label, key in [
+                    ("red mask", "red_mask_path"),
+                    ("stamp suppression mask", "stamp_suppression_mask_path"),
+                    ("black text protection mask", "black_text_protection_path"),
+                    ("OCR input stamp suppressed", "ocr_input_stamp_suppressed_path"),
+                ]:
+                    path_value = input_metadata.get(key)
                     if path_value and Path(path_value).exists():
                         links.append(f'<a href="{escape(rel_link(Path(path_value), base_dir))}">{escape(label)}</a>')
             input_source = artifact.get("ocr_input_source", "rendered_original") if artifact else "rendered_original"
             input_label = "OCR input (preprocessed)" if input_source == "preprocessed" else "OCR input (rendered original)"
             line_table = _line_table(page.lines)
+            excluded_table = _excluded_stamp_table(artifact.get("excluded_stamp_lines", []) if artifact else [])
             warnings = []
             warnings.extend(record.result.warnings)
             if artifact:
@@ -146,6 +164,12 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                 f"<div class=\"split\"><div><h4>{escape(input_label)}</h4>{image_html}</div>"
                 f"<div><h4>Bbox overlay</h4>{overlay_html}</div></div>"
                 f"<h4>Lines</h4>{line_table}"
+                f"<p>Stamp suppression: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_suppression', 'off') if artifact else 'off')} | "
+                f"OCR stamp filter: {escape((artifact.get('ocr_input_metadata') or {}).get('ocr_stamp_filter', 'off') if artifact else 'off')}</p>"
+                f"<p>Raw: {escape(artifact.get('raw_line_count', len(page.lines)) if artifact else len(page.lines))} | "
+                f"Filtered: {escape(artifact.get('filtered_line_count', len(page.lines)) if artifact else len(page.lines))} | "
+                f"Excluded stamp: {escape(artifact.get('excluded_stamp_line_count', 0) if artifact else 0)}</p>"
+                f"<h4>Excluded stamp lines</h4>{excluded_table}"
                 f"<h4>Page text</h4><pre>{escape(numbered_text)}</pre>"
                 "</section>"
             )
@@ -186,6 +210,18 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         output.append(value)
     return output
+
+
+def _excluded_stamp_table(lines: list[dict[str, Any]]) -> str:
+    rows = ["<tr><th>line_id</th><th>text</th><th>reason</th><th>stamp overlap</th><th>dark text overlap</th></tr>"]
+    for line in lines:
+        rows.append(
+            "<tr>"
+            f"<td>{escape(line.get('line_id'))}</td><td>{escape(line.get('text'))}</td>"
+            f"<td>{escape(line.get('reason'))}</td><td>{escape(line.get('stamp_overlap_ratio'))}</td>"
+            f"<td>{escape(line.get('dark_text_overlap_ratio'))}</td></tr>"
+        )
+    return "<table>" + "".join(rows) + "</table>"
 
 
 def write_marker_report(output_path: str | Path, records: list[OCRCacheRecord]) -> Path:

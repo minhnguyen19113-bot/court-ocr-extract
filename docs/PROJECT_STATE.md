@@ -1,5 +1,14 @@
 # Project State
 
+## Latest Surya Windows Runtime + OCR Stamp Suppression
+
+- Da them `surya_runtime.py` de resolve Docker theo `SURYA_DOCKER_BINARY`, `DOCKER_BINARY`, PATH va Docker Desktop path tren Windows.
+- Da them `scripts.check_surya_runtime_backend`; GPU container chi duoc kiem khi co `--check-gpu-container`.
+- Da them stamp suppression va post-OCR stamp filter theo mode `off|conservative|balanced|aggressive`; raw/filtered/excluded lines va overlap metadata duoc giu de review.
+- `rel_link()` ho tro artifact o sibling stage directory nhu `preprocess/` khi tao OCR review HTML.
+- Khong auto-correct ten nguoi, dia danh, hay noi dung OCR bang heuristic.
+- Codex chi dung synthetic tests; chua chay PDF that, Surya inference that, Local LLM, cloud API, hay full pipeline.
+
 Last updated: 2026-07-10
 
 ## Current Phase

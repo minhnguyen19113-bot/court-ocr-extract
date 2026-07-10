@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -53,4 +54,10 @@ def escape(value: object) -> str:
 
 
 def rel_link(target: Path, base: Path) -> str:
-    return target.resolve().relative_to(base.resolve()).as_posix()
+    target = target.resolve()
+    base = base.resolve()
+    try:
+        return target.relative_to(base).as_posix()
+    except ValueError:
+        # Review artifacts may intentionally live in a sibling stage directory.
+        return Path(os.path.relpath(target, base)).as_posix()

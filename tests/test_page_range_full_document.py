@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from court_ocr_extract import cli
 from court_ocr_extract.ocr_backends.base import OCRBackendStatus, OCRResult
 from court_ocr_extract.pdf_render import parse_page_range
@@ -94,6 +96,20 @@ def test_full_document_helpers_disable_page_limit_and_marker() -> None:
     assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, max_pages=20), settings) == 20
     assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, max_pages=None), settings) == 3
     assert cli._resolve_stop_marker(SimpleNamespace(full_document=False), settings) == "NỘI DUNG VỤ ÁN"
+
+
+def test_ocr_review_page_prefix_resolves_to_max_pages() -> None:
+    settings = SimpleNamespace(max_pages_before_marker=3)
+
+    assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, pages="1", max_pages=None), settings) == 1
+    assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, pages="1-3", max_pages=None), settings) == 3
+
+
+def test_ocr_review_rejects_non_prefix_page_range() -> None:
+    settings = SimpleNamespace(max_pages_before_marker=3)
+
+    with pytest.raises(ValueError, match="prefix starting at page 1"):
+        cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, pages="2", max_pages=None), settings)
 
 
 def test_debug_ocr_review_full_document_passes_none_and_empty_marker(tmp_path, monkeypatch) -> None:
