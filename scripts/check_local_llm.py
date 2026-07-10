@@ -16,7 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from court_ocr_extract.config import get_settings
-from court_ocr_extract.extraction.local_llm_extractor import LocalLLMExtractor
+from court_ocr_extract.extractors.local_llm_extractor import TypedLocalLLMExtractor
 
 
 SYNTHETIC_OCR = """
@@ -52,7 +52,7 @@ def main() -> None:
     print(f"  model: {settings.local_llm_model}")
     print(f"  base_url: {settings.local_llm_base_url}")
 
-    output = LocalLLMExtractor(settings).extract(SYNTHETIC_OCR)
+    output = TypedLocalLLMExtractor(settings).extract(SYNTHETIC_OCR)
     payload = {
         "method": output.method,
         "case_non_empty": sum(1 for field in output.case_fields.values() if field.value),

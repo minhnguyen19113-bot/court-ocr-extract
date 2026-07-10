@@ -1,7 +1,7 @@
 import os
 
 from court_ocr_extract.config import Settings
-from court_ocr_extract.extraction.local_llm_extractor import MockLocalLLMExtractor
+from court_ocr_extract.extractors.local_llm_extractor import MockLocalLLMExtractor
 from court_ocr_extract.local_llm.json_parser import normalize_extraction_payload, parse_json_object
 
 

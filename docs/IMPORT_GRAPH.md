@@ -51,11 +51,20 @@ Sau khi migrate caller và xóa hai duplicate Excel writer paths:
 - Không còn import `court_ocr_extract.excel` hoặc `court_ocr_extract.export.excel_writer` trong `src/`, `scripts/`, hoặc `tests/`.
 - Pipeline, evaluation script, và tests dùng `court_ocr_extract.excel_writer`.
 
+## Snapshot Phase 1F
+
+Sau khi migrate extraction callers và xóa năm duplicate/unimported paths:
+
+- Python modules scanned: 145.
+- Internal import edges: 274.
+- Parse errors: 0.
+- Unimported src modules: 7.
+- Không còn import `extraction.local_llm_extractor`, `extraction.rule_support`, `extraction.base`, root `extractor`, hoặc root `llm` trong safe code/docs roots.
+- Main CLI và scripts dùng `extraction_pipeline.py` + `extractors/`; typed pipeline/remote worker dùng adapter trong canonical Local LLM module.
+
 Các module low-fan-in/unimported hiện là tín hiệu audit, chưa phải bằng chứng để xóa:
 
 - `court_ocr_extract.export.json_writer`
-- `court_ocr_extract.extraction.base`
-- `court_ocr_extract.llm`
 - `court_ocr_extract.logging_config`
 - `court_ocr_extract.models.local_model_loader`
 - `court_ocr_extract.models.vllm_server`

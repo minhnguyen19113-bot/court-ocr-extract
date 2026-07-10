@@ -7,10 +7,10 @@ from typing import Any
 from court_ocr_extract.config import Settings, get_settings
 from court_ocr_extract.excel_writer import write_excel_from_results
 from court_ocr_extract.extraction.gliner_extractor import GLiNERExtractor
-from court_ocr_extract.extraction.local_llm_extractor import LocalLLMExtractor
 from court_ocr_extract.extraction.merge import merge_extractor_outputs
-from court_ocr_extract.extraction.rule_support import anchor_support_output
 from court_ocr_extract.extraction.validators import validate_extraction
+from court_ocr_extract.extractors.local_llm_extractor import TypedLocalLLMExtractor
+from court_ocr_extract.extractors.rule_support import anchor_support_output
 from court_ocr_extract.file_utils import (
     safe_stem,
     sha256_file,
@@ -234,7 +234,7 @@ def process_ocr_text(
     primary = None
     if use_local_llm and text_before_marker:
         try:
-            primary = LocalLLMExtractor(settings).extract(text_before_marker)
+            primary = TypedLocalLLMExtractor(settings).extract(text_before_marker)
         except Exception as exc:
             if require_local_llm:
                 raise RuntimeError(

@@ -1,6 +1,6 @@
 # Pipeline Spec
 
-Last updated: 2026-07-07
+Last updated: 2026-07-10
 
 This is the target rebuild spec. Phase 1B cleaned defaults to match this spec but did not implement real runtime changes.
 
@@ -85,6 +85,14 @@ Debug UI must include:
 - warning and hallucination checks
 
 ## Extraction
+
+Canonical implementation sau Phase 1F:
+
+- Orchestrator: `src/court_ocr_extract/extraction_pipeline.py`.
+- Backend package/interface: `src/court_ocr_extract/extractors/` và `extractors/base.py`.
+- Local LLM backend: `extractors/local_llm_extractor.py`.
+- Rule support helper: `extractors/rule_support.py`; chỉ dùng khi được chọn rõ hoặc làm support/validation.
+- `scripts.check_extractor` là static configuration check; không xác nhận endpoint/model quality.
 
 Terminal summary must include:
 

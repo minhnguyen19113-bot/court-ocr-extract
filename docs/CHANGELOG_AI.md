@@ -1,5 +1,17 @@
 # AI Changelog
 
+## 2026-07-10 - Phase 1F Consolidate Duplicate Extraction Modules
+
+- Chọn `src/court_ocr_extract/extraction_pipeline.py` và `src/court_ocr_extract/extractors/` làm canonical extraction path.
+- Hợp nhất Local LLM backend cùng typed compatibility adapter vào `extractors/local_llm_extractor.py`.
+- Hợp nhất rule backend/typed anchor vào `extractors/rule_support.py`; chuyển regex parser vào `extractors/rule_parser.py`.
+- Migrate pipeline, remote worker, runtime script, và tests sang canonical imports.
+- Xóa `extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, root `extractor.py`, và root `llm.py`.
+- Giữ typed merge/schema/validation/GLiNER helpers và direct vision/cloud benchmark adapters đúng vai trò riêng.
+- Sửa `scripts.check_extractor` thành static configuration check mặc định, không endpoint request.
+- Thêm synthetic no-network extraction contract tests và architecture guardrails.
+- Không chạy PDF/dữ liệu/model endpoint thật, không gọi cloud API, không sửa prompt/schema lớn, và không push.
+
 ## 2026-07-10 - Phase 1E Consolidate Duplicate Excel / Export Paths
 
 - Audited Excel/export filenames, imports, docs references, import graph, và safe repo inventory.

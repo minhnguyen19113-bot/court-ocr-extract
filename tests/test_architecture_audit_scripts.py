@@ -6,6 +6,8 @@ from scripts.check_architecture_guardrails import (
     check_architecture,
     cli_has_bad_pages_default,
     cli_has_full_document,
+    find_extraction_test_network_calls,
+    find_legacy_extraction_import_refs,
     find_legacy_excel_import_refs,
     find_old_app_main_path_refs,
     format_report,
@@ -30,6 +32,7 @@ def test_repo_inventory_excludes_protected_real_data_roots() -> None:
     assert inventory.optional_app_dirs == []
     assert "surya_adapter" in inventory.duplicate_groups
     assert "excel_writer" not in inventory.duplicate_groups
+    assert "local_llm_extractor" not in inventory.duplicate_groups
 
 
 def test_import_graph_scans_python_modules_and_reports_internal_edges() -> None:
@@ -95,3 +98,38 @@ def test_architecture_guardrail_requires_canonical_excel_writer(tmp_path: Path) 
     report = check_architecture(tmp_path)
 
     assert any("Canonical Excel writer is missing" in failure for failure in report.failures)
+
+
+def test_architecture_guardrail_flags_legacy_extraction_imports(tmp_path: Path) -> None:
+    source = tmp_path / "scripts/legacy_extract.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "from court_ocr_extract.extraction." + "local_llm_extractor import LocalLLMExtractor\n",
+        encoding="utf-8",
+    )
+
+    findings = find_legacy_extraction_import_refs(tmp_path)
+
+    assert findings == ["scripts/legacy_extract.py: 1"]
+
+
+def test_architecture_guardrail_requires_canonical_extraction_paths(tmp_path: Path) -> None:
+    report = check_architecture(tmp_path)
+
+    assert any(
+        "Canonical extraction paths are missing" in failure
+        for failure in report.failures
+    )
+
+
+def test_architecture_guardrail_flags_direct_network_calls_in_tests(tmp_path: Path) -> None:
+    test_file = tmp_path / "tests/test_network.py"
+    test_file.parent.mkdir(parents=True)
+    test_file.write_text(
+        "urllib.request." + "urlopen('http://127.0.0.1')\n",
+        encoding="utf-8",
+    )
+
+    findings = find_extraction_test_network_calls(tmp_path)
+
+    assert findings == ["tests/test_network.py: 1"]

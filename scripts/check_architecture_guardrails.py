@@ -64,6 +64,21 @@ LEGACY_EXCEL_WRITER_PATHS = [
     "src/court_ocr_extract/export/excel_writer.py",
 ]
 EXCEL_IMPORT_ROOTS = ["README.md", "docs", "scripts", "src", "tests"]
+CANONICAL_EXTRACTION_PATHS = [
+    "src/court_ocr_extract/extraction_pipeline.py",
+    "src/court_ocr_extract/extractors/__init__.py",
+    "src/court_ocr_extract/extractors/base.py",
+    "src/court_ocr_extract/extractors/local_llm_extractor.py",
+    "src/court_ocr_extract/extractors/rule_support.py",
+]
+LEGACY_EXTRACTION_PATHS = [
+    "src/court_ocr_extract/extraction/base.py",
+    "src/court_ocr_extract/extraction/local_llm_extractor.py",
+    "src/court_ocr_extract/extraction/rule_support.py",
+    "src/court_ocr_extract/extractor.py",
+    "src/court_ocr_extract/llm.py",
+]
+EXTRACTION_IMPORT_ROOTS = ["README.md", "docs", "scripts", "src", "tests"]
 
 TESSERACT_DEFAULT_PATTERNS = [
     re.compile(r"\bocr_backend\s*[:=]\s*[\"']?tesseract\b", re.IGNORECASE),
@@ -107,6 +122,23 @@ LEGACY_EXCEL_IMPORT_PATTERNS = [
         r"\bimport\s+court_ocr_extract\.(?:excel|export\.excel_writer)\b",
         re.IGNORECASE,
     ),
+]
+
+LEGACY_EXTRACTION_IMPORT_PATTERNS = [
+    re.compile(
+        r"\bfrom\s+court_ocr_extract\.(?:extraction\.(?:base|local_llm_extractor|rule_support)|extractor|llm)\s+import\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bimport\s+court_ocr_extract\.(?:extraction\.(?:base|local_llm_extractor|rule_support)|extractor|llm)\b",
+        re.IGNORECASE,
+    ),
+]
+
+TEST_NETWORK_CALL_PATTERNS = [
+    re.compile(r"\burllib\.request\.urlopen\s*\(", re.IGNORECASE),
+    re.compile(r"\brequests\.(?:get|post|request)\s*\(", re.IGNORECASE),
+    re.compile(r"\bhttpx\.(?:get|post|request)\s*\(", re.IGNORECASE),
 ]
 
 
@@ -208,6 +240,22 @@ def find_legacy_excel_import_refs(repo_root: Path) -> list[str]:
     )
 
 
+def find_legacy_extraction_import_refs(repo_root: Path) -> list[str]:
+    return count_pattern_matches(
+        repo_root,
+        LEGACY_EXTRACTION_IMPORT_PATTERNS,
+        EXTRACTION_IMPORT_ROOTS,
+    )
+
+
+def find_extraction_test_network_calls(repo_root: Path) -> list[str]:
+    return count_pattern_matches(
+        repo_root,
+        TEST_NETWORK_CALL_PATTERNS,
+        ["tests"],
+    )
+
+
 def cli_has_bad_pages_default(repo_root: Path) -> bool:
     cli_path = repo_root / "src/court_ocr_extract/cli.py"
     if not cli_path.exists():
@@ -268,6 +316,26 @@ def check_architecture(repo_root: Path = REPO_ROOT) -> ArchitectureGuardrailRepo
             "Legacy Excel writer imports detected: " + "; ".join(legacy_excel_imports)
         )
 
+    missing_extraction = [
+        path for path in CANONICAL_EXTRACTION_PATHS if not (repo_root / path).exists()
+    ]
+    if missing_extraction:
+        failures.append(
+            "Canonical extraction paths are missing: " + "; ".join(missing_extraction)
+        )
+    legacy_extraction_imports = find_legacy_extraction_import_refs(repo_root)
+    if legacy_extraction_imports:
+        failures.append(
+            "Legacy extraction imports detected: "
+            + "; ".join(legacy_extraction_imports)
+        )
+    extraction_test_network_calls = find_extraction_test_network_calls(repo_root)
+    if extraction_test_network_calls:
+        failures.append(
+            "Direct network calls detected in tests: "
+            + "; ".join(extraction_test_network_calls)
+        )
+
     if cli_has_bad_pages_default(repo_root):
         failures.append("CLI still appears to default --pages to 1-3 or cli.py is missing.")
     if not cli_has_full_document(repo_root):
@@ -281,6 +349,9 @@ def check_architecture(repo_root: Path = REPO_ROOT) -> ArchitectureGuardrailRepo
     for path in LEGACY_EXCEL_WRITER_PATHS:
         if (repo_root / path).exists():
             warnings.append(f"Legacy Excel compatibility path still present: {path}")
+    for path in LEGACY_EXTRACTION_PATHS:
+        if (repo_root / path).exists():
+            warnings.append(f"Legacy extraction compatibility path still present: {path}")
     duplicate_paths = [
         ("Surya adapters", ["src/court_ocr_extract/ocr_backends/surya_ocr.py", "src/court_ocr_extract/ocr_surya.py", "src/court_ocr_extract/ocr/surya_adapter.py"]),
         ("Validators", ["src/court_ocr_extract/validation.py", "src/court_ocr_extract/validator.py", "src/court_ocr_extract/extraction/validators.py"]),
@@ -291,6 +362,10 @@ def check_architecture(repo_root: Path = REPO_ROOT) -> ArchitectureGuardrailRepo
             warnings.append(f"Duplicate/conflict group needs cleanup decision: {label} ({len(existing)})")
     if (repo_root / "src/court_ocr_extract/ocr_backends/openai_vision_ocr.py").exists():
         warnings.append("Cloud OCR adapters exist but must remain opt-in.")
+    if (repo_root / "src/court_ocr_extract/extractors/openai_extractor.py").exists():
+        warnings.append("Cloud extraction adapters exist but must remain opt-in.")
+    if (repo_root / "src/court_ocr_extract/extractors/direct_vision_extractor.py").exists():
+        warnings.append("Direct vision extractor exists as an experimental benchmark path.")
     if (repo_root / "src/court_ocr_extract/vlm_page_reader.py").exists():
         warnings.append("VLM benchmark path exists and must stay separate from main Surya path.")
 

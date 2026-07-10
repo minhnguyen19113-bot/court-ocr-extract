@@ -91,6 +91,21 @@ Các cột audit/trace mục tiêu bên trên chưa có trong 11 headers hiện 
 
 Phase 1E không ép thay đổi schema lớn. Việc bổ sung các cột này cần một phase schema riêng với migration/QA rõ ràng.
 
+## Extraction Draft Contract
+
+Canonical `extraction_pipeline.py` tạo draft envelope gồm:
+
+- `case_id`
+- `source_index`
+- `ocr_backend`
+- `extractor_backend`
+- `marker_found`
+- `status`
+- `error`
+- `payload`
+
+`payload` hiện gồm `case`, `participants`, và `document_warnings`. Participant có `confidence`, `evidence`, và `warnings`; `needs_review` được tính bằng validation/review helper, chưa phải field persisted trực tiếp trong extraction payload. Phase 1F chỉ hợp nhất module, không đổi schema này.
+
 ## QA Report
 
 Required metrics:

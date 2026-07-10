@@ -61,14 +61,28 @@ Last updated: 2026-07-10
 - [x] Cập nhật inventory/import graph/memory/schema/testing docs.
 - [x] Không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API, không push.
 
-## Phase 1F / Phase 2 Candidates
+## Phase 1F
+
+- [x] Audit extraction/extractor/rule/schema modules và mọi caller trong safe roots.
+- [x] Xác nhận `extraction_pipeline.py` là canonical orchestrator và `extractors/` là canonical backend package.
+- [x] Hợp nhất Local LLM typed compatibility behavior vào canonical `extractors/local_llm_extractor.py`.
+- [x] Hợp nhất rule support và chuyển rule parser vào canonical `extractors/` package.
+- [x] Migrate pipeline, remote worker, scripts, và tests khỏi legacy imports.
+- [x] Xóa 5 duplicate/unimported extraction paths; không tạo compatibility wrapper.
+- [x] Giữ merge/schema/validation/GLiNER và direct vision/cloud benchmark paths đúng vai trò.
+- [x] Thêm synthetic no-network contract tests và static `check_extractor` mode.
+- [x] Cập nhật architecture guardrail, inventory/import graph, docs và memory.
+- [x] Không chạy PDF/dữ liệu/model endpoint thật, không gọi cloud API, không push.
+
+## Phase 2 / Phase 3 Candidates
 
 Do not start without Project Owner / ChatGPT approval.
 
 - Consolidate Surya OCR adapter path.
 - Define and implement real Surya OCR cache contract.
 - Expand debug UI around bbox/evidence/QA links.
-- Choose canonical extraction package/API.
+- TOOLKIT-1 evaluation harness + gold dataset manifest.
+- Phase 3A Local LLM strict JSON/evidence hardening.
 - Bổ sung audit/trace columns vào Excel trong một phase schema riêng nếu được duyệt.
 
 ## Memory/Reporting Rules

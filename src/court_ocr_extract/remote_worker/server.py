@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 
 from court_ocr_extract.config import get_settings
-from court_ocr_extract.extraction.local_llm_extractor import LocalLLMExtractor
+from court_ocr_extract.extractors.local_llm_extractor import TypedLocalLLMExtractor
 from court_ocr_extract.models import model_to_dict
 from court_ocr_extract.ocr.mock_adapter import MockOcrAdapter
 from court_ocr_extract.ocr.surya_adapter import SuryaOcrEngine
@@ -59,7 +59,7 @@ def ocr_page(
 @app.post("/extract")
 def extract(payload: ExtractRequest, _: None = Depends(_authorize)):
     settings = get_settings()
-    output = LocalLLMExtractor(settings).extract(payload.text)
+    output = TypedLocalLLMExtractor(settings).extract(payload.text)
     return model_to_dict(output)
 
 

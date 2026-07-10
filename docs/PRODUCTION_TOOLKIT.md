@@ -1,6 +1,6 @@
 # Production Toolkit
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 ## Mục tiêu
 
@@ -37,6 +37,12 @@ PDF
 ```
 
 Các command trên không được dùng để kết luận chất lượng OCR thật.
+
+Canonical extraction tooling sau Phase 1F:
+
+- `src/court_ocr_extract/extraction_pipeline.py`: orchestrator từ OCR cache sang validated draft.
+- `src/court_ocr_extract/extractors/`: backend factory/interface và Local LLM/rule adapters.
+- `python -m scripts.check_extractor`: static configuration check, không kiểm endpoint/model quality.
 
 ## Gate production
 

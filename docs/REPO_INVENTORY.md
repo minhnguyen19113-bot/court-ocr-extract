@@ -40,6 +40,15 @@ Script nguồn: `python -m scripts.repo_inventory`.
 - Root keep files: 5.
 - Excel writer duplicate group: none.
 
+## Snapshot Phase 1F
+
+- Safe files scanned: 225.
+- Code files: 156.
+- Docs/prompt files: 47.
+- Config files: 9.
+- Root keep files: 5.
+- Local LLM extractor duplicate group: none.
+
 ## Nhóm chính đang giữ
 
 | Nhóm | Trạng thái | Ghi chú |
@@ -48,6 +57,8 @@ Script nguồn: `python -m scripts.repo_inventory`.
 | `src/court_ocr_extract/ocr_backends/surya_ocr.py` | main candidate | Surya runtime path hiện tại. |
 | `src/court_ocr_extract/ocr_cache.py` | main candidate | Contract OCR cache. |
 | `src/court_ocr_extract/excel_writer.py` | canonical | Excel writer duy nhất sau Phase 1E; chứa draft-record và typed-result APIs. |
+| `src/court_ocr_extract/extraction_pipeline.py` | canonical | Extraction orchestrator sau Phase 1F. |
+| `src/court_ocr_extract/extractors/` | canonical | Backend factory/base, Local LLM, rule support và opt-in benchmark adapters. |
 | `src/court_ocr_extract/local_llm/` | main candidate | Local LLM client/parser/prompt builder. |
 | `src/court_ocr_extract/visual_debug.py`, `review_html.py` | main candidate | Visual QA/debug UI. |
 | `scripts/project_snapshot.py`, `check_repo_guardrails.py` | guardrail tooling | Memory/safety checks. |
@@ -59,7 +70,6 @@ Script nguồn: `python -m scripts.repo_inventory`.
 | PDF render | `src/court_ocr_extract/pdf_render.py`, `src/court_ocr_extract/pdf/render.py` | Chọn API render canonical. |
 | Preprocess | `preprocess.py`, `image_preprocess.py`, `image_processing/preprocess.py` | Chọn một entrypoint preprocess. |
 | Surya adapter | `ocr_backends/surya_ocr.py`, `ocr_surya.py`, `ocr/surya_adapter.py` | Giữ `ocr_backends/surya_ocr.py` làm runtime chính hay chuyển vào package `ocr/`. |
-| Local LLM extractor | `extraction/local_llm_extractor.py`, `extractors/local_llm_extractor.py` | Chọn package extraction canonical. |
 | Validation | `validation.py`, `validator.py`, `extraction/validators.py` | Hợp nhất warning/evidence rules. |
 
 ## Nhóm legacy/optional
@@ -75,6 +85,12 @@ Script nguồn: `python -m scripts.repo_inventory`.
 | --- | --- | --- | --- |
 | Excel writer | `src/court_ocr_extract/excel_writer.py` | `src/court_ocr_extract/excel.py`, `src/court_ocr_extract/export/excel_writer.py` | Git history trước Phase 1E commit. |
 
+## Nhóm đã xử lý trong Phase 1F
+
+| Nhóm | Canonical | Path đã xóa | Restore path |
+| --- | --- | --- | --- |
+| Extraction orchestrator/backend | `extraction_pipeline.py`, `extractors/` | `extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, `extractor.py`, `llm.py` | Git history trước Phase 1F commit. |
+
 ## Kết luận hiện tại
 
-Phase 1E đã xử lý riêng nhóm Excel/export sau approval và audit caller. Repo vẫn chưa đủ điều kiện xóa tracked code hàng loạt ở các nhóm Surya, extraction, validation, render/preprocess; các nhóm này tiếp tục cần approval và test riêng.
+Phase 1E và 1F đã xử lý riêng Excel/export và extraction backend sau approval/audit caller. Repo vẫn chưa đủ điều kiện xóa tracked code hàng loạt ở các nhóm Surya, validation, render/preprocess; các nhóm này tiếp tục cần approval và test riêng.

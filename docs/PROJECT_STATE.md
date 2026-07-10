@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 ## Current Phase
 
-Phase 1E: CONSOLIDATE DUPLICATE EXCEL / EXPORT PATHS.
+Phase 1F: CONSOLIDATE DUPLICATE EXTRACTION MODULES.
 
-Phase này hợp nhất Excel/export vào `src/court_ocr_extract/excel_writer.py`, chuyển caller sang canonical path, xóa hai duplicate path đã hết caller, và thêm synthetic contract tests. Codex không chạy PDF thật, không đọc dữ liệu thật, không gọi cloud API, không chạy full pipeline, không sửa Surya OCR backend, Local LLM extractor, hoặc extraction logic lớn.
+Phase này hợp nhất extraction backend vào `src/court_ocr_extract/extractors/`, giữ `src/court_ocr_extract/extraction_pipeline.py` làm orchestrator, migrate caller và xóa các duplicate path đã hết caller. Codex không chạy PDF thật, không đọc dữ liệu thật, không gọi model endpoint/cloud API, không chạy full pipeline, không sửa Surya OCR runtime, Excel schema, VLM benchmark, prompt lớn, hoặc Local LLM hardening.
 
 ## Active Direction
 
@@ -34,7 +34,7 @@ Tesseract is legacy only. PaddleOCR is not part of the rebuild path. Cloud OCR/e
 - `src/court_ocr_extract/settings.py` is canonical config for new rebuild work.
 - `src/court_ocr_extract/config.py` remains a legacy compatibility module for older imports.
 - `src/court_ocr_extract/excel_writer.py` là Excel writer canonical duy nhất; `excel.py` và `export/excel_writer.py` đã được xóa trong Phase 1E sau khi migrate caller.
-- Extractors, validation modules, Surya adapters, và PDF/render modules vẫn có implementation chồng lấn.
+- Extraction backend overlap đã được xử lý trong Phase 1F; validation modules, Surya adapters, và PDF/render modules vẫn có implementation chồng lấn.
 - Existing tests are contract/control-flow oriented and use synthetic fixtures only.
 - Old app folders `app/`, `app_fastapi/`, and `app_streamlit/` were removed in Phase 1D. Restore path: use Git history before the Phase 1D commit if needed.
 
@@ -121,6 +121,16 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Các cột audit/trace mục tiêu chưa được thêm trong phase này; cần một phase schema riêng nếu Project Owner duyệt.
 - Không chạy PDF thật, không đọc Excel thật, không gọi cloud API, và không push.
 
+## Latest Phase 1F Work
+
+- Chọn `src/court_ocr_extract/extraction_pipeline.py` làm canonical orchestrator và `src/court_ocr_extract/extractors/` làm canonical backend package.
+- Hợp nhất Local LLM backend/typed adapter vào `extractors/local_llm_extractor.py`; hợp nhất rule backend/typed anchor vào `extractors/rule_support.py`.
+- Chuyển rule parser vào `extractors/rule_parser.py` và migrate pipeline, remote worker, scripts, tests sang canonical imports.
+- Xóa `extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, root `extractor.py`, và root `llm.py`; restore bằng Git history trước Phase 1F nếu cần.
+- Giữ `extraction/merge.py`, `schemas.py`, `validators.py`, và `gliner_extractor.py` vì có trách nhiệm typed merge/schema/validation/experimental riêng.
+- `scripts.check_extractor` mặc định chạy static configuration check, không gọi endpoint.
+- Thêm synthetic extraction contract tests với fake response; không network/model thật.
+
 ## Next Gate
 
-Project Owner / ChatGPT nên duyệt một hướng tiếp theo: Phase 1F consolidate duplicate extraction modules, TOOLKIT-1 evaluation harness + gold dataset manifest, hoặc Phase 2B Surya visual QA hardening. Surya/runtime pilot thật vẫn do Project Owner chạy ngoài Codex.
+Project Owner / ChatGPT nên duyệt một hướng tiếp theo: TOOLKIT-1 evaluation harness + gold dataset manifest, Phase 2B Surya visual QA hardening, hoặc Phase 3A Local LLM strict JSON/evidence hardening. Surya/runtime pilot thật vẫn do Project Owner chạy ngoài Codex.

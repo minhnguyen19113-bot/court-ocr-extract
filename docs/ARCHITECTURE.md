@@ -68,8 +68,11 @@ Likely main candidates:
 - PDF/render: `src/court_ocr_extract/pdf/`, `src/court_ocr_extract/pdf_render.py`
 - Preprocess: `src/court_ocr_extract/preprocess.py`, `src/court_ocr_extract/image_processing/`
 - Surya/OCR cache: `src/court_ocr_extract/ocr/`, `src/court_ocr_extract/ocr_backends/surya_ocr.py`, `src/court_ocr_extract/ocr_cache.py`
-- Local LLM: `src/court_ocr_extract/local_llm/`, `src/court_ocr_extract/extraction/local_llm_extractor.py`
-- Extraction and validation: `src/court_ocr_extract/extraction/`, `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/qa.py`
+- Extraction orchestrator: canonical `src/court_ocr_extract/extraction_pipeline.py`.
+- Extractor backends: canonical `src/court_ocr_extract/extractors/`; Local LLM backend ở `extractors/local_llm_extractor.py`, rule helper ở `extractors/rule_support.py`.
+- Local LLM client/parser: `src/court_ocr_extract/local_llm/`.
+- Typed merge/schema/validation compatibility: `src/court_ocr_extract/extraction/`; package này không còn sở hữu extractor backend.
+- Validation/QA: `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/extraction/validators.py`, `src/court_ocr_extract/qa.py`.
 - Excel export: canonical `src/court_ocr_extract/excel_writer.py`; JSON helper vẫn ở `src/court_ocr_extract/export/json_writer.py`.
 - Review UI/debug: `src/court_ocr_extract/visual_debug.py`, `src/court_ocr_extract/review_html.py`, `src/court_ocr_extract/extraction_preview.py`
 - Ezycloudx/remote worker: `src/court_ocr_extract/remote_worker/`, `scripts/ezycloudx_*`
@@ -84,6 +87,14 @@ Phase 1B/1E canonical decisions:
 - Excel writer: `src/court_ocr_extract/excel_writer.py` là canonical path duy nhất.
 - Phase 1E đã migrate caller và xóa `src/court_ocr_extract/excel.py` cùng `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
 
+Phase 1F canonical decisions:
+
+- Orchestrator: `src/court_ocr_extract/extraction_pipeline.py`.
+- Backend interface/factory: `src/court_ocr_extract/extractors/base.py` và `extractors/__init__.py`.
+- Local LLM: `src/court_ocr_extract/extractors/local_llm_extractor.py`.
+- Rule support: `src/court_ocr_extract/extractors/rule_support.py` với parser nội bộ `extractors/rule_parser.py`.
+- Typed old-pipeline behavior được giữ bằng `TypedLocalLLMExtractor` trong canonical module, không bằng duplicate module/wrapper.
+
 Legacy or conflict candidates are tracked in `docs/CLEANUP_PLAN.md`.
 
 ## Proposed Post-Cleanup Structure
@@ -97,7 +108,7 @@ src/court_ocr_extract/
     surya/
     cache/
   vlm/
-  extract/
+  extractors/
   validate/
   export/
   qa/

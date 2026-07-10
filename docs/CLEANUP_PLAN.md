@@ -10,6 +10,8 @@ Phase 1D removes old app folders after audit confirms they are not imported by t
 
 Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_writer.py` and removes two duplicate paths after migrating every caller.
 
+Phase 1F consolidates extractor backends into `src/court_ocr_extract/extractors/`, moves rule parsing under that package, and removes five duplicate/unimported extraction paths after caller migration.
+
 ## Categories
 
 - `main_candidate`: likely belongs in the rebuilt main path.
@@ -24,6 +26,7 @@ Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_wr
 - `unknown_need_review`: needs human decision before action.
 - `removed_in_phase1d`: removed after Phase 1D audit; restore from Git history if needed.
 - `removed_in_phase1e`: removed after Phase 1E caller/import audit; restore from Git history if needed.
+- `removed_in_phase1f`: removed after Phase 1F extraction caller/import audit; restore from Git history if needed.
 
 ## Summary Counts
 
@@ -32,7 +35,7 @@ Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_wr
 | main_candidate | 21 |
 | legacy_optional | 12 |
 | experimental | 6 |
-| duplicate_conflict | 7 |
+| duplicate_conflict | 5 |
 | safe_to_remove_candidate | 0 |
 | docs_memory | 17 |
 | tests_keep | 17 |
@@ -41,6 +44,7 @@ Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_wr
 | unknown_need_review | 4 |
 | removed_in_phase1d | 4 |
 | removed_in_phase1e | 2 |
+| removed_in_phase1f | 5 |
 
 Counts are planning counts by grouped file/folder rows below, not exact file totals.
 
@@ -75,10 +79,11 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `src/court_ocr_extract/vlm_backends/`, `vlm_page_reader.py` | experimental | VLM benchmark bridge exists. | Keep as benchmark, add validation parity later. |
 | `src/court_ocr_extract/extractors/direct_vision_extractor.py` | experimental | Direct vision extraction path. | Keep for VLM benchmark review. |
 | `scripts/smoke_vlm_synthetic.py`, `tests/test_vlm_contract.py` | experimental | Synthetic VLM contract only. | Keep; do not use for real quality. |
-| `src/court_ocr_extract/local_llm/` | main_candidate | Local LLM client/parser/prompt builder. | Keep and harden strict JSON. |
-| `src/court_ocr_extract/extraction/local_llm_extractor.py` | main_candidate | Newer extraction package. | Prefer after canonical review. |
-| `src/court_ocr_extract/extractors/local_llm_extractor.py` | duplicate_conflict | Older/parallel extractor path. | Compare then consolidate. |
-| `src/court_ocr_extract/extraction/`, `extractor.py`, `extraction_pipeline.py` | duplicate_conflict | Rule/merge/extraction paths overlap. | Choose canonical extraction API. |
+| `src/court_ocr_extract/local_llm/` | main_candidate | Local LLM client/parser/prompt builder used by typed compatibility adapter. | Keep; strict JSON/evidence hardening cần Phase 3A. |
+| `src/court_ocr_extract/extraction_pipeline.py`, `src/court_ocr_extract/extractors/` | main_candidate | Canonical orchestrator và backend package sau Phase 1F. | Keep; mọi backend mới phải theo `ExtractorBackend`. |
+| `src/court_ocr_extract/extraction/merge.py`, `schemas.py`, `__init__.py` | legacy_optional | Typed merge/schema compatibility helpers; không còn sở hữu extractor backend. | Giữ cho legacy typed pipeline; review riêng khi pipeline cũ được retire. |
+| `src/court_ocr_extract/extraction/gliner_extractor.py` | experimental | Optional GLiNER support có behavior riêng. | Giữ experimental; không coi là canonical backend. |
+| `src/court_ocr_extract/extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, `extractor.py`, `llm.py` | removed_in_phase1f | Duplicate/unimported paths đã migrate vào canonical `extractors/`. | Đã xóa; restore bằng Git history trước Phase 1F nếu cần. |
 | `src/court_ocr_extract/validation.py`, `validator.py`, `extraction/validators.py` | duplicate_conflict | Validation split across modules. | Choose canonical validation package. |
 | `src/court_ocr_extract/excel_writer.py` | main_candidate | Canonical Excel writer duy nhất sau Phase 1E; hỗ trợ draft records và typed `ExtractionResult`. | Keep; chỉ mở rộng schema qua phase được duyệt. |
 | `src/court_ocr_extract/excel.py`, `src/court_ocr_extract/export/excel_writer.py` | removed_in_phase1e | Caller đã migrate sang canonical path; không cần compatibility wrapper. | Đã xóa; restore bằng Git history trước Phase 1E nếu cần. |
@@ -114,7 +119,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - PaddleOCR: no safe code/docs references found in Phase 1A scan.
 - VLM: useful benchmark modules exist, but they must not become unvalidated main path by accident.
 - Cloud adapters: OpenAI/Gemini/Google OCR/extraction adapters exist and must remain opt-in.
-- Duplicate extractor: `extraction/`, `extractors/`, `extractor.py`, and `extraction_pipeline.py`.
+- Duplicate extractor: resolved in Phase 1F; backend ownership thuộc `extractors/`, orchestrator thuộc `extraction_pipeline.py`.
 - Duplicate Excel writer: resolved in Phase 1E; `excel_writer.py` là canonical duy nhất, hai path cũ đã xóa.
 - Settings/config conflict: `settings.py` is canonical; `config.py` remains compatibility until consolidation.
 - Old app folders: removed in Phase 1D after no main path import/reference was found.
@@ -150,6 +155,15 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 - Architecture guardrail fail nếu canonical writer thiếu hoặc legacy import quay lại; path compatibility còn tồn tại sẽ phát warning.
 - Restore path: use Git history before the Phase 1E commit.
 
+## Latest Phase 1F Extraction Consolidation
+
+- Canonical orchestrator: `src/court_ocr_extract/extraction_pipeline.py`.
+- Canonical package/base/Local LLM/rule helper: `src/court_ocr_extract/extractors/`.
+- Typed compatibility behavior nằm trong canonical `local_llm_extractor.py`; không tạo wrapper file.
+- Xóa năm legacy/duplicate paths sau khi migrate mọi repo caller.
+- Giữ merge/schema/validators/GLiNER, direct vision và cloud adapters theo vai trò riêng; cloud vẫn disabled/opt-in.
+- Restore path: use Git history before the Phase 1F commit.
+
 ## No-Delete Rule
 
-Ngoài các cleanup slice Phase 1D và Phase 1E đã được Project Owner phê duyệt rõ, mọi tracked source/docs row còn lại chỉ là candidate classification. Không xóa hoặc move thêm tracked source/docs nếu chưa có approval riêng. Generated local cache folders có thể được dọn trong cleanup an toàn.
+Ngoài các cleanup slice Phase 1D, Phase 1E và Phase 1F đã được Project Owner phê duyệt rõ, mọi tracked source/docs row còn lại chỉ là candidate classification. Không xóa hoặc move thêm tracked source/docs nếu chưa có approval riêng. Generated local cache folders có thể được dọn trong cleanup an toàn.

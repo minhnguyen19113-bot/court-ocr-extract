@@ -52,6 +52,10 @@ After Phase 1E, `scripts.check_architecture_guardrails` phải fail nếu canoni
 
 `tests/test_excel_writer_contract.py` chỉ tạo workbook synthetic trong `tmp_path`, mở lại bằng `openpyxl`, và kiểm sheet/header hiện tại. Test này không đọc hoặc ghi Excel real-data trong `outputs/`.
 
+After Phase 1F, `scripts.check_architecture_guardrails` phải fail nếu canonical extraction paths thiếu, legacy extraction import quay lại, hoặc tests chứa direct network call. `scripts.check_extractor` mặc định chỉ kiểm static configuration và không gọi model endpoint.
+
+`tests/test_extraction_consolidation.py` dùng fake Local LLM response và synthetic `OCRCacheRecord`; test kiểm `case_id`, fields, evidence, warnings và review helper mà không ghi `outputs/`.
+
 ## Phase 1C Verification Commands
 
 ```powershell
@@ -77,6 +81,22 @@ git status --short
 .\.venv\Scripts\python -B -m scripts.repo_inventory
 .\.venv\Scripts\python -B -m scripts.import_graph
 .\.venv\Scripts\python -B -m scripts.check_ocr_backend --backend surya
+.\.venv\Scripts\python -B -m pytest -p no:cacheprovider
+git diff --check
+git status --short
+```
+
+## Phase 1F Verification Commands
+
+```powershell
+.\.venv\Scripts\python -B -m compileall src scripts -q
+.\.venv\Scripts\python -B -m scripts.project_snapshot
+.\.venv\Scripts\python -B -m scripts.check_repo_guardrails
+.\.venv\Scripts\python -B -m scripts.check_architecture_guardrails
+.\.venv\Scripts\python -B -m scripts.repo_inventory
+.\.venv\Scripts\python -B -m scripts.import_graph
+.\.venv\Scripts\python -B -m scripts.check_ocr_backend --backend surya
+.\.venv\Scripts\python -B -m scripts.check_extractor
 .\.venv\Scripts\python -B -m pytest -p no:cacheprovider
 git diff --check
 git status --short

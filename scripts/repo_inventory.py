@@ -50,10 +50,6 @@ DUPLICATE_GROUPS = {
         "src/court_ocr_extract/ocr_surya.py",
         "src/court_ocr_extract/ocr/surya_adapter.py",
     ],
-    "local_llm_extractor": [
-        "src/court_ocr_extract/extraction/local_llm_extractor.py",
-        "src/court_ocr_extract/extractors/local_llm_extractor.py",
-    ],
     "validation": [
         "src/court_ocr_extract/validation.py",
         "src/court_ocr_extract/validator.py",

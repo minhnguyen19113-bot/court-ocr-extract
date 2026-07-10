@@ -59,6 +59,18 @@ Phase 1E consolidated Excel/export paths:
 - Restore path: use Git history before the Phase 1E commit.
 - Workbook schema vẫn là 11 domain headers; 8 audit/trace columns mục tiêu cần phase schema riêng.
 
+Phase 1F consolidated extraction modules:
+
+- Canonical orchestrator: `src/court_ocr_extract/extraction_pipeline.py`.
+- Canonical package: `src/court_ocr_extract/extractors/`.
+- Canonical Local LLM: `src/court_ocr_extract/extractors/local_llm_extractor.py`.
+- Canonical rule helper: `src/court_ocr_extract/extractors/rule_support.py`.
+- Removed `extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, root `extractor.py`, và root `llm.py`.
+- `extraction/` chỉ còn typed merge/schema/validation/GLiNER helpers, không phải backend owner.
+- `TypedLocalLLMExtractor` giữ old typed pipeline behavior trong canonical module; không có wrapper file.
+- `scripts.check_extractor` là static config check, không endpoint request.
+- Restore path: use Git history before the Phase 1F commit.
+
 Phase 2A đã triển khai đường chạy Surya OCR ở mức code/contract và thêm artifact để review OCR bằng hình ảnh. README, `.env.example`, Ezycloudx docs, visual QA docs, workflow docs, run scripts, và `settings.py` vẫn trỏ về default Surya target thay vì Tesseract.
 
 Canonical decisions:
@@ -66,6 +78,7 @@ Canonical decisions:
 - `src/court_ocr_extract/settings.py` is canonical rebuild config.
 - `src/court_ocr_extract/config.py` is compatibility/legacy.
 - `src/court_ocr_extract/excel_writer.py` là canonical Excel writer duy nhất; không import hai path đã xóa.
+- `src/court_ocr_extract/extraction_pipeline.py` và `src/court_ocr_extract/extractors/` là canonical extraction path.
 - Surya OCR + local LLM is the main candidate.
 - Local VLM is the benchmark path.
 
@@ -129,15 +142,15 @@ Template report chuẩn:
 
 - Tesseract remains in code/docs only as legacy optional; Surya backend must not fallback to Tesseract.
 - `settings.py` and `config.py` still overlap internally, but `settings.py` is canonical for new work.
-- Multiple extraction, validation, render, và OCR paths vẫn overlap; Excel writer overlap đã được xử lý trong Phase 1E.
+- Validation, render, và OCR paths vẫn overlap; Excel/extraction backend overlap đã được xử lý trong Phase 1E/1F.
 - Old app folders were removed in Phase 1D; do not reintroduce old app run instructions in README/docs/scripts.
 
 ## Suggested Next Step
 
 Ask Project Owner / ChatGPT to approve one next slice:
 
-1. Phase 1F: consolidate duplicate extraction modules.
-2. TOOLKIT-1: evaluation harness + gold dataset manifest.
-3. Phase 2B: Surya visual QA hardening.
+1. TOOLKIT-1: evaluation harness + gold dataset manifest.
+2. Phase 2B: Surya visual QA hardening.
+3. Phase 3A: Local LLM strict JSON/evidence hardening.
 4. Một phase Excel schema riêng để thêm audit/trace columns nếu được duyệt.
 5. Ezycloudx Surya package/model check và possible `surya-ocr` version pin.
