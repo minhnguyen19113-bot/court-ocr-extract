@@ -168,6 +168,16 @@ Do not start without Project Owner / ChatGPT approval.
 - [x] Thêm fake-backend tests; không chạy PDF/Surya/LLM/cloud/full pipeline thật.
 - [ ] Project Owner chạy visual OCR review Mode 3 trên Ezycloudx.
 
+## Pin Surya OCR Version
+
+- [x] Pin `surya-ocr==0.20.0` trong project extra và requirements.
+- [x] Chặn mọi installed version khác trước import/API/runtime.
+- [x] Báo rõ installed/supported version và reinstall commands.
+- [x] Nâng `check_ocr_backend` để in version mà không inference.
+- [x] Thêm tests cho 0.20.0, 0.21.1, missing package và no-inference.
+- [x] Ghi Surya 2/Docker thành phase riêng, không hỗ trợ trong main path hiện tại.
+- [ ] Project Owner reinstall pinned extras trên VM rồi chạy lại check.
+
 ## Repo Cleanup
 
 - [x] Audit generated cache trong các root code/docs/tests/app an toàn.

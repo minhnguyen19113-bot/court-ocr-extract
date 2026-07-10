@@ -24,6 +24,9 @@ from court_ocr_extract.review_html import write_ocr_review, write_run_index
 from court_ocr_extract.settings import PipelineSettings
 
 
+SUPPORTED_SURYA_OCR_VERSION = "0.20.0"
+
+
 class SuryaRuntimeError(RuntimeError):
     pass
 
@@ -48,6 +51,10 @@ class SuryaOCRBackend:
                 False,
                 "ENABLE_SURYA_OCR must be true; Surya is the target OCR backend.",
             )
+        installed_version = installed_surya_ocr_version()
+        version_error = surya_version_guard_error(installed_version)
+        if version_error:
+            return OCRBackendStatus(self.name, False, version_error)
         try:
             importlib.import_module("surya")
         except Exception as exc:
@@ -65,7 +72,8 @@ class SuryaOCRBackend:
         return OCRBackendStatus(
             self.name,
             True,
-            f"Surya package is importable.{suffix} Adapter API: {detection.kind}.",
+            f"Surya package is importable.{suffix} Supported version: {SUPPORTED_SURYA_OCR_VERSION}. "
+            f"Adapter API: {detection.kind}.",
         )
 
     def ocr_pdf_prefix(
@@ -495,7 +503,51 @@ def _run_surya_legacy(images: list[Image.Image], languages: list[str]) -> list[A
     )
 
 
+def installed_surya_ocr_version() -> str:
+    try:
+        return metadata.version("surya-ocr")
+    except metadata.PackageNotFoundError:
+        return ""
+
+
+def surya_version_guard_error(installed_version: str) -> str | None:
+    reinstall = (
+        'Reinstall with `.\\.venv\\Scripts\\python.exe -m pip uninstall -y surya-ocr` then '
+        '`.\\.venv\\Scripts\\python.exe -m pip install -e ".[dev,ocr]"`. '
+        "Verify with `.\\.venv\\Scripts\\python.exe -m pip show surya-ocr`."
+    )
+    if not installed_version:
+        return (
+            "surya-ocr is not installed. "
+            f"Supported version: {SUPPORTED_SURYA_OCR_VERSION}. {reinstall} "
+            f"Direct pinned install: `pip install surya-ocr=={SUPPORTED_SURYA_OCR_VERSION}`."
+        )
+    if installed_version == SUPPORTED_SURYA_OCR_VERSION:
+        return None
+    if _version_tuple(installed_version) >= (0, 21, 0):
+        return (
+            f"This project currently supports surya-ocr=={SUPPORTED_SURYA_OCR_VERSION} for the Surya adapter. "
+            f"Detected surya-ocr {installed_version}, which requires Surya 2 inference backend / Docker. "
+            "Please reinstall dependencies from the pinned project extras. "
+            f"Installed version: {installed_version}. Supported version: {SUPPORTED_SURYA_OCR_VERSION}. {reinstall}"
+        )
+    return (
+        f"Unsupported surya-ocr version. Installed version: {installed_version}. "
+        f"Supported version: {SUPPORTED_SURYA_OCR_VERSION}. {reinstall}"
+    )
+
+
+def _version_tuple(value: str) -> tuple[int, int, int]:
+    import re
+
+    numbers = [int(item) for item in re.findall(r"\d+", value)[:3]]
+    return tuple((numbers + [0, 0, 0])[:3])
+
+
 def _surya_version() -> str:
+    installed = installed_surya_ocr_version()
+    if installed:
+        return installed
     for package_name in ("surya-ocr", "surya"):
         try:
             return metadata.version(package_name)

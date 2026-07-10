@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 ## Current Phase
 
-OCR USES PREPROCESSED INPUT sau RED SEAL + TEXT ENHANCEMENT FIX.
+PIN SURYA OCR VERSION sau OCR USES PREPROCESSED INPUT.
 
-Task này nối final preprocessed image vào Surya OCR theo opt-in CLI và Mode 3 do Project Owner chọn. Codex chỉ dùng fake backend/synthetic images, không đọc/chạy PDF thật, không gọi Surya/Local LLM/cloud và không chạy full pipeline.
+Task này pin `surya-ocr==0.20.0` và chặn dependency drift lên Surya 2/0.21.x trước import/runtime. Codex không chạy PDF/OCR/Surya inference, Local LLM, cloud hoặc full pipeline.
 
 ## Active Direction
 
@@ -171,6 +171,15 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Preprocess exception tạo named final safe copy và warning, không âm thầm gọi OCR bằng rendered path.
 - Tests dùng fake Surya; chưa có real PDF/OCR inference trong Codex.
 
+## Latest Surya Version Pin
+
+- `pyproject.toml` và `requirements.txt` pin exact `surya-ocr==0.20.0`.
+- Main adapter chưa hỗ trợ Surya 2 / `surya-ocr>=0.21.0`.
+- Version guard đọc distribution metadata trước `import surya`, API detection hoặc runtime call.
+- `check_ocr_backend` in installed/supported version; local `.venv` hiện pass với 0.20.0.
+- Sai version/missing package trả reinstall commands rõ; không chờ tới Docker/vLLM error.
+- Tests mock version/import và không gọi inference.
+
 ## Next Gate
 
-Project Owner cần chạy `debug-ocr-review --use-preprocessed` Mode 3 trên VM và so sánh OCR text/bbox với image input. Chỉ sau visual OCR review mới quyết định bật Mode 3 cho pilot mặc định.
+Project Owner phải reinstall `.[dev,ocr]`, xác nhận installed/supported đều là `0.20.0`, rồi mới chạy lại Mode 3 OCR review trên VM.

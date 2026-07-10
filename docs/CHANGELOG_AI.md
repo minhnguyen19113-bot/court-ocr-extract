@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-10 - Pin Surya OCR Version
+
+- Pin `surya-ocr==0.20.0` trong `pyproject.toml` và `requirements.txt`.
+- Thêm version guard trước import/API/runtime; 0.21.x báo Surya 2/Docker và reinstall instructions.
+- Nâng `scripts.check_ocr_backend` để in installed/supported version mà không inference.
+- Thêm tests cho supported, drifted, missing và no-inference paths.
+- Không chạy PDF/OCR/Surya inference/LLM/cloud/full pipeline.
+
 ## 2026-07-10 - OCR Uses Preprocessed Input
 
 - Xác nhận Surya trước đây dùng rendered original, không dùng output từ `debug-preprocess`.

@@ -46,7 +46,7 @@ git clone https://github.com/<user>/<repo>.git court-ocr-extract
 cd C:\court-ocr-extract
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,ocr]"
 Copy-Item .env.example .env -Force
 ```
 
@@ -69,7 +69,7 @@ python -m scripts.check_ocr_backend --backend surya
 python -m scripts.check_extractor --backend local_llm
 ```
 
-Surya runtime adapter has been wired in code. The VM may still need `surya-ocr` package/model setup; if a command reports Surya unavailable or unsupported, treat that as runtime setup or version-pin work, not permission to switch the main default.
+The main adapter is pinned to `surya-ocr==0.20.0`. `surya-ocr>=0.21.0` is Surya 2 and is not supported by this path; the availability check fails before Docker/vLLM runtime. Reinstall from `.[dev,ocr]` after pulling dependency changes, and do not replace the pin with an unversioned install.
 
 ## Synthetic Smoke Debug
 

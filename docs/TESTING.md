@@ -64,6 +64,8 @@ Preprocess v2 tests mở rộng sang HSV/Lab/RGB metadata, `neutralize|inpaint|w
 
 Preprocessed OCR wiring tests monkeypatch render/preprocess và fake `_run_surya_on_images`/backend. Tests kiểm final path, Mode 3 metadata, cache/manifest/artifacts, rendered-original branch và exception safe copy mà không mở PDF hoặc gọi Surya thật.
 
+Surya version-guard tests monkeypatch distribution version và import/runtime entrypoints. Chúng kiểm 0.20.0 pass, 0.21.1/missing fail trước import, reinstall message và `check_ocr_backend` không gọi `ocr_pdf_prefix`.
+
 ## Phase 1C Verification Commands
 
 ```powershell

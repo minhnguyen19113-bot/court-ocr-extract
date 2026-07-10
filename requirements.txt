@@ -7,4 +7,4 @@ openpyxl>=3.1
 rapidfuzz>=3.9
 tqdm>=4.66
 typer>=0.12
-surya-ocr>=0.14
+surya-ocr==0.20.0

@@ -53,6 +53,8 @@ Debug UI must include:
 
 ## Surya OCR
 
+Runtime contract: main adapter chỉ hỗ trợ `surya-ocr==0.20.0`. Version guard phải chạy trước import/API detection; Surya 2/0.21.x và Docker/vLLM backend không thuộc phase hiện tại.
+
 OCR input routing:
 
 - Không có `--use-preprocessed`: Surya dùng rendered original như behavior cũ và metadata ghi `ocr_input_source=rendered_original`.

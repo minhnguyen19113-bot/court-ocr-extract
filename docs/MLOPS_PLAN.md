@@ -18,7 +18,7 @@ Quản trị version, runtime, benchmark, và rollback cho Surya OCR, local LLM,
 
 ## Versioning đề xuất
 
-- Pin hoặc document `surya-ocr` version sau khi Ezycloudx check thật.
+- Main adapter đã pin `surya-ocr==0.20.0`; guard fail mọi version khác trước runtime. Surya 2/0.21.x cần phase/runtime governance riêng.
 - Ghi model/runtime version vào run manifest.
 - Khi prompt/schema đổi, cập nhật `docs/CHANGELOG_AI.md` và evaluation baseline.
 - Không thay default sang cloud model nếu không có explicit opt-in decision.

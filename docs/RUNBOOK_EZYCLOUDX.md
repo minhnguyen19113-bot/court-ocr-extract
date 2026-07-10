@@ -165,13 +165,16 @@ OCR cache toàn bộ file cũng dùng `--full-document`; command này không ch�
   --debug-visual
 ```
 
-Nếu thiếu Surya:
+Nếu thiếu Surya hoặc VM đã drift lên 0.21.x, reinstall đúng pin:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[ocr]"
-# or
-.\.venv\Scripts\python.exe -m pip install surya-ocr
+.\.venv\Scripts\python.exe -m pip uninstall -y surya-ocr
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,ocr]"
+.\.venv\Scripts\python.exe -m pip show surya-ocr
+.\.venv\Scripts\python.exe -B -m scripts.check_ocr_backend --backend surya
 ```
+
+Main path chỉ hỗ trợ `surya-ocr==0.20.0`. Không dùng Surya 2 / `surya-ocr>=0.21.0` trong phase này vì runtime đó cần inference backend riêng như vLLM/llama.cpp/Docker. Guard sẽ fail trước import/runtime nếu version sai.
 
 Command target để review OCR:
 
@@ -193,7 +196,7 @@ Target full run after Project Owner acceptance:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_full_windows.ps1 -OcrBackend surya -Extractor local_llm -ReviewSampleSize 10 -ReviewMode mixed -AcceptedSample10
 ```
 
-Phase 2A đã wire `SuryaOCRBackend` cho API `surya-ocr 0.20.0` qua `RecognitionPredictor(..., full_page=True)`. Nếu `check_ocr_backend --backend surya` báo unsupported API, giữ nguyên default Surya và cập nhật adapter/version pin; không fallback sang Tesseract.
+Phase 2A đã wire `SuryaOCRBackend` cho API `surya-ocr 0.20.0` qua `RecognitionPredictor(..., full_page=True)`. Dependency đã pin exact; nếu check báo version sai, reinstall project extras, không fallback sang Tesseract và không cài Surya không version.
 
 ## VLM Benchmark
 

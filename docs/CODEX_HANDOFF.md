@@ -105,7 +105,7 @@ Phase 2A notes:
 - `debug-ocr-review` có thể dùng wiring `surya`, nhưng Codex không được chạy command này trên PDF thật.
 - Surya artifact theo page được ghi dưới `ocr_surya/` khi bật debug visual.
 - Synthetic tests chỉ chứng minh schema/control-flow, không chứng minh chất lượng OCR thật.
-- Nếu thiếu Surya, cài bằng `pip install -e ".[ocr]"` hoặc `pip install surya-ocr`.
+- Nếu thiếu/sai version Surya, uninstall rồi cài lại bằng `pip install -e ".[dev,ocr]"`; không dùng install không pin.
 
 Full-document debug review notes:
 
@@ -141,6 +141,14 @@ OCR preprocessed-input notes:
 - Backend ghi `ocr_input_source`/options vào `OCRResult.metadata`, cache và manifest; page artifact có `ocr_input_image_path`.
 - Không có flag thì giữ rendered-original behavior. Preprocess exception tạo final safe copy có warning.
 - Fake-backend tests chứng minh wiring; Project Owner vẫn phải chạy visual OCR review thật.
+
+Surya version-pin notes:
+
+- Main path hỗ trợ exact `surya-ocr==0.20.0`; pin nằm trong `pyproject.toml` và `requirements.txt`.
+- 0.21.x là Surya 2, cần inference backend/Docker và không được hỗ trợ trong phase này.
+- Guard đọc package metadata trước import; `check_ocr_backend` in installed/supported version và không inference.
+- VM bị drift phải uninstall Surya rồi reinstall `.[dev,ocr]`; không dùng `pip install surya-ocr` không pin.
+- Local `.venv` tại thời điểm task có 0.20.0 và static availability check pass.
 
 Repo cleanup notes:
 
@@ -187,6 +195,6 @@ Template report chuẩn:
 
 Ask Project Owner / ChatGPT to approve one next slice:
 
-1. Project Owner chạy `debug-ocr-review --use-preprocessed` Mode 3 theo runbook.
-2. Review `ocr_input_source`, input image, bbox, text, warnings và preprocess artifacts.
-3. Nếu đạt, chạy command `ocr --use-preprocessed` để tạo pilot cache.
+1. Project Owner pull, uninstall drifted Surya và reinstall `.[dev,ocr]`.
+2. Xác nhận `check_ocr_backend` in installed/supported `0.20.0`.
+3. Sau đó mới chạy lại `debug-ocr-review --use-preprocessed` Mode 3.

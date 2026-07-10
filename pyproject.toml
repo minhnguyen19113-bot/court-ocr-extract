@@ -41,7 +41,7 @@ gpu = [
     "vllm>=0.6; platform_system != 'Windows'"
 ]
 ocr = [
-    "surya-ocr>=0.14"
+    "surya-ocr==0.20.0"
 ]
 
 [tool.setuptools.packages.find]

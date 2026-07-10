@@ -11,6 +11,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from court_ocr_extract.ocr_backends import get_ocr_backend
+from court_ocr_extract.ocr_backends.surya_ocr import (
+    SUPPORTED_SURYA_OCR_VERSION,
+    installed_surya_ocr_version,
+)
 
 
 def main() -> None:
@@ -30,6 +34,9 @@ def main() -> None:
 
     status = backend.check_available()
     print(f"OCR backend: {status.name}")
+    if status.name in {"surya", "surya_optional"}:
+        print(f"Installed version: {installed_surya_ocr_version() or 'not installed'}")
+        print(f"Supported version: {SUPPORTED_SURYA_OCR_VERSION}")
     print(f"Available: {status.available}")
     print(f"Reason: {status.reason}")
     if not status.available:

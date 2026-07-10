@@ -34,6 +34,7 @@ Last updated: 2026-07-10
 | D-028 | Accepted | Preprocess mặc định dùng `conservative`, red seal removal trên ảnh màu và `deskew=off`; `safe` phải qua confidence/range/crop/layout guard, mọi transform phải có blank fallback. | Kết quả debug thật cho thấy auto-deskew và threshold cũ có thể làm nghiêng hoặc blank trang; ưu tiên bảo toàn nội dung trước OCR. |
 | D-029 | Accepted | Preprocess v2 mặc định dùng `red_removal_mode=neutralize` và `text_enhance=light`; `white_fill`/`strong` chỉ dùng thử nghiệm, mọi stage có protection/guard/fallback. | Feedback visual thật xác nhận deskew/blank đã ổn nhưng seal còn residual và chữ hơi mờ; cần tăng chất lượng mà không xóa nét đen hoặc tạo noise giả. |
 | D-030 | Accepted | Mode 3 (`inpaint`, text `medium`, profile `balanced`, deskew `off`) là candidate OCR input do Project Owner chọn; chỉ dùng khi truyền `--use-preprocessed`, chưa đổi default OCR toàn cục. | Giữ backward compatibility và tạo gate visual OCR riêng trước khi áp dụng candidate này cho pilot mặc định. |
+| D-031 | Accepted | Main Surya adapter pin exact `surya-ocr==0.20.0`; mọi version khác fail trước import/runtime. Surya 2/0.21.x chỉ được xem xét trong phase riêng. | 0.21.1 đổi sang inference backend cần Docker/vLLM và gây runtime drift trên VM; pin exact giữ API `recognition_full_page` hiện đã test. |
 
 ## Pending Decisions Before Cleanup / Phase 2
 
