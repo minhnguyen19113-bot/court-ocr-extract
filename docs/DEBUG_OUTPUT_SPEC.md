@@ -1,6 +1,6 @@
 # Debug Output Spec
 
-Last updated: 2026-07-07
+Last updated: 2026-07-10
 
 Debug output is mandatory for reviewer trust. It must be safe by default and should never print or expose full real OCR text in logs.
 
@@ -52,10 +52,17 @@ Default page scope:
 
 Must show:
 
-- before/after images side by side
-- transform list
+- original, `red_mask`, `seal_removed`, final preprocessed và before/after images
+- `preprocess_profile`, red-pixel metrics, deskew angle/confidence/reason và before/after foreground metrics
 - non-overwrite guarantee
-- warnings for risky transforms
+- warnings và fallback source khi transform bị bỏ qua hoặc blank guard kích hoạt
+
+Safety contract:
+
+- Red seal detection/removal chạy trên ảnh màu trước grayscale.
+- `--deskew off` là mặc định; `safe` chỉ xoay trong ngưỡng 0.3-5 độ khi confidence đủ cao và không có crop/multi-column risk.
+- Nếu output mất quá nhiều foreground hoặc gần trắng, dùng original/previous safe stage và ghi `preprocess_blank_guard_triggered` cùng `foreground_loss_too_high`.
+- Mỗi page có `metadata.json`; Project Owner phải review `debug-preprocess` trước khi chạy OCR thật.
 
 Default page scope:
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from court_ocr_extract.image_processing.red_stamp_removal import reduce_red_stamp
+from court_ocr_extract.image_processing.red_stamp_removal import reduce_red_stamp_with_metadata
 
 
 def remove_red_seal_debug(input_path: str | Path, output_dir: str | Path) -> dict[str, Path]:
@@ -14,20 +14,7 @@ def remove_red_seal_debug(input_path: str | Path, output_dir: str | Path) -> dic
     before = output_dir / "before.png"
     mask = output_dir / "red_mask.png"
     after = output_dir / "after.png"
-    Image.open(input_path).save(before)
-    _write_red_mask(input_path, mask)
-    reduce_red_stamp(input_path, after)
+    with Image.open(input_path) as image:
+        image.convert("RGB").save(before)
+    reduce_red_stamp_with_metadata(input_path, after, mask_path=mask)
     return {"before": before, "red_mask": mask, "after": after}
-
-
-def _write_red_mask(input_path: Path, output_path: Path) -> None:
-    with Image.open(input_path).convert("RGB") as image:
-        mask = Image.new("L", image.size, 0)
-        source = image.load()
-        target = mask.load()
-        for y in range(image.height):
-            for x in range(image.width):
-                r, g, b = source[x, y]
-                if r > 120 and r > g * 1.25 and r > b * 1.25:
-                    target[x, y] = 255
-        mask.save(output_path)

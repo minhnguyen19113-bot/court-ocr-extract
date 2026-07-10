@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from PIL import Image, ImageOps
 
@@ -12,8 +13,22 @@ def preprocess_image(
     output_path: str | Path,
     *,
     remove_red_seal: bool = False,
+    intermediate_path: str | Path | None = None,
+    red_mask_path: str | Path | None = None,
+    deskew_mode: str = "off",
+    preprocess_profile: str = "conservative",
+    metadata: dict[str, Any] | None = None,
 ) -> Path:
-    return preprocess_for_ocr(input_path, output_path, remove_red_stamp=remove_red_seal)
+    return preprocess_for_ocr(
+        input_path,
+        output_path,
+        remove_red_stamp=remove_red_seal,
+        intermediate_path=intermediate_path,
+        red_mask_path=red_mask_path,
+        deskew_mode=deskew_mode,
+        preprocess_profile=preprocess_profile,
+        metadata=metadata,
+    )
 
 
 def make_before_after_compare(before_path: str | Path, after_path: str | Path, output_path: str | Path) -> Path:

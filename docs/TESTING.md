@@ -58,6 +58,8 @@ After Phase 1F, `scripts.check_architecture_guardrails` phải fail nếu canoni
 
 TOOLKIT-1 tests chỉ dùng hai JSONL fixtures đã redact trong `tests/fixtures/` và `tmp_path`. Tests cover manifest validation, PII detection/redaction, perfect/mismatch metrics, participant missing/extra, evidence/source coverage, safe report và CLI. Không test nào đọc `data/`, `data_private/` hoặc `outputs/`.
 
+Preprocess safety tests dùng ảnh RGB synthetic trong `tmp_path` để kiểm red HSV mask/removal, bảo toàn chữ đen, no-seal behavior, color-before-grayscale order, safe deskew, blank fallback và debug HTML. Chúng không mở PDF, không gọi OCR/Surya và không chứng minh ngưỡng phù hợp cho scan thật.
+
 ## Phase 1C Verification Commands
 
 ```powershell

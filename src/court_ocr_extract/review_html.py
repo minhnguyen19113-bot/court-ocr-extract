@@ -38,6 +38,58 @@ def write_image_grid(
     return write_html(output_path, title, "\n".join(sections))
 
 
+def write_preprocess_review(
+    output_path: str | Path,
+    *,
+    cases: list[dict[str, Any]],
+    base_dir: str | Path,
+) -> Path:
+    base_dir = Path(base_dir)
+    sections = ["<h1>Preprocess Safety Review</h1>"]
+    metadata_fields = [
+        "page_number",
+        "preprocess_profile",
+        "red_pixels_ratio",
+        "red_seal_removed",
+        "deskew_mode",
+        "detected_angle",
+        "deskew_applied",
+        "deskew_confidence",
+        "deskew_reason",
+        "foreground_before",
+        "foreground_after",
+        "fallback_source",
+        "warnings",
+    ]
+    for case in cases:
+        page_sections = []
+        for page in case.get("pages", []):
+            images = []
+            for label, image_path in page.get("images", []):
+                image_path = Path(image_path)
+                if image_path.exists():
+                    images.append(
+                        f'<div><h4>{escape(label)}</h4><img src="{escape(rel_link(image_path, base_dir))}" '
+                        f'alt="{escape(label)}"></div>'
+                    )
+            metadata = page.get("metadata", {})
+            rows = []
+            for field in metadata_fields:
+                value = metadata.get(field)
+                if isinstance(value, list):
+                    value = "; ".join(str(item) for item in value)
+                rows.append(f"<tr><th>{escape(field)}</th><td>{escape(value)}</td></tr>")
+            page_sections.append(
+                "<section>"
+                f"<h3>Page {escape(metadata.get('page_number'))}</h3>"
+                f"<div class=\"grid\">{''.join(images)}</div>"
+                f"<table>{''.join(rows)}</table>"
+                "</section>"
+            )
+        sections.append(f"<section><h2>{escape(case['case_id'])}</h2>{''.join(page_sections)}</section>")
+    return write_html(output_path, "Preprocess Safety Review", "\n".join(sections))
+
+
 def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, base_dir: str | Path) -> Path:
     base_dir = Path(base_dir)
     sections = ["<h1>OCR Review</h1>"]

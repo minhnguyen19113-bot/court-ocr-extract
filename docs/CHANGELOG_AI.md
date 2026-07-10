@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-10 - Preprocess Safety Fix
+
+- Thay auto-deskew mặc định bằng `off`; thêm `safe`/`force` và metadata angle/confidence/reason.
+- Chuyển red seal HSV detection/removal lên ảnh màu trước grayscale; thêm mask, ratio và high-ratio safeguard.
+- Thêm foreground/dark/brightness/entropy blank guard cùng fallback original/previous safe stage.
+- Nâng `debug-preprocess` HTML/CLI với artifacts, metadata, warnings và ba preprocess profiles.
+- Thêm synthetic tests; không đọc/chạy PDF thật, OCR/Surya/model/cloud hoặc full pipeline.
+
 ## 2026-07-10 - TOOLKIT-1 Evaluation Harness + Gold Dataset Manifest
 
 - Thêm `evaluation/manifest.py`, `metrics.py`, `report.py`, `privacy.py` và package exports.

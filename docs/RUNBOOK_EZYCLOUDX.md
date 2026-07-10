@@ -56,6 +56,23 @@ Project Owner đặt đúng 1 PDF cần pilot vào folder `data\raw_pdfs\pilot_o
   --input data\raw_pdfs\pilot_one `
   --limit 1 `
   --review-sample-size 1 `
+  --deskew off `
+  --red-seal-removal on `
+  --preprocess-profile conservative `
+  --output outputs\debug_visual `
+  --open
+```
+
+Project Owner phải kiểm tra original/red mask/seal removed/final và warnings của toàn bộ trang trước OCR. Chỉ sau khi bản `off` không blank/mất chữ mới thử `--deskew safe`; không dùng `force` cho pilot production.
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-preprocess `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --deskew safe `
+  --red-seal-removal on `
+  --preprocess-profile conservative `
   --output outputs\debug_visual `
   --open
 ```

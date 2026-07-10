@@ -115,6 +115,15 @@ Full-document debug review notes:
 - `ocr --full-document` cũng truyền `max_pages=None` và `stop_marker=""`, chỉ tạo OCR cache/debug visual, không chạy extraction/LLM/Excel.
 - Pilot 1 PDF nên dùng folder `data\raw_pdfs\pilot_one` với `--limit 1` và `--review-sample-size 1`.
 
+Preprocess safety notes:
+
+- Auto-deskew `minAreaRect` cũ đã bị thay; canonical preprocess default không rotate.
+- `debug-preprocess` default: `--deskew off --red-seal-removal on --preprocess-profile conservative`.
+- Red mask/removal chạy trên original color trước grayscale; output có per-page `red_mask.png`, `seal_removed.png`, `final_preprocessed.png` và `metadata.json`.
+- `safe` deskew chỉ rotate khi đủ confidence và qua angle/crop/multi-column guard; rotation mở rộng canvas.
+- Blank guard fallback về original/previous safe stage và ghi warnings rõ.
+- Không có real PDF/OCR run trong task; Project Owner phải review bản `off` trên Ezycloudx trước khi tiếp tục OCR.
+
 Repo cleanup notes:
 
 - Generated cache local đã được dọn khỏi workspace.
@@ -160,8 +169,6 @@ Template report chuẩn:
 
 Ask Project Owner / ChatGPT to approve one next slice:
 
-1. TOOLKIT-2: connect pipeline output to prediction manifest.
-2. Phase 2B: Surya visual QA hardening.
-3. Phase 3A: Local LLM strict JSON/evidence hardening.
-4. Một phase Excel schema riêng để thêm audit/trace columns nếu được duyệt.
-5. Ezycloudx Surya package/model check và possible `surya-ocr` version pin.
+1. Project Owner chạy lại full-page `debug-preprocess --deskew off` và duyệt artifacts/warnings.
+2. Nếu bản mặc định đạt, thử riêng `--deskew safe` để so sánh.
+3. Chỉ sau preprocess gate mới tiếp tục Surya visual QA/OCR.

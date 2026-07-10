@@ -134,6 +134,18 @@ Do not start without Project Owner / ChatGPT approval.
 - Cải thiện review UI sau khi thấy behavior thật của Surya bbox/text.
 - Chỉ bắt đầu hardening Local LLM strict JSON/evidence sau khi OCR review path được duyệt.
 
+## Preprocess Safety Fix
+
+- [x] Thay auto-deskew `minAreaRect` mạo hiểm bằng default `off` và mode `safe` có confidence/range/layout/crop guard.
+- [x] Chạy HSV red mask/removal trên ảnh màu trước grayscale, tạo mask và metadata.
+- [x] Thêm foreground/dark/brightness/entropy blank guard và safe fallback.
+- [x] Thêm CLI options cho deskew, red-seal removal và preprocess profile.
+- [x] Nâng debug HTML để hiển thị original/red mask/seal removed/final/metadata/warnings.
+- [x] Thêm synthetic tests cho seal/no-seal, color-order, deskew, blank fallback và debug review.
+- [x] Không chạy PDF/OCR/Surya/model/cloud/full pipeline thật.
+- [ ] Project Owner chạy lại `debug-preprocess --deskew off` trên Ezycloudx và duyệt toàn bộ trang.
+- [ ] Chỉ thử `--deskew safe` sau khi preview mặc định được chấp nhận.
+
 ## Repo Cleanup
 
 - [x] Audit generated cache trong các root code/docs/tests/app an toàn.

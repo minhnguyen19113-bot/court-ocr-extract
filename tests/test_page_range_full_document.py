@@ -47,9 +47,15 @@ def test_debug_render_without_pages_passes_none_to_render(tmp_path, monkeypatch)
 
 def test_debug_preprocess_without_pages_passes_none_to_render(tmp_path, monkeypatch) -> None:
     captured: list[list[int] | None] = []
+    preprocess_options: list[dict[str, object]] = []
     case = _case(tmp_path)
     _stub_review_command(monkeypatch, tmp_path, case)
-    monkeypatch.setattr(cli, "preprocess_image", lambda before, after: Path(after))
+
+    def fake_preprocess(before, after, **kwargs):
+        preprocess_options.append(kwargs)
+        return Path(after)
+
+    monkeypatch.setattr(cli, "preprocess_image", fake_preprocess)
     monkeypatch.setattr(cli, "make_before_after_compare", lambda before, after, compare: Path(compare))
 
     def fake_render_pdf_pages(pdf_path, output_dir, *, dpi, page_numbers=None, max_pages=None):
@@ -73,6 +79,9 @@ def test_debug_preprocess_without_pages_passes_none_to_render(tmp_path, monkeypa
     )
 
     assert captured == [None]
+    assert preprocess_options[0]["deskew_mode"] == "off"
+    assert preprocess_options[0]["remove_red_seal"] is True
+    assert preprocess_options[0]["preprocess_profile"] == "conservative"
 
 
 def test_full_document_helpers_disable_page_limit_and_marker() -> None:
@@ -154,6 +163,7 @@ def _stub_review_command(monkeypatch, tmp_path, case) -> None:
     monkeypatch.setattr(cli, "make_run_dir", lambda output: tmp_path / "debug")
     monkeypatch.setattr(cli, "_sample_case_files", lambda args: [case])
     monkeypatch.setattr(cli, "write_image_grid", lambda output_path, *, title, cases, base_dir: Path(output_path))
+    monkeypatch.setattr(cli, "write_preprocess_review", lambda output_path, *, cases, base_dir: Path(output_path))
     monkeypatch.setattr(cli, "write_run_index", lambda run_dir, links: Path(run_dir) / "index.html")
     monkeypatch.setattr(cli, "_maybe_open", lambda path, enabled: None)
     monkeypatch.setattr(cli, "_print_phase_result", lambda name, run_dir: None)

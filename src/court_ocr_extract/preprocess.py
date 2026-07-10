@@ -50,32 +50,8 @@ def reduce_red_stamp_hsv(image, cv2, np):
 
 
 def deskew_gray(gray, cv2, np):
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    threshold = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-    coords = np.column_stack(np.where(threshold > 0))
-    if coords.size == 0:
-        return gray
-
-    angle = cv2.minAreaRect(coords)[-1]
-    if angle < -45:
-        angle = -(90 + angle)
-    else:
-        angle = -angle
-
-    if abs(angle) < 0.05 or abs(angle) > 15:
-        return gray
-
-    height, width = gray.shape[:2]
-    center = (width // 2, height // 2)
-    rotation = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(
-        gray,
-        rotation,
-        (width, height),
-        flags=cv2.INTER_CUBIC,
-        borderMode=cv2.BORDER_CONSTANT,
-        borderValue=255,
-    )
+    """Legacy helper retained as a no-rotation compatibility shim."""
+    return gray
 
 
 def enhance_contrast(gray, cv2):

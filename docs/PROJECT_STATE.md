@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 ## Current Phase
 
-TOOLKIT-1: EVALUATION HARNESS + GOLD DATASET MANIFEST.
+PREPROCESS SAFETY FIX sau TOOLKIT-1.
 
-Phase này thêm manifest schema/validator, aggregate metrics, privacy helper, safe report và synthetic fixtures cho evaluation. Codex không tạo/đọc gold thật, không chạy PDF/OCR/Excel thật, không gọi model endpoint/cloud API, không chạy full pipeline, không sửa Surya runtime, Local LLM logic lớn hoặc Excel schema.
+Task này sửa preprocess theo hướng bảo thủ bằng synthetic images: red seal trên ảnh màu, deskew có confidence/guardrail, blank fallback và debug metadata. Codex không đọc/chạy PDF thật, không gọi OCR/Surya/model/cloud, không chạy full pipeline và không sửa Local LLM/Excel/extraction pipeline.
 
 ## Active Direction
 
@@ -141,6 +141,16 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Guardrail bảo vệ `data_private/`, `data/gold/`, manifest ngoài tests và obvious PII trong synthetic manifests.
 - Synthetic evaluation không chứng minh chất lượng OCR/extraction thật và không thay human review.
 
+## Latest Preprocess Safety Fix
+
+- `debug-preprocess` có `--deskew off|safe|force`, `--red-seal-removal on|off` và `--preprocess-profile conservative|balanced|aggressive`.
+- Default an toàn là `deskew=off`, red-seal removal bật và profile conservative.
+- HSV red mask/removal chạy trên original color trước grayscale; ratio quá cao sẽ skip thay vì xóa mạo hiểm.
+- Safe deskew cần đủ horizontal evidence, góc 0.3-5 độ, không có foreground sát mép và không có layout hai cột mơ hồ.
+- Blank guard so foreground/dark ratio/brightness/entropy và fallback original hoặc `seal_removed` khi after mất nội dung.
+- Debug review hiển thị original, red mask, seal removed, final, compare, metadata và warnings theo page.
+- Tests chỉ dùng ảnh synthetic; chất lượng và ngưỡng trên scan thật chưa được xác nhận.
+
 ## Next Gate
 
-Project Owner / ChatGPT nên duyệt một hướng tiếp theo: TOOLKIT-2 connect pipeline output to prediction manifest, Phase 2B Surya visual QA hardening, hoặc Phase 3A Local LLM strict JSON/evidence hardening. Real gold evaluation vẫn do Project Owner chạy ngoài Codex.
+Project Owner cần chạy lại `debug-preprocess` với `deskew off` trên VM và review toàn bộ trang. Chỉ thử `safe` sau khi bản mặc định không blank/mất chữ; chưa tiếp tục OCR trước gate này.

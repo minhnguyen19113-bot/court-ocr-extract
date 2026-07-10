@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ from court_ocr_extract.review_html import (
     write_image_grid,
     write_marker_report,
     write_ocr_review,
+    write_preprocess_review,
     write_run_index,
 )
 from court_ocr_extract.review_manifest import write_review_manifest
@@ -83,6 +85,13 @@ def _add_debug_render(subparsers) -> None:
 def _add_debug_preprocess(subparsers) -> None:
     parser = subparsers.add_parser("debug-preprocess")
     _add_input_review_args(parser)
+    parser.add_argument("--deskew", choices=["off", "safe", "force"], default="off")
+    parser.add_argument("--red-seal-removal", choices=["on", "off"], default="on")
+    parser.add_argument(
+        "--preprocess-profile",
+        choices=["conservative", "balanced", "aggressive"],
+        default="conservative",
+    )
     parser.set_defaults(func=cmd_debug_preprocess)
 
 
@@ -231,18 +240,41 @@ def cmd_debug_preprocess(args) -> None:
     run_dir = make_run_dir(args.output)
     cases = _sample_case_files(args)
     pages = parse_page_range(args.pages)
-    image_cases = []
+    review_cases = []
     for case in track(cases, "Preprocessing cases", total=len(cases)):
         rendered = render_pdf_pages(case.path, run_dir / case.case_id / "01_rendered", dpi=settings.ocr_dpi, page_numbers=pages)
-        images = []
+        review_pages = []
         for page in rendered:
-            after = run_dir / case.case_id / "02_preprocess" / f"page_{page.page_number:03d}_after.png"
-            compare = run_dir / case.case_id / "02_preprocess" / f"page_{page.page_number:03d}_compare.png"
-            preprocess_image(page.image_path, after)
+            page_dir = run_dir / case.case_id / "02_preprocess" / f"page_{page.page_number:03d}"
+            after = page_dir / "final_preprocessed.png"
+            compare = page_dir / "before_after_compare.png"
+            red_mask = page_dir / "red_mask.png"
+            seal_removed = page_dir / "seal_removed.png"
+            metadata_path = page_dir / "metadata.json"
+            page_dir.mkdir(parents=True, exist_ok=True)
+            metadata: dict[str, Any] = {"page_number": page.page_number}
+            preprocess_image(
+                page.image_path,
+                after,
+                remove_red_seal=args.red_seal_removal == "on",
+                intermediate_path=seal_removed,
+                red_mask_path=red_mask,
+                deskew_mode=args.deskew,
+                preprocess_profile=args.preprocess_profile,
+                metadata=metadata,
+            )
+            metadata["page_number"] = page.page_number
+            metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             make_before_after_compare(page.image_path, after, compare)
-            images.append((f"page {page.page_number} compare", compare))
-        image_cases.append({"case_id": case.case_id, "images": images})
-    grid = write_image_grid(run_dir / "preprocess_review_grid.html", title="Preprocess Review", cases=image_cases, base_dir=run_dir)
+            page_images = [("original", page.image_path)]
+            if red_mask.exists():
+                page_images.append(("red_mask", red_mask))
+            if seal_removed.exists():
+                page_images.append(("seal_removed", seal_removed))
+            page_images.extend([("final_preprocessed", after), ("before_after_compare", compare)])
+            review_pages.append({"metadata": metadata, "images": page_images})
+        review_cases.append({"case_id": case.case_id, "pages": review_pages})
+    grid = write_preprocess_review(run_dir / "preprocess_review_grid.html", cases=review_cases, base_dir=run_dir)
     index = write_run_index(run_dir, {"preprocess review": grid})
     _maybe_open(index, args.open)
     _print_phase_result("debug-preprocess", run_dir)

@@ -22,6 +22,19 @@ Debug UI must include:
 
 ## Preprocess / Enhance
 
+Preprocess là optional và phải theo thứ tự an toàn:
+
+```text
+original color -> optional HSV red mask/removal -> grayscale/enhance
+-> optional confidence-gated deskew -> blank/foreground guard -> final hoặc safe fallback
+```
+
+- Default là `preprocess_profile=conservative`, `deskew=off`, `red_seal_removal=on` cho debug review.
+- Red seal không được detect sau grayscale; ratio quá cao phải skip removal và warning.
+- `deskew=safe` chỉ xoay góc 0.3-5 độ khi đủ horizontal evidence, không gần mép và không có layout hai cột mơ hồ.
+- Rotation dùng expanded canvas để tránh cắt góc. `force` chỉ dành cho thử nghiệm có review.
+- Nếu after gần blank hoặc mất quá nhiều foreground/dark pixels, fallback về original hoặc `seal_removed` stage.
+
 Terminal summary must include:
 
 - before image path
@@ -31,7 +44,8 @@ Terminal summary must include:
 
 Debug UI must include:
 
-- before/after side-by-side
+- original, red mask, seal-removed, final và before/after comparison
+- red ratio, deskew metadata, foreground/brightness/entropy metrics và warnings
 - clear indication that original images are not overwritten
 
 ## Surya OCR
