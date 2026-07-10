@@ -157,6 +157,17 @@ Do not start without Project Owner / ChatGPT approval.
 - [x] Giữ nguyên deskew; không chạy PDF/OCR/model/cloud/full pipeline thật.
 - [ ] Project Owner so sánh ba cấu hình preprocess v2 trên Ezycloudx trước OCR.
 
+## OCR Uses Preprocessed Input
+
+- [x] Audit xác nhận OCR cũ chỉ dùng rendered original.
+- [x] Thêm `--use-preprocessed` và preprocess options cho `debug-ocr-review`/`ocr`.
+- [x] Truyền final preprocessed path vào Surya khi opt-in; giữ behavior cũ khi không bật.
+- [x] Ghi source/options vào OCR result, cache, page artifacts và manifest.
+- [x] Giữ preprocess artifacts và tạo `page_NNN_ocr_input.png`.
+- [x] Thêm safe-copy warning khi preprocess exception.
+- [x] Thêm fake-backend tests; không chạy PDF/Surya/LLM/cloud/full pipeline thật.
+- [ ] Project Owner chạy visual OCR review Mode 3 trên Ezycloudx.
+
 ## Repo Cleanup
 
 - [x] Audit generated cache trong các root code/docs/tests/app an toàn.

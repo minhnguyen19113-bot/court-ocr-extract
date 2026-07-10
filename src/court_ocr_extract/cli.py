@@ -119,6 +119,7 @@ def _add_debug_ocr_review(subparsers) -> None:
     _add_input_review_args(parser)
     parser.add_argument("--ocr-backend", default=None)
     _add_full_document_args(parser)
+    _add_ocr_preprocess_args(parser)
     parser.set_defaults(func=cmd_debug_ocr_review)
 
 
@@ -142,6 +143,7 @@ def _add_ocr(subparsers) -> None:
     parser.add_argument("--fallback-ocr-backend", default="")
     parser.add_argument("--debug-visual", action="store_true")
     _add_full_document_args(parser)
+    _add_ocr_preprocess_args(parser)
     parser.set_defaults(func=cmd_ocr)
 
 
@@ -156,6 +158,23 @@ def _add_full_document_args(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=None,
         help="Optional maximum pages to process. Ignored when --full-document is set.",
+    )
+
+
+def _add_ocr_preprocess_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--use-preprocessed", action="store_true")
+    parser.add_argument("--deskew", choices=["off", "safe", "force"], default="off")
+    parser.add_argument("--red-seal-removal", choices=["on", "off"], default="on")
+    parser.add_argument(
+        "--red-removal-mode",
+        choices=["neutralize", "inpaint", "white_fill"],
+        default="neutralize",
+    )
+    parser.add_argument("--text-enhance", choices=["off", "light", "medium", "strong"], default="light")
+    parser.add_argument(
+        "--preprocess-profile",
+        choices=["conservative", "balanced", "aggressive"],
+        default="conservative",
     )
 
 
@@ -359,23 +378,27 @@ def cmd_ocr(args) -> None:
     for case in track(cases, "OCR cases", total=len(cases)):
         work_dir = debug_run_dir / case.case_id if debug_run_dir else None
         try:
-            result = backend.ocr_pdf_prefix(
+            result = _run_ocr_backend(
+                backend,
                 case.path,
                 max_pages=max_pages,
                 stop_marker=stop_marker,
                 debug_visual=bool(debug_run_dir),
                 work_dir=work_dir,
+                preprocess_options=_ocr_preprocess_options(args),
             )
         except Exception:
             if not args.fallback_ocr_backend:
                 raise
             fallback = get_ocr_backend(args.fallback_ocr_backend, settings)
-            result = fallback.ocr_pdf_prefix(
+            result = _run_ocr_backend(
+                fallback,
                 case.path,
                 max_pages=max_pages,
                 stop_marker=stop_marker,
                 debug_visual=bool(debug_run_dir),
                 work_dir=work_dir,
+                preprocess_options=_ocr_preprocess_options(args),
             )
         record = OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result)
         write_ocr_cache_record(record, cache_dir)
@@ -595,12 +618,14 @@ def _run_sample_ocr(args, run_dir: Path) -> list[OCRCacheRecord]:
     stop_marker = _resolve_stop_marker(args, settings)
     records: list[OCRCacheRecord] = []
     for case in track(cases, "OCR review cases", total=len(cases)):
-        result = backend.ocr_pdf_prefix(
+        result = _run_ocr_backend(
+            backend,
             case.path,
             max_pages=max_pages,
             stop_marker=stop_marker,
             debug_visual=True,
             work_dir=run_dir / case.case_id,
+            preprocess_options=_ocr_preprocess_options(args),
         )
         records.append(OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result))
     return records
@@ -613,6 +638,48 @@ def _resolve_ocr_page_limit(args, settings) -> int | None:
     if max_pages is not None:
         return max_pages
     return settings.max_pages_before_marker
+
+
+def _ocr_preprocess_options(args) -> dict[str, Any] | None:
+    if not getattr(args, "use_preprocessed", False):
+        return None
+    return {
+        "deskew": args.deskew,
+        "red_seal_removal": args.red_seal_removal == "on",
+        "red_removal_mode": args.red_removal_mode,
+        "text_enhance": args.text_enhance,
+        "preprocess_profile": args.preprocess_profile,
+    }
+
+
+def _run_ocr_backend(
+    backend,
+    pdf_path: Path,
+    *,
+    max_pages: int | None,
+    stop_marker: str,
+    debug_visual: bool,
+    work_dir: Path | None,
+    preprocess_options: dict[str, Any] | None,
+) -> OCRResult:
+    if preprocess_options is None:
+        return backend.ocr_pdf_prefix(
+            pdf_path,
+            max_pages=max_pages,
+            stop_marker=stop_marker,
+            debug_visual=debug_visual,
+            work_dir=work_dir,
+        )
+    if getattr(backend, "name", "") not in {"surya", "surya_optional"}:
+        raise RuntimeError("--use-preprocessed currently requires the Surya OCR backend.")
+    return backend.ocr_pdf_prefix(
+        pdf_path,
+        max_pages=max_pages,
+        stop_marker=stop_marker,
+        debug_visual=debug_visual,
+        work_dir=work_dir,
+        preprocess_options=preprocess_options,
+    )
 
 
 def _resolve_stop_marker(args, settings) -> str:

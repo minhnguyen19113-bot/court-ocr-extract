@@ -4,9 +4,9 @@ Last updated: 2026-07-10
 
 ## Current Phase
 
-RED SEAL + TEXT ENHANCEMENT FIX sau PREPROCESS SAFETY FIX.
+OCR USES PREPROCESSED INPUT sau RED SEAL + TEXT ENHANCEMENT FIX.
 
-Task này tối ưu red-seal removal và black-text enhancement bằng synthetic images sau feedback visual thật của Project Owner. Codex không đọc output/PDF thật, không gọi OCR/Surya/Local LLM/cloud, không chạy full pipeline và không sửa deskew, Excel hay extraction pipeline.
+Task này nối final preprocessed image vào Surya OCR theo opt-in CLI và Mode 3 do Project Owner chọn. Codex chỉ dùng fake backend/synthetic images, không đọc/chạy PDF thật, không gọi Surya/Local LLM/cloud và không chạy full pipeline.
 
 ## Active Direction
 
@@ -161,6 +161,16 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Debug per-page có red mask, protection mask, seal removed, text enhanced, final và metadata đầy đủ.
 - Deskew logic/default giữ nguyên; tests chỉ dùng synthetic images.
 
+## Latest OCR Uses Preprocessed Input
+
+- Trước task này, Surya luôn nhận rendered original; `debug-preprocess` là nhánh review độc lập.
+- `debug-ocr-review` và `ocr` có `--use-preprocessed` cùng toàn bộ preprocess options.
+- Khi opt-in, backend truyền final preprocessed path vào Surya và lưu preprocess + OCR input artifacts cạnh nhau.
+- `OCRResult.metadata`, OCR cache và Surya manifest ghi `ocr_input_source` cùng Mode 3 options.
+- Không có flag thì behavior cũ và `ocr_input_source=rendered_original` được giữ nguyên.
+- Preprocess exception tạo named final safe copy và warning, không âm thầm gọi OCR bằng rendered path.
+- Tests dùng fake Surya; chưa có real PDF/OCR inference trong Codex.
+
 ## Next Gate
 
-Project Owner cần so sánh `neutralize+light`, `inpaint+light` và `inpaint+medium` trên VM. Chỉ tiếp tục OCR sau khi red residual giảm đủ, chữ đen rõ hơn và protection/final artifacts không mất nội dung.
+Project Owner cần chạy `debug-ocr-review --use-preprocessed` Mode 3 trên VM và so sánh OCR text/bbox với image input. Chỉ sau visual OCR review mới quyết định bật Mode 3 cho pilot mặc định.

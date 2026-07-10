@@ -34,6 +34,7 @@ class OCRResult:
     warnings: list[str] = field(default_factory=list)
     timing: dict[str, float] = field(default_factory=dict)
     cost_estimate: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -54,6 +55,7 @@ class OCRResult:
             warnings=list(payload.get("warnings", [])),
             timing=dict(payload.get("timing", {})),
             cost_estimate=payload.get("cost_estimate"),
+            metadata=dict(payload.get("metadata", {})),
         )
 
 
@@ -70,5 +72,6 @@ class OCRBackend(Protocol):
         stop_marker: str,
         debug_visual: bool = False,
         work_dir: Path | None = None,
+        preprocess_options: dict[str, Any] | None = None,
     ) -> OCRResult:
         ...

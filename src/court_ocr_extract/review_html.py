@@ -127,6 +127,8 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                     path_value = artifact.get(key)
                     if path_value and Path(path_value).exists():
                         links.append(f'<a href="{escape(rel_link(Path(path_value), base_dir))}">{escape(label)}</a>')
+            input_source = artifact.get("ocr_input_source", "rendered_original") if artifact else "rendered_original"
+            input_label = "OCR input (preprocessed)" if input_source == "preprocessed" else "OCR input (rendered original)"
             line_table = _line_table(page.lines)
             warnings = []
             warnings.extend(record.result.warnings)
@@ -140,7 +142,8 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                 f"<h3>Page {escape(page.page_index)}</h3>"
                 f"<p>{' | '.join(links)}</p>"
                 f"<p>{escape('; '.join(_dedupe(warnings)))}</p>"
-                f"<div class=\"split\"><div><h4>Original</h4>{image_html}</div>"
+                f"<p>ocr_input_source: <span class=\"badge\">{escape(input_source)}</span></p>"
+                f"<div class=\"split\"><div><h4>{escape(input_label)}</h4>{image_html}</div>"
                 f"<div><h4>Bbox overlay</h4>{overlay_html}</div></div>"
                 f"<h4>Lines</h4>{line_table}"
                 f"<h4>Page text</h4><pre>{escape(numbered_text)}</pre>"

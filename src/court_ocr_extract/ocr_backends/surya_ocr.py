@@ -17,6 +17,7 @@ from PIL import Image
 
 from court_ocr_extract.bbox import draw_bbox_overlay
 from court_ocr_extract.early_stop import find_marker_in_text
+from court_ocr_extract.image_preprocess import preprocess_image
 from court_ocr_extract.ocr_backends.base import OCRBackendStatus, OCRPage, OCRResult
 from court_ocr_extract.pdf_render import render_pdf_pages
 from court_ocr_extract.review_html import write_ocr_review, write_run_index
@@ -74,6 +75,7 @@ class SuryaOCRBackend:
         stop_marker: str,
         debug_visual: bool = False,
         work_dir: Path | None = None,
+        preprocess_options: dict[str, Any] | None = None,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -93,13 +95,24 @@ class SuryaOCRBackend:
                 dpi=self.settings.ocr_dpi,
                 max_pages=max_pages,
             )
+            image_paths = [page.image_path for page in rendered_pages]
+            input_metadata_by_page: dict[int, dict[str, Any]] = {}
+            result_metadata: dict[str, Any] = {"ocr_input_source": "rendered_original"}
+            if preprocess_options is not None:
+                image_paths, input_metadata_by_page, result_metadata = _preprocess_ocr_pages(
+                    rendered_pages,
+                    work_dir=work_dir,
+                    options=preprocess_options,
+                )
             result = self.ocr_images(
-                [page.image_path for page in rendered_pages],
+                image_paths,
                 stop_marker=stop_marker,
                 debug_visual=debug_visual,
                 work_dir=work_dir,
                 page_numbers=[page.page_number for page in rendered_pages],
                 warn_if_marker_missing=bool(stop_marker and max_pages is not None),
+                metadata=result_metadata,
+                input_metadata_by_page=input_metadata_by_page,
             )
             result.timing["total_seconds"] = time.perf_counter() - start
             return result
@@ -116,6 +129,8 @@ class SuryaOCRBackend:
         work_dir: Path | None = None,
         page_numbers: list[int] | None = None,
         warn_if_marker_missing: bool = False,
+        metadata: dict[str, Any] | None = None,
+        input_metadata_by_page: dict[int, dict[str, Any]] | None = None,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -132,7 +147,9 @@ class SuryaOCRBackend:
             artifacts_dir.mkdir(parents=True, exist_ok=True)
 
         pages: list[OCRPage] = []
-        warnings: list[str] = []
+        metadata = dict(metadata or {"ocr_input_source": "rendered_original"})
+        input_metadata_by_page = input_metadata_by_page or {}
+        warnings: list[str] = list(metadata.get("preprocess_warnings", []))
         marker_found = False
         marker_page = None
 
@@ -156,6 +173,7 @@ class SuryaOCRBackend:
                     lines=lines,
                     page_text=text_for_cache,
                     warnings=page_warnings,
+                    input_metadata=input_metadata_by_page.get(page_number, metadata),
                 )
                 image_for_review = artifact_block.get("original_image_path")
 
@@ -188,6 +206,7 @@ class SuryaOCRBackend:
             pages=pages,
             warnings=_dedupe(warnings),
             timing={"total_seconds": time.perf_counter() - start},
+            metadata=metadata,
         )
         if artifacts_dir is not None:
             case_id = Path(work_dir).name if work_dir is not None else "surya_review"
@@ -219,6 +238,76 @@ class SuryaOCRBackend:
         finally:
             for image in images:
                 image.close()
+
+
+def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, Any]):
+    normalized = {
+        "deskew": str(options.get("deskew", "off")),
+        "red_seal_removal": bool(options.get("red_seal_removal", True)),
+        "red_removal_mode": str(options.get("red_removal_mode", "neutralize")),
+        "text_enhance": str(options.get("text_enhance", "light")),
+        "preprocess_profile": str(options.get("preprocess_profile", "conservative")),
+    }
+    preprocess_dir = Path(work_dir) / "preprocess"
+    preprocess_dir.mkdir(parents=True, exist_ok=True)
+    image_paths: list[Path] = []
+    page_metadata: dict[int, dict[str, Any]] = {}
+    aggregate_warnings: list[str] = []
+
+    for page in rendered_pages:
+        page_number = int(page.page_number)
+        prefix = f"page_{page_number:03d}"
+        original = preprocess_dir / f"{prefix}_original.png"
+        red_mask = preprocess_dir / f"{prefix}_red_mask.png"
+        protection = preprocess_dir / f"{prefix}_black_text_protection_mask.png"
+        seal_removed = preprocess_dir / f"{prefix}_seal_removed.png"
+        text_enhanced = preprocess_dir / f"{prefix}_text_enhanced.png"
+        final = preprocess_dir / f"{prefix}_final_preprocessed.png"
+        metadata_path = preprocess_dir / f"{prefix}_metadata.json"
+        shutil.copy2(page.image_path, original)
+        values: dict[str, Any] = {}
+        try:
+            preprocess_image(
+                page.image_path,
+                final,
+                remove_red_seal=normalized["red_seal_removal"],
+                intermediate_path=seal_removed,
+                red_mask_path=red_mask,
+                black_text_protection_path=protection,
+                red_removal_mode=normalized["red_removal_mode"],
+                text_enhanced_path=text_enhanced,
+                text_enhance_mode=normalized["text_enhance"],
+                deskew_mode=normalized["deskew"],
+                preprocess_profile=normalized["preprocess_profile"],
+                metadata=values,
+            )
+        except Exception as exc:
+            shutil.copy2(page.image_path, final)
+            values = {
+                "warnings": [f"preprocess_failed_using_rendered_safe_copy:{type(exc).__name__}"],
+                "fallback_source": "rendered_original_safe_copy",
+            }
+        values.update(
+            {
+                "page_number": page_number,
+                "ocr_input_source": "preprocessed",
+                **normalized,
+                "original_path": str(original),
+                "final_preprocessed_path": str(final),
+            }
+        )
+        warnings = [str(item) for item in values.get("warnings", [])]
+        aggregate_warnings.extend(f"page_{page_number:03d}:{warning}" for warning in warnings)
+        metadata_path.write_text(json.dumps(values, ensure_ascii=False, indent=2), encoding="utf-8")
+        page_metadata[page_number] = values
+        image_paths.append(final)
+
+    result_metadata = {
+        "ocr_input_source": "preprocessed",
+        **normalized,
+        "preprocess_warnings": _dedupe(aggregate_warnings),
+    }
+    return image_paths, page_metadata, result_metadata
 
 
 def normalize_surya_prediction(
@@ -271,15 +360,18 @@ def write_surya_page_artifacts(
     lines: list[dict[str, Any]],
     page_text: str,
     warnings: list[str],
+    input_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifacts_dir = Path(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     original_path = artifacts_dir / f"page_{page_number:03d}_original.png"
+    ocr_input_path = artifacts_dir / f"page_{page_number:03d}_ocr_input.png"
     bbox_path = artifacts_dir / f"page_{page_number:03d}_bbox.png"
     lines_path = artifacts_dir / f"page_{page_number:03d}_lines.json"
     text_path = artifacts_dir / f"page_{page_number:03d}_text.md"
 
     shutil.copy2(image_path, original_path)
+    shutil.copy2(image_path, ocr_input_path)
     if any(line.get("bbox") for line in lines):
         draw_bbox_overlay(original_path, lines, bbox_path, color="red")
     else:
@@ -291,6 +383,9 @@ def write_surya_page_artifacts(
     return {
         "type": "surya_artifacts",
         "original_image_path": str(original_path),
+        "ocr_input_image_path": str(ocr_input_path),
+        "ocr_input_source": (input_metadata or {}).get("ocr_input_source", "rendered_original"),
+        "ocr_input_metadata": dict(input_metadata or {}),
         "bbox_image_path": str(bbox_path),
         "lines_json_path": str(lines_path),
         "text_markdown_path": str(text_path),
@@ -318,6 +413,7 @@ def write_surya_run_artifacts(
         "marker_page": result.marker_page,
         "total_lines": sum(len(page.lines) for page in result.pages),
         "warnings": result.warnings,
+        "metadata": result.metadata,
         "pages": [
             {
                 "page_index": page.page_index,

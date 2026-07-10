@@ -80,12 +80,15 @@ Must show:
 - bbox overlay
 - line table with `line_id`, bbox, reading order, text, confidence, warnings
 - low-confidence filter
+- `ocr_input_source` và preprocess options khi input là preprocessed
+- link/ảnh `page_NNN_ocr_input.png`, phân biệt với rendered original và final preprocess
 
 Layout artifact Surya của Phase 2A:
 
 ```text
 <run_dir>/<case_id>/ocr_surya/
   page_001_original.png
+  page_001_ocr_input.png
   page_001_bbox.png
   page_001_lines.json
   page_001_text.md
@@ -96,6 +99,8 @@ Layout artifact Surya của Phase 2A:
 ```
 
 Review HTML cần hiển thị original page image, bbox overlay, line table, warnings, và link đến page text/line JSON.
+
+Khi bật `--use-preprocessed`, case directory còn có `preprocess/page_NNN_{original,red_mask,black_text_protection_mask,seal_removed,text_enhanced,final_preprocessed}.png` và metadata JSON. OCR manifest phải ghi Mode 3 đã truyền và `ocr_input_source=preprocessed`.
 
 Full-document OCR review:
 

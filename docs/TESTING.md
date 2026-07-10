@@ -62,6 +62,8 @@ Preprocess safety tests dùng ảnh RGB synthetic trong `tmp_path` để kiểm 
 
 Preprocess v2 tests mở rộng sang HSV/Lab/RGB metadata, `neutralize|inpaint|white_fill`, black-text overlap protection, red residual, text `light`, strong-mode guard, blank/no-seal và mọi debug artifact. Passing tests chỉ chứng minh contract synthetic, không chứng minh chất lượng scan thật.
 
+Preprocessed OCR wiring tests monkeypatch render/preprocess và fake `_run_surya_on_images`/backend. Tests kiểm final path, Mode 3 metadata, cache/manifest/artifacts, rendered-original branch và exception safe copy mà không mở PDF hoặc gọi Surya thật.
+
 ## Phase 1C Verification Commands
 
 ```powershell

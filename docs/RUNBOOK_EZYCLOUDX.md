@@ -99,6 +99,47 @@ Nếu chữ vẫn mờ sau khi seal đã sạch, thử text medium riêng:
 
 `white_fill`, `text-enhance=strong`, và `deskew=force` chỉ dùng thử nghiệm có visual review; không dùng làm default production.
 
+## OCR trên Mode 3 đã chọn
+
+`debug-preprocess` chỉ review preprocess; muốn Surya thực sự nhận final image phải dùng `debug-ocr-review --use-preprocessed`:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-ocr-review `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --ocr-backend surya `
+  --full-document `
+  --use-preprocessed `
+  --deskew off `
+  --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance medium `
+  --preprocess-profile balanced `
+  --output outputs\debug_visual_ocr_mode3 `
+  --open
+```
+
+Sau khi visual OCR review đạt, tạo cache Mode 3 bằng:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli ocr `
+  --input-dir data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --cache-dir outputs\ocr_cache `
+  --ocr-backend surya `
+  --full-document `
+  --debug-visual `
+  --use-preprocessed `
+  --deskew off `
+  --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance medium `
+  --preprocess-profile balanced
+```
+
+Không có `--use-preprocessed`, OCR vẫn dùng rendered original. Reviewer phải kiểm tra `ocr_input_source`, `preprocess/` artifacts và `ocr_surya/page_NNN_ocr_input.png` trước khi chấp nhận cache.
+
 OCR review toàn bộ file phải dùng `--full-document` để không cắt theo `settings.max_pages_before_marker` và không dừng/truncate tại marker nội dung.
 
 ```powershell

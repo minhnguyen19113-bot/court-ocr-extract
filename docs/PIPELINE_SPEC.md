@@ -53,6 +53,14 @@ Debug UI must include:
 
 ## Surya OCR
 
+OCR input routing:
+
+- Không có `--use-preprocessed`: Surya dùng rendered original như behavior cũ và metadata ghi `ocr_input_source=rendered_original`.
+- Có `--use-preprocessed`: backend render, preprocess từng page, rồi chỉ truyền `page_NNN_final_preprocessed.png` vào Surya; metadata ghi source và toàn bộ options.
+- `debug-preprocess` chỉ tạo review preprocess độc lập, không tự thay đổi OCR input.
+- Mode hiện được Project Owner chọn cho pilot OCR: `deskew=off`, red removal `inpaint`, text enhance `medium`, profile `balanced`, red-seal removal bật.
+- Preprocess failure phải tạo final safe copy, ghi warning và vẫn dùng named final path; không âm thầm chuyển call sang rendered path.
+
 Terminal summary must include:
 
 - pages processed
@@ -80,6 +88,7 @@ Ghi chú triển khai Phase 2A:
 - Nếu Surya không trả về reading order, line được sort từ trên xuống dưới rồi trái sang phải bằng bbox và ghi `reading_order_fallback_used`.
 - Nếu Surya không trả về confidence, `confidence` giữ giá trị `null`.
 - Debug artifacts chỉ được ghi khi bật debug visual/work directory.
+- Khi dùng preprocessed input, giữ cả `preprocess/` artifacts và `ocr_surya/page_NNN_ocr_input.png` để reviewer đối chiếu.
 - Test synthetic/mocking chỉ bao phủ contract; chất lượng thật vẫn cần Project Owner validate.
 
 ## VLM End-to-End

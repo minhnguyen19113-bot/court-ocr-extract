@@ -64,4 +64,5 @@ def safe_cache_metadata(record: OCRCacheRecord) -> dict[str, Any]:
         "status": record.result.status,
         "warnings": list(record.result.warnings),
         "timing": dict(record.result.timing),
+        "metadata": dict(record.result.metadata),
     }

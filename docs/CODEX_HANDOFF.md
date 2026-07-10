@@ -133,6 +133,15 @@ Red seal/text enhancement v2 notes:
 - Text enhancement chạy sau red removal; guard fallback khi dark pixels/foreground bùng nổ hoặc entropy collapse.
 - Project Owner cần so sánh ba run v2 trong runbook; Codex chưa đọc/chạy real PDF/output.
 
+OCR preprocessed-input notes:
+
+- Trước wiring này, Surya backend render và OCR ảnh gốc; `debug-preprocess` không nối vào OCR.
+- `--use-preprocessed` hiện opt-in cho `debug-ocr-review` và `ocr`, chỉ hỗ trợ Surya.
+- Candidate được chọn: deskew off, red removal inpaint, text medium, profile balanced, red removal on.
+- Backend ghi `ocr_input_source`/options vào `OCRResult.metadata`, cache và manifest; page artifact có `ocr_input_image_path`.
+- Không có flag thì giữ rendered-original behavior. Preprocess exception tạo final safe copy có warning.
+- Fake-backend tests chứng minh wiring; Project Owner vẫn phải chạy visual OCR review thật.
+
 Repo cleanup notes:
 
 - Generated cache local đã được dọn khỏi workspace.
@@ -178,6 +187,6 @@ Template report chuẩn:
 
 Ask Project Owner / ChatGPT to approve one next slice:
 
-1. Project Owner so sánh `neutralize+light`, `inpaint+light`, `inpaint+medium` theo runbook.
-2. Chọn mode giảm red residual nhưng giữ được black-text protection và dấu tiếng Việt.
-3. Chỉ sau preprocess gate mới tiếp tục Surya visual QA/OCR.
+1. Project Owner chạy `debug-ocr-review --use-preprocessed` Mode 3 theo runbook.
+2. Review `ocr_input_source`, input image, bbox, text, warnings và preprocess artifacts.
+3. Nếu đạt, chạy command `ocr --use-preprocessed` để tạo pilot cache.

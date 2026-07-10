@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-10 - OCR Uses Preprocessed Input
+
+- Xác nhận Surya trước đây dùng rendered original, không dùng output từ `debug-preprocess`.
+- Thêm opt-in `--use-preprocessed` và preprocess options cho `debug-ocr-review`/`ocr`.
+- Nối final preprocessed path vào Surya; giữ rendered-original behavior khi không có flag.
+- Thêm OCR input source/options vào result/cache/manifest và giữ preprocess/OCR artifacts cạnh nhau.
+- Thêm fake Surya/CLI tests; không chạy PDF/OCR/LLM/cloud/full pipeline thật.
+
 ## 2026-07-10 - Red Seal + Text Enhancement Fix
 
 - Mở rộng red mask thành HSV + Lab + RGB, morphology, component count và residual metrics.
