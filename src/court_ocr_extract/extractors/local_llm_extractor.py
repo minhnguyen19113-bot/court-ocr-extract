@@ -42,6 +42,24 @@ class LocalLLMExtractor:
         raw = self._call_local_model(prompt)
         return normalize_extraction(parse_json_object(raw))
 
+    def call_json_prompt(self, *, prompt: str, text: str) -> dict[str, Any]:
+        """Run a task-specific prompt through the configured local model."""
+        status = self.check_available()
+        if not status.available:
+            raise RuntimeError(status.reason)
+        raw = self._call_local_model(prompt + "\n\nINPUT:\n" + text)
+        try:
+            return parse_json_object(raw)
+        except (json.JSONDecodeError, ValueError):
+            repair_path = Path(__file__).resolve().parents[3] / "prompts" / "json_repair_prompt.vi.md"
+            repair_prompt = (
+                repair_path.read_text(encoding="utf-8")
+                if repair_path.exists()
+                else "Chỉ sửa payload thành một JSON object hợp lệ, không thêm markdown."
+            )
+            repaired = self._call_local_model(repair_prompt + "\n\nJSON LỖI:\n" + raw)
+            return parse_json_object(repaired)
+
     def _call_local_model(self, prompt: str) -> str:
         provider = self.settings.local_llm_provider.lower()
         if provider == "ollama":

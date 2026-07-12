@@ -26,6 +26,7 @@ from court_ocr_extract.ocr_cache import (
     write_ocr_cache_record,
 )
 from court_ocr_extract.pdf_render import parse_page_range, render_pdf_pages
+from court_ocr_extract.pre_content_ab import run_pre_content_ab_test
 from court_ocr_extract.progress import track
 from court_ocr_extract.qa import print_safe_qa, qa_excel
 from court_ocr_extract.red_seal import remove_red_seal_debug
@@ -59,6 +60,7 @@ def main(argv: list[str] | None = None) -> None:
     _add_qa(subparsers)
     _add_benchmark_ocr(subparsers)
     _add_benchmark_extractors(subparsers)
+    _add_compare_pre_content(subparsers)
     _add_zip_debug_visual(subparsers)
     args = parser.parse_args(argv)
     args.func(args)
@@ -254,6 +256,17 @@ def _add_benchmark_extractors(subparsers) -> None:
     parser.add_argument("--review-sample-size", type=int, default=5)
     parser.add_argument("--review-mode", default="mixed")
     parser.set_defaults(func=cmd_benchmark_extractors)
+
+
+def _add_compare_pre_content(subparsers) -> None:
+    parser = subparsers.add_parser("compare-pre-content")
+    parser.add_argument("--ocr-cache-dir", required=True)
+    parser.add_argument("--input-dir", default=None, help="Optional source directory for operator traceability; PDFs are not read by this command.")
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--strategies", default="hybrid_rule_llm,llm_only")
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--open", action="store_true")
+    parser.set_defaults(func=cmd_compare_pre_content)
 
 
 def _add_zip_debug_visual(subparsers) -> None:
@@ -627,6 +640,25 @@ def cmd_benchmark_extractors(args) -> None:
         rows.append([extractor_name, total, success, total - success, review, note])
     _write_benchmark(args.output, "EXTRACTOR_BENCHMARK", ["EXTRACTOR", "TỔNG PDF", "SỐ FILE THÀNH CÔNG", "SỐ FILE LỖI", "SỐ FILE CẦN REVIEW", "GHI CHÚ"], rows)
     print(f"Extractor benchmark: {args.output}")
+
+
+def cmd_compare_pre_content(args) -> None:
+    records = read_ocr_cache_dir(args.ocr_cache_dir)
+    if not records:
+        raise RuntimeError(f"No OCR cache records found in: {args.ocr_cache_dir}")
+    strategies = [value.strip() for value in args.strategies.split(",") if value.strip()]
+    summary = run_pre_content_ab_test(
+        records,
+        output_dir=args.output_dir,
+        settings=get_settings(),
+        strategies=strategies,
+        limit=args.limit,
+    )
+    index = Path(args.output_dir) / "index.html"
+    _maybe_open(index, args.open)
+    print(f"Pre-content A/B cases: {summary['case_count']}")
+    print(f"Judgment benchmark cases: {summary['judgment_benchmark_count']}")
+    print(f"Output: {index}")
 
 
 def cmd_zip_debug_visual(args) -> None:

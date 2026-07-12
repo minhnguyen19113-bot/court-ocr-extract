@@ -221,3 +221,18 @@ Khong sua `.venv\Lib\site-packages` thu cong. Project tu resolve Docker qua `SUR
 ```
 
 OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, excluded lines, suppression mask va OCR input trong HTML review. Neu balanced con doc dau moc, review aggressive rieng; khong auto-correct ten nguoi hay noi dung bang heuristic.
+## Chạy pre-content A/B trên VM
+
+Đặt 9 PDF local tại `data\test_pdfs\pre_content_9`, tạo OCR cache bằng Surya Mode 3 đã duyệt, rồi chạy:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
+  --input-dir data\test_pdfs\pre_content_9 `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_9 `
+  --output-dir outputs\pre_content_ab_test `
+  --strategies hybrid_rule_llm,llm_only `
+  --limit 9 `
+  --open
+```
+
+Review `outputs\pre_content_ab_test\index.html` và `compare_summary.xlsx`. Không commit PDF mặc định. Correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark.

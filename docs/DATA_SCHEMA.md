@@ -140,3 +140,6 @@ Prediction JSONL record:
 - warnings và `needs_review`.
 
 Evaluation report schema là whitelist numeric metrics trong `evaluation.metrics.METRIC_KEYS`; không chứa raw manifest values.
+## Pre-content A/B schema
+
+Schema thử nghiệm gồm `document_type`, `metadata`, `trial_panel`, `defendants`, `participants`, `evidence`, `warnings`, `needs_review` và `field_meta`. Entity giữ `raw_block`, `evidence_line_ids` và warning riêng. `correction_notice` dùng nhánh nhẹ `notice_number`, `notice_date`, `referenced_judgment_number`, `correction_from`, `correction_to`; không ép vào schema bản án.

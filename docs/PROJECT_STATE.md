@@ -1,5 +1,14 @@
 # Project State
 
+## Nhánh thử nghiệm pre-content A/B
+
+- Đã thêm A/B test `hybrid_rule_llm` so với `llm_only`, chỉ xử lý phần trước heading `NỘI DUNG VỤ ÁN` từ OCR cache đã lọc.
+- Rule-only chỉ là intermediate/debug; chưa được chọn làm hướng cuối.
+- Document router phân loại `judgment_criminal_first_instance`, `correction_notice`, `unknown`; correction notice không bị ép vào schema bản án và không tính trong benchmark bản án chính.
+- Local LLM chỉ fill/repair field thiếu hoặc chạy LLM-only trên pre-content; tên người/địa danh không được tự sửa khi thiếu evidence.
+- Đây là nhánh thử nghiệm, chưa thay đổi extraction pipeline production sau `NỘI DUNG VỤ ÁN`.
+- 9 PDF có thể đặt local tại `data/test_pdfs/pre_content_9/` nhưng không commit mặc định. Codex chưa chạy hoặc đọc các PDF này.
+
 ## Latest Surya Windows Runtime + OCR Stamp Suppression
 
 - Da them `surya_runtime.py` de resolve Docker theo `SURYA_DOCKER_BINARY`, `DOCKER_BINARY`, PATH va Docker Desktop path tren Windows.

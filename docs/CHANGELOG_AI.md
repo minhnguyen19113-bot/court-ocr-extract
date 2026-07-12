@@ -160,3 +160,8 @@
 - Them stamp suppression/filter theo mask, overlap metadata, raw/filtered/excluded artifacts.
 - Sua relative link trong OCR review khi artifact nam ngoai `ocr_surya/`.
 - Bo sung synthetic tests; khong chay du lieu/PDF/OCR inference that.
+## 2026-07-13 - PRE-CONTENT EXTRACTION A/B TEST
+
+- Thêm nhánh thử nghiệm so sánh hybrid rule+LLM và LLM-only trên phần trước `NỘI DUNG VỤ ÁN`.
+- Thêm document router, segmenter, schema, rule extractor, hybrid merge, prompts và compare runner.
+- Thêm review artifacts JSON/Excel/HTML và synthetic tests; không chạy PDF/Surya/Local LLM thật trong Codex.

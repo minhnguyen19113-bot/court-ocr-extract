@@ -128,3 +128,6 @@ TOOLKIT-1 chưa có OCR CER/WER và không được dùng để kết luận rea
 ## Surya runtime va stamp suppression
 
 Synthetic tests cover Docker resolver override, Windows Docker Desktop discovery, diagnostics khong GPU mac dinh, stamp mask/suppression, protected dark text, post-OCR filter, raw/filtered/excluded artifacts va preprocessed OCR path. Passing tests khong thay the visual review OCR that tren Ezycloudx.
+## Pre-content A/B synthetic tests
+
+Tests không đọc PDF thật và không gọi Local LLM thật. Coverage gồm heading có/không dấu, missing heading fallback, correction notice router, nhiều bị cáo, participants, evidence line IDs, rule/LLM conflict, high-confidence rule protection và JSON/Excel/HTML summary artifacts.

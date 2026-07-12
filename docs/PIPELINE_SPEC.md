@@ -1,5 +1,9 @@
 # Pipeline Spec
 
+## Pre-content extraction A/B
+
+Nhánh thử nghiệm nhận filtered OCR lines, route document và cắt phần trước `NỘI DUNG VỤ ÁN`. Mode A chạy rule-based trước rồi Local LLM chỉ fill/repair field chưa giải quyết; mode B chạy Local LLM trên cùng pre-content input. Cả hai phải giữ evidence/warnings và không dùng nội dung sau heading. Rule-only không phải output quyết định cuối.
+
 ## Stamp suppression contract
 
 Khi dung preprocessed input, tao `stamp_suppression_mask` va `ocr_input_stamp_suppressed`; post-OCR filter giu raw lines, filtered lines va excluded lines co `reason`, `stamp_overlap_ratio`, `dark_text_overlap_ratio`. Khong hard-code noi dung dau moc va khong fallback sang OCR backend khac.

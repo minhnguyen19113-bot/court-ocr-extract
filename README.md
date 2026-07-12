@@ -170,3 +170,6 @@ python -m court_ocr_extract.cli zip-debug-visual --run-id latest --output output
 - QA report does not expose sensitive data.
 
 Do not call the pipeline production-ready until the Project Owner has reviewed and accepted real-data pilot outputs.
+# Pre-content extraction A/B
+
+Nhánh thử nghiệm `compare-pre-content` so sánh hybrid rule+Local LLM với Local LLM-only trên filtered OCR trước `NỘI DUNG VỤ ÁN`. Đây chưa phải quyết định production; rule-only chỉ dùng để debug và correction notice được route riêng.

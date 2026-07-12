@@ -203,3 +203,8 @@ Ask Project Owner / ChatGPT to approve one next slice:
 Task hien tai da hoan thien contract cho Windows Surya runtime va stamp suppression V3. Dung `--stamp-suppression balanced` va `--ocr-stamp-filter balanced` khi co `--use-preprocessed`; dung aggressive chi sau visual review.
 
 Codex chua chay PDF that, chua goi Surya inference/Local LLM/cloud API, va khong commit/push. Project Owner can kiem balanced output, excluded stamp lines, raw-vs-filtered text va false removal tren Ezycloudx.
+## Bàn giao pre-content A/B
+
+CLI mới: `court_ocr_extract.cli compare-pre-content`. Command chỉ đọc OCR cache và so sánh `hybrid_rule_llm,llm_only`; không tự OCR PDF. Output chính là `index.html`, `compare_summary.json`, `compare_summary.xlsx` và artifacts theo case.
+
+Nhánh này chưa phải production decision. Correction notice được route riêng và loại khỏi benchmark bản án chính. Project Owner cần review disagreement, evidence coverage, false rule match và LLM hallucination trên 9 PDF local trước khi chọn hướng.

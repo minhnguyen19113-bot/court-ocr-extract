@@ -1,5 +1,15 @@
 # Tasks
 
+## PRE-CONTENT EXTRACTION A/B TEST
+
+- [x] Thêm document router và pre-content segmenter trên filtered OCR lines.
+- [x] Thêm schema chung và rule-based intermediate extractor.
+- [x] Thêm `hybrid_rule_llm` với bảo vệ rule field và conflict review.
+- [x] Thêm `llm_only` với prompt giới hạn pre-content và JSON repair.
+- [x] Thêm `compare-pre-content` cùng JSON, Excel, HTML artifacts.
+- [x] Thêm synthetic tests cho segmenter, rule, hybrid và compare.
+- [ ] Project Owner chạy A/B trên 9 PDF và quyết định hướng tiếp theo.
+
 ## SURYA WINDOWS RUNTIME + OCR STAMP SUPPRESSION V3
 
 - [x] Codify Windows Docker resolver va runtime diagnostics.
