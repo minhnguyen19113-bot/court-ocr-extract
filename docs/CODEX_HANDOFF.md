@@ -1,5 +1,11 @@
 # Codex Handoff
 
+## Bàn giao Local LLM context budget
+
+Canonical Local LLM hiện là `Qwen/Qwen2.5-3B-Instruct` tại `http://127.0.0.1:8000/v1`, context 8192, output 1024, input 6000 và safety margin 512. Không đổi lại 7B full bf16 trên RTX 5060 Ti 16GB nếu chưa có runtime profile khác chứng minh đủ KV cache.
+
+Trước compare, chạy `.\.venv\Scripts\python.exe -B -m scripts.check_llm_backend`; sau khi `ok=true`, chạy `compare-pre-content --require-llm --limit 1`. Review `LLM_STATUS`, chunk errors, `llm_actually_called` và HTML. `llm_only_failed`/`llm_only_not_run` không phải extraction hợp lệ; hybrid rule-only fallback phải được đánh dấu cần review. Codex chưa gọi endpoint thật.
+
 ## Bàn giao OCR marker early-stop
 
 Surya `ocr` hiện mặc định xử lý từng page với một predictor runner dùng lại và dừng ở high/medium marker `NỘI DUNG VỤ ÁN`. Không truyền `--max-pages` nghĩa là chạy đến marker hoặc hết file. `--full-document` là override duy nhất để không dừng/trim.

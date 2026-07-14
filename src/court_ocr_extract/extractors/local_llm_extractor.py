@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +8,6 @@ from court_ocr_extract.extraction.schemas import CASE_FIELD_KEYS, PARTICIPANT_FI
 from court_ocr_extract.extractors.base import (
     ExtractorBackendStatus,
     normalize_extraction,
-    parse_json_object,
 )
 from court_ocr_extract.extractors.rule_support import anchor_support_output
 from court_ocr_extract.local_llm import LocalLLMClient, normalize_extraction_payload
@@ -24,6 +21,7 @@ class LocalLLMExtractor:
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
+        self.last_request_statuses: list[dict[str, Any]] = []
 
     def check_available(self) -> ExtractorBackendStatus:
         if not self.settings.enable_local_llm_extraction:
@@ -38,54 +36,43 @@ class LocalLLMExtractor:
         status = self.check_available()
         if not status.available:
             raise RuntimeError(status.reason)
-        prompt = _load_prompt() + "\n\nOCR TEXT:\n" + text
-        raw = self._call_local_model(prompt)
-        return normalize_extraction(parse_json_object(raw))
+        client = LocalLLMClient(self.settings)
+        payload = client.generate_json(
+            text=text,
+            system_prompt=_load_prompt(),
+            repair_prompt=_load_repair_prompt(),
+            chunk_name=f"case:{case_id}",
+        )
+        return normalize_extraction(payload)
 
     def call_json_prompt(self, *, prompt: str, text: str) -> dict[str, Any]:
         """Run a task-specific prompt through the configured local model."""
+        payload, _ = self.call_json_prompt_with_status(prompt=prompt, text=text)
+        return payload
+
+    def call_json_prompt_with_status(
+        self,
+        *,
+        prompt: str,
+        text: str,
+        chunk_name: str = "request",
+        chunked: bool = False,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         status = self.check_available()
         if not status.available:
             raise RuntimeError(status.reason)
-        raw = self._call_local_model(prompt + "\n\nINPUT:\n" + text)
+        client = LocalLLMClient(self.settings)
         try:
-            return parse_json_object(raw)
-        except (json.JSONDecodeError, ValueError):
-            repair_path = Path(__file__).resolve().parents[3] / "prompts" / "json_repair_prompt.vi.md"
-            repair_prompt = (
-                repair_path.read_text(encoding="utf-8")
-                if repair_path.exists()
-                else "Chỉ sửa payload thành một JSON object hợp lệ, không thêm markdown."
+            payload = client.generate_json(
+                text=text,
+                system_prompt=prompt,
+                repair_prompt=_load_repair_prompt(),
+                chunk_name=chunk_name,
+                chunked=chunked,
             )
-            repaired = self._call_local_model(repair_prompt + "\n\nJSON LỖI:\n" + raw)
-            return parse_json_object(repaired)
-
-    def _call_local_model(self, prompt: str) -> str:
-        provider = self.settings.local_llm_provider.lower()
-        if provider == "ollama":
-            return self._call_ollama(prompt)
-        return self._call_openai_compatible(prompt)
-
-    def _call_ollama(self, prompt: str) -> str:
-        url = self.settings.local_llm_base_url.rstrip("/") + "/api/generate"
-        payload = {
-            "model": self.settings.local_llm_model_name,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": self.settings.local_llm_temperature},
-        }
-        data = _post_json(url, payload, timeout=self.settings.local_llm_timeout_seconds)
-        return str(data.get("response") or "")
-
-    def _call_openai_compatible(self, prompt: str) -> str:
-        url = self.settings.local_llm_base_url.rstrip("/") + "/chat/completions"
-        payload = {
-            "model": self.settings.local_llm_model_name,
-            "temperature": self.settings.local_llm_temperature,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        data = _post_json(url, payload, timeout=self.settings.local_llm_timeout_seconds)
-        return str(data["choices"][0]["message"]["content"])
+        finally:
+            self.last_request_statuses = client.request_statuses
+        return payload, self.last_request_statuses
 
 
 class LocalLlmExtractionError(RuntimeError):
@@ -250,19 +237,15 @@ def _safe_confidence(value: Any) -> float:
     return max(0.0, min(1.0, confidence))
 
 
-def _post_json(url: str, payload: dict[str, Any], *, timeout: float) -> dict[str, Any]:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
 def _load_prompt() -> str:
     path = Path(__file__).resolve().parents[3] / "prompts" / "extraction_prompt.vi.md"
     if path.exists():
         return path.read_text(encoding="utf-8")
     return "Return only strict JSON following the extraction schema."
+
+
+def _load_repair_prompt() -> str:
+    path = Path(__file__).resolve().parents[3] / "prompts" / "json_repair_prompt.vi.md"
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return "Chỉ sửa payload thành một JSON object hợp lệ, không thêm markdown."

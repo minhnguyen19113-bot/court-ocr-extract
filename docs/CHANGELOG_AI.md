@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-14 - Local LLM Context Budget + Chunked Extraction Fix
+
+- Chuyển default Local LLM sang Qwen2.5-3B/8192 và thêm toàn bộ env budget/chunk.
+- Hợp nhất request qua budget-aware client, bắt buộc `max_tokens`, thêm error taxonomy và preflight `/models` + chat.
+- Chia pre-content theo nhóm thông tin, merge partial output và loại bỏ LLM-only null giả khi runtime/chunk lỗi.
+- Nâng compare CLI, HTML và workbook với structured review sheets cùng `LLM_STATUS`.
+- Tests chỉ dùng mock HTTP/synthetic text; không gọi LLM, PDF, Surya, Docker hoặc cloud thật.
+
 ## 2026-07-14 - OCR Marker Early Stop Fix
 
 - Thêm shared marker detector có Unicode folding, diacritic-insensitive matching, spacing/split-line tolerance và confidence.

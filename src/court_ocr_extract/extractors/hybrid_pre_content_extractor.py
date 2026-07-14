@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from court_ocr_extract.extractors.llm_only_pre_content_extractor import LLMCallable
-from court_ocr_extract.extractors.local_llm_extractor import LocalLLMExtractor
+from court_ocr_extract.extractors.pre_content_chunking import extract_pre_content_chunks
 from court_ocr_extract.extractors.pre_content_schema import (
     DEFENDANT_FIELDS,
     METADATA_FIELDS,
     PARTICIPANT_FIELDS,
     TRIAL_PANEL_FIELDS,
-    normalize_pre_content_output,
     unresolved_field_paths,
 )
 from court_ocr_extract.extractors.rule_based_pre_content_extractor import extract_pre_content_rules
@@ -29,34 +27,43 @@ class HybridPreContentExtractor:
     def extract(self, segment: dict[str, Any], *, case_id: str) -> dict[str, Any]:
         rule_output = extract_pre_content_rules(segment)
         unresolved = unresolved_field_paths(rule_output)
-        request = {
-            "case_id": case_id,
-            "scope": "pre_content_only",
-            "pre_content_text": segment.get("pre_content_text", ""),
-            "pre_content_lines": segment.get("pre_content_lines", []),
-            "rule_output": rule_output,
-            "unresolved_fields": unresolved,
-        }
         try:
-            repair = normalize_pre_content_output(
-                self._call(_load_prompt(), json.dumps(request, ensure_ascii=False, indent=2)),
-                document_type=rule_output["document_type"],
+            repair = extract_pre_content_chunks(
+                segment,
+                settings=self.settings,
+                prompt=_load_prompt()
+                + "\n\nCác field chưa giải quyết: "
+                + ", ".join(unresolved),
+                strategy=self.name,
+                llm_callable=self._llm_callable,
             )
-            merged = merge_rule_and_llm(rule_output, repair)
-            merged["llm_json_valid"] = True
+            if repair.get("result_valid"):
+                merged = merge_rule_and_llm(rule_output, repair)
+            else:
+                merged = deepcopy(rule_output)
+                merged["warnings"].extend(repair.get("warnings", []))
+            merged["llm_json_valid"] = bool(repair.get("result_valid"))
+            merged["result_valid"] = True
+            merged["status"] = (
+                "hybrid_succeeded" if repair.get("result_valid") else "hybrid_rule_only_fallback"
+            )
+            merged["llm_status"] = repair.get("llm_status", [])
+            merged["llm_actually_called"] = bool(repair.get("llm_actually_called"))
+            merged["chunk_count"] = int(repair.get("chunk_count", 0))
         except Exception as exc:
             merged = deepcopy(rule_output)
             merged["warnings"].append(f"hybrid_llm_repair_failed:{type(exc).__name__}:{exc}")
             merged["needs_review"] = True
             merged["llm_json_valid"] = False
+            merged["result_valid"] = True
+            merged["status"] = "hybrid_rule_only_fallback"
+            merged["llm_status"] = []
+            merged["llm_actually_called"] = False
+            merged["chunk_count"] = 0
         merged["rule_output"] = rule_output
         merged["unresolved_fields"] = unresolved
+        merged["case_id"] = case_id
         return merged
-
-    def _call(self, prompt: str, text: str) -> dict[str, Any]:
-        if self._llm_callable is not None:
-            return self._llm_callable(prompt, text)
-        return LocalLLMExtractor(self.settings).call_json_prompt(prompt=prompt, text=text)
 
 
 def merge_rule_and_llm(rule: dict[str, Any], llm: dict[str, Any]) -> dict[str, Any]:

@@ -1,5 +1,11 @@
 # Debug Output Spec
 
+## Local LLM status trong compare report
+
+HTML phải hiển thị preflight/runtime, provider, model, base URL, context window, input token ước lượng, chunk count, `llm_actually_called` và chunk errors. `llm_only_failed`/`llm_only_not_run` phải hiện “không có output hợp lệ”, không render schema null như kết quả model.
+
+Workbook compare có review sheets `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `LLM_STATUS`; JSON blob chỉ được giữ trong debug sheets `FIELD_LONG`, `EVIDENCE_LINES`, `RAW_JSON`, không đặt trong sheet review chính.
+
 ## Marker và early-stop metadata
 
 OCR review phải hiển thị marker found/page/matched text/confidence, early-stop triggered, pages processed/total, pages skipped và reason. Marker line được gắn `marker_match=true` và highlight trong HTML. Cache/manifest phải giữ `metadata.marker`, `metadata.early_stop`, `pages_total` và `text_before_marker`; raw page OCR vẫn được giữ để review dù canonical extraction text đã trim.

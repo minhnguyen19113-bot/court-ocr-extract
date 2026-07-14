@@ -1,13 +1,15 @@
 local_llm:
   provider: vllm
-  model_name: Qwen/Qwen3-4B-Instruct
-  base_url: http://127.0.0.1:8001/v1
+  model_name: Qwen/Qwen2.5-3B-Instruct
+  base_url: http://127.0.0.1:8000/v1
   temperature: 0
-  max_tokens: 2048
-  quantization: 4bit_or_8bit_when_supported
+  context_window: 8192
+  max_output_tokens: 1024
+  max_input_tokens: 6000
+  max_input_chars: 22000
+  quantization: bf16
   candidates:
-    - Qwen/Qwen3-4B-Instruct
-    - Qwen/Qwen3-8B-Instruct
+    - Qwen/Qwen2.5-3B-Instruct
     - vinai/PhoGPT-4B-Chat
 ner:
   optional_models:

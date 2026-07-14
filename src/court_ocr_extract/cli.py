@@ -18,6 +18,7 @@ from court_ocr_extract.extraction_pipeline import extract_from_ocr_cache_records
 from court_ocr_extract.extraction_preview import write_extraction_preview
 from court_ocr_extract.image_preprocess import make_before_after_compare, preprocess_image
 from court_ocr_extract.image_processing.stamp_suppression import suppress_stamp_for_ocr
+from court_ocr_extract.local_llm.preflight import check_llm_backend
 from court_ocr_extract.ocr_backends import get_ocr_backend
 from court_ocr_extract.ocr_backends.surya_runtime import collect_surya_runtime_diagnostics
 from court_ocr_extract.ocr_backends.base import OCRResult
@@ -286,6 +287,10 @@ def _add_compare_pre_content(subparsers) -> None:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--strategies", default="hybrid_rule_llm,llm_only")
     parser.add_argument("--limit", type=int, default=None)
+    llm_policy = parser.add_mutually_exclusive_group()
+    llm_policy.add_argument("--require-llm", action="store_true")
+    llm_policy.add_argument("--allow-llm-failure", action="store_true")
+    parser.add_argument("--skip-llm-preflight", action="store_true")
     parser.add_argument("--open", action="store_true")
     parser.set_defaults(func=cmd_compare_pre_content)
 
@@ -699,17 +704,35 @@ def cmd_compare_pre_content(args) -> None:
     if not records:
         raise RuntimeError(f"No OCR cache records found in: {args.ocr_cache_dir}")
     strategies = [value.strip() for value in args.strategies.split(",") if value.strip()]
+    llm_preflight = None
+    llm_available = True
+    needs_llm = any(value in {"hybrid_rule_llm", "llm_only"} for value in strategies)
+    if needs_llm and args.skip_llm_preflight:
+        if args.require_llm:
+            raise RuntimeError("--require-llm cannot be combined with --skip-llm-preflight.")
+    elif needs_llm:
+        llm_preflight = check_llm_backend(get_settings())
+        llm_available = bool(llm_preflight["ok"])
+        if not llm_available and not args.allow_llm_failure:
+            raise RuntimeError(
+                "Local LLM preflight failed before case processing: "
+                f"{llm_preflight.get('error_type')}: {llm_preflight.get('error')}"
+            )
     summary = run_pre_content_ab_test(
         records,
         output_dir=args.output_dir,
         settings=get_settings(),
         strategies=strategies,
         limit=args.limit,
+        llm_preflight=llm_preflight,
+        llm_available=llm_available,
     )
     index = Path(args.output_dir) / "index.html"
     _maybe_open(index, args.open)
     print(f"Pre-content A/B cases: {summary['case_count']}")
     print(f"Judgment benchmark cases: {summary['judgment_benchmark_count']}")
+    if llm_preflight is not None:
+        print(f"Local LLM preflight: {'ok' if llm_preflight['ok'] else 'failed'}")
     print(f"Output: {index}")
 
 

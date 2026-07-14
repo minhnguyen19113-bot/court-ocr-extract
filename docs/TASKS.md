@@ -1,5 +1,15 @@
 # Tasks
 
+## LOCAL LLM CONTEXT BUDGET + CHUNKED EXTRACTION FIX
+
+- [x] Chuyển default VM sang Qwen2.5-3B, context 8192 và output 1024.
+- [x] Thêm token estimator, input char/token cap, safety margin, trim và fail rõ theo error type.
+- [x] Bắt buộc `max_tokens` trong OpenAI-compatible payload.
+- [x] Thêm chunk metadata/panel/defendants/participants, partial merge và de-duplicate.
+- [x] Thêm `/models` + chat preflight, CLI require/allow/skip policy và không tạo null giả.
+- [x] Thêm structured Excel, HTML runtime status và mock/synthetic tests.
+- [ ] Project Owner chạy `scripts.check_llm_backend`, sau đó compare 1 case trên VM và review chunk errors/output.
+
 ## OCR MARKER EARLY STOP FIX
 
 - [x] Thêm shared marker detector cho raw/filtered/page text và noisy Unicode/spacing.

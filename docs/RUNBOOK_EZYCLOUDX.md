@@ -1,5 +1,39 @@
 # Ezycloudx Runbook
 
+## Local LLM 3B: preflight và context budget
+
+Runtime mặc định đã xác nhận cho RTX 5060 Ti 16GB là `Qwen/Qwen2.5-3B-Instruct` với `max_model_len=8192`; không dùng Qwen2.5-7B full bf16 làm default vì không còn đủ KV cache sau khi load model. Thiết lập session:
+
+```powershell
+$env:LOCAL_LLM_PROVIDER = "vllm"
+$env:LOCAL_LLM_BASE_URL = "http://127.0.0.1:8000/v1"
+$env:LOCAL_LLM_MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
+$env:LOCAL_LLM_CONTEXT_WINDOW = "8192"
+$env:LOCAL_LLM_MAX_OUTPUT_TOKENS = "1024"
+$env:LOCAL_LLM_MAX_INPUT_TOKENS = "6000"
+$env:LOCAL_LLM_MAX_INPUT_CHARS = "22000"
+$env:LOCAL_LLM_ENABLE_CHUNKED_EXTRACTION = "true"
+```
+
+Chạy preflight thật trước compare; script gọi `/models` rồi một `/chat/completions` nhỏ và không in API key:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m scripts.check_llm_backend
+```
+
+Sau khi `ok=true`, chạy một case:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
+  --input-dir data\test_pdfs\pre_content_9 `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
+  --output-dir outputs\pre_content_ab_test_llm_3b_budget_check_1 `
+  --strategies hybrid_rule_llm,llm_only `
+  --require-llm --limit 1 --open
+```
+
+Không gửi toàn bộ pre-content trong một prompt. Mỗi request phải thỏa `estimated_input_tokens + max_output_tokens + safety_margin <= context_window`; lỗi budget/context có mã rõ. `--allow-llm-failure` chỉ dùng khi cần report strategy không chạy; mặc định và `--require-llm` đều fail-fast trước case khi preflight lỗi.
+
 ## OCR pre-content dừng sớm tại marker
 
 Command `ocr` mặc định scan từng page và dừng sau page chứa `NỘI DUNG VỤ ÁN`. Không truyền `--max-pages` thì OCR tiếp tục đến marker hoặc hết file; không còn giới hạn ngầm 7 page. Predictor/vLLM được khởi tạo một lần và giữ warm giữa các page. Batch mặc định là 1 để dừng chính xác.

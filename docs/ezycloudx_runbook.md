@@ -1,5 +1,7 @@
 # Ezycloudx Windows VM Runbook
 
+> Legacy compatibility runbook. Dùng `docs/RUNBOOK_EZYCLOUDX.md` cho command Surya/Local LLM hiện hành.
+
 This runbook reflects Phase 1B defaults plus the Phase 2A Surya adapter fix. Surya OCR + local LLM is the main candidate. Local VLM is a benchmark path. Tesseract is legacy optional only and must not be used as fallback for Surya.
 
 ## 1. Base Setup
@@ -54,8 +56,8 @@ Local LLM target:
 ```powershell
 # vLLM/OpenAI-compatible local endpoint target
 # LOCAL_LLM_PROVIDER=vllm
-# LOCAL_LLM_MODEL_NAME=Qwen/Qwen2.5-14B-Instruct
-# LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
+# LOCAL_LLM_MODEL_NAME=Qwen/Qwen2.5-3B-Instruct
+# LOCAL_LLM_BASE_URL=http://127.0.0.1:8000/v1
 ```
 
 VLM benchmark target:

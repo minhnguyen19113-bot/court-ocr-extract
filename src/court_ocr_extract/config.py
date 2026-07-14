@@ -67,16 +67,29 @@ class Settings:
         if self.local_llm_provider == "mock" and not self.allow_contract_fixtures:
             self.local_llm_provider = "ollama"
         self.local_llm_backend = self.local_llm_provider
-        self.local_llm_base_url = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
+        self.local_llm_base_url = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8000/v1")
         self.local_llm_model = os.getenv(
             "LOCAL_LLM_MODEL_NAME",
-            os.getenv("LOCAL_LLM_MODEL", "Qwen/Qwen2.5-14B-Instruct"),
+            os.getenv("LOCAL_LLM_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
         )
         self.local_llm_quantization = os.getenv("LOCAL_LLM_QUANTIZATION", "AWQ")
-        self.local_llm_max_new_tokens = _env_int(
-            "LOCAL_LLM_MAX_TOKENS",
-            _env_int("LOCAL_LLM_MAX_NEW_TOKENS", 4096),
+        self.local_llm_context_window = _env_int("LOCAL_LLM_CONTEXT_WINDOW", 8192)
+        self.local_llm_max_output_tokens = _env_int(
+            "LOCAL_LLM_MAX_OUTPUT_TOKENS",
+            _env_int("LOCAL_LLM_MAX_TOKENS", _env_int("LOCAL_LLM_MAX_NEW_TOKENS", 1024)),
         )
+        self.local_llm_max_new_tokens = self.local_llm_max_output_tokens
+        self.local_llm_max_input_tokens = _env_int("LOCAL_LLM_MAX_INPUT_TOKENS", 6000)
+        self.local_llm_max_input_chars = _env_int("LOCAL_LLM_MAX_INPUT_CHARS", 22000)
+        self.local_llm_safety_margin_tokens = _env_int("LOCAL_LLM_SAFETY_MARGIN_TOKENS", 512)
+        self.local_llm_truncation_strategy = os.getenv(
+            "LOCAL_LLM_TRUNCATION_STRATEGY", "preserve_head"
+        )
+        self.local_llm_enable_chunked_extraction = _env_bool(
+            "LOCAL_LLM_ENABLE_CHUNKED_EXTRACTION", True
+        )
+        self.local_llm_chunk_lines = _env_int("LOCAL_LLM_CHUNK_LINES", 80)
+        self.local_llm_chunk_overlap_lines = _env_int("LOCAL_LLM_CHUNK_OVERLAP_LINES", 10)
         self.local_llm_temperature = _env_float("LOCAL_LLM_TEMPERATURE", 0.0)
         self.gliner_model = os.getenv("GLINER_MODEL", "urchade/gliner_multi-v2.1")
         self.surya_langs = os.getenv("SURYA_LANGS", "vi")

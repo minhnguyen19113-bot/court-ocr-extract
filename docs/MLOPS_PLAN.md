@@ -19,6 +19,8 @@ Quản trị version, runtime, benchmark, và rollback cho Surya OCR, local LLM,
 ## Versioning đề xuất
 
 - Main adapter đã pin `surya-ocr==0.20.0`; guard fail mọi version khác trước runtime. Surya 2/0.21.x cần phase/runtime governance riêng.
+- Local LLM runtime mặc định đã xác nhận là `Qwen/Qwen2.5-3B-Instruct`, vLLM OpenAI-compatible, context 8192/output 1024 trên RTX 5060 Ti 16GB. Qwen2.5-7B full bf16 không là default vì thiếu KV cache.
+- Manifest/report phải giữ context window, input token estimate, output budget, chunk name, truncation, request status và error type; không lưu prompt/OCR text trong log an toàn.
 - Ghi model/runtime version vào run manifest.
 - Khi prompt/schema đổi, cập nhật `docs/CHANGELOG_AI.md` và evaluation baseline.
 - Không thay default sang cloud model nếu không có explicit opt-in decision.

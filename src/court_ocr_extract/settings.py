@@ -40,12 +40,20 @@ class PipelineSettings:
     extractor_backend: str = "local_llm"
     enable_local_llm_extraction: bool = True
     local_llm_provider: str = "vllm"
-    local_llm_model_name: str = "Qwen/Qwen2.5-14B-Instruct"
-    local_llm_base_url: str = "http://127.0.0.1:8001/v1"
+    local_llm_model_name: str = "Qwen/Qwen2.5-3B-Instruct"
+    local_llm_base_url: str = "http://127.0.0.1:8000/v1"
     local_llm_temperature: float = 0.0
     local_llm_timeout_seconds: float = 300.0
     local_llm_json_mode: bool = True
-    local_llm_max_tokens: int = 4096
+    local_llm_context_window: int = 8192
+    local_llm_max_output_tokens: int = 1024
+    local_llm_max_input_tokens: int = 6000
+    local_llm_max_input_chars: int = 22000
+    local_llm_safety_margin_tokens: int = 512
+    local_llm_truncation_strategy: str = "preserve_head"
+    local_llm_enable_chunked_extraction: bool = True
+    local_llm_chunk_lines: int = 80
+    local_llm_chunk_overlap_lines: int = 10
     vlm_provider: str = "ollama"
     vlm_model_name: str = "qwen2.5vl:7b"
     vlm_base_url: str = "http://127.0.0.1:11434"
@@ -122,12 +130,24 @@ def get_settings() -> PipelineSettings:
         extractor_backend=_env("EXTRACTOR_BACKEND", "local_llm"),
         enable_local_llm_extraction=_env_bool("ENABLE_LOCAL_LLM_EXTRACTION", True),
         local_llm_provider=_env("LOCAL_LLM_PROVIDER", "vllm"),
-        local_llm_model_name=_env("LOCAL_LLM_MODEL_NAME", "Qwen/Qwen2.5-14B-Instruct"),
-        local_llm_base_url=_env("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1"),
+        local_llm_model_name=_env("LOCAL_LLM_MODEL_NAME", "Qwen/Qwen2.5-3B-Instruct"),
+        local_llm_base_url=_env("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8000/v1"),
         local_llm_temperature=_env_float("LOCAL_LLM_TEMPERATURE", 0.0),
         local_llm_timeout_seconds=_env_float("LOCAL_LLM_TIMEOUT_SECONDS", 300.0),
         local_llm_json_mode=_env_bool("LOCAL_LLM_JSON_MODE", True),
-        local_llm_max_tokens=_env_int("LOCAL_LLM_MAX_TOKENS", 4096),
+        local_llm_context_window=_env_int("LOCAL_LLM_CONTEXT_WINDOW", 8192),
+        local_llm_max_output_tokens=_env_int(
+            "LOCAL_LLM_MAX_OUTPUT_TOKENS", _env_int("LOCAL_LLM_MAX_TOKENS", 1024)
+        ),
+        local_llm_max_input_tokens=_env_int("LOCAL_LLM_MAX_INPUT_TOKENS", 6000),
+        local_llm_max_input_chars=_env_int("LOCAL_LLM_MAX_INPUT_CHARS", 22000),
+        local_llm_safety_margin_tokens=_env_int("LOCAL_LLM_SAFETY_MARGIN_TOKENS", 512),
+        local_llm_truncation_strategy=_env("LOCAL_LLM_TRUNCATION_STRATEGY", "preserve_head"),
+        local_llm_enable_chunked_extraction=_env_bool(
+            "LOCAL_LLM_ENABLE_CHUNKED_EXTRACTION", True
+        ),
+        local_llm_chunk_lines=_env_int("LOCAL_LLM_CHUNK_LINES", 80),
+        local_llm_chunk_overlap_lines=_env_int("LOCAL_LLM_CHUNK_OVERLAP_LINES", 10),
         vlm_provider=_env("VLM_PROVIDER", "ollama"),
         vlm_model_name=_env("VLM_MODEL_NAME", "qwen2.5vl:7b"),
         vlm_base_url=_env("VLM_BASE_URL", "http://127.0.0.1:11434"),

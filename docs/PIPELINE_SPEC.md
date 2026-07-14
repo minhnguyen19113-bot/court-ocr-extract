@@ -1,5 +1,13 @@
 # Pipeline Spec
 
+## Local LLM context budget và chunked extraction
+
+Local LLM mặc định dùng `Qwen/Qwen2.5-3B-Instruct`, context 8192, output 1024, input tối đa 6000 token/22000 ký tự và safety margin 512. OpenAI-compatible payload luôn có `temperature=0` và `max_tokens>0`. Adapter ước lượng tiếng Việt bằng `ceil(chars/3.2)`, trim `preserve_head` trước HTTP và fail `llm_context_budget_exceeded` nếu vẫn không an toàn.
+
+Pre-content không được gửi nguyên khối. Extractor chia request thành document metadata, trial panel, từng defendant và participants; mỗi chunk có status/budget/error riêng. Kết quả thành công được merge và de-duplicate; một chunk lỗi không xóa chunk khác. Hybrid giữ rule output khi LLM lỗi. Nếu mọi chunk `llm_only` lỗi, status là `llm_only_failed`, `result_valid=false`; schema null/rỗng không được coi là model output hợp lệ.
+
+`compare-pre-content` preflight `/models` và chat nhỏ trước vòng case. `--require-llm` fail-fast, `--allow-llm-failure` ghi strategy không chạy, `--skip-llm-preflight` là opt-out rõ ràng.
+
 ## Marker detection và page-level early-stop
 
 Pre-content OCR mặc định chạy `render page/batch -> preprocess -> predictor call -> normalize raw/filtered lines -> marker detection -> cache/debug -> break`. Predictor Surya được tạo một lần cho mỗi PDF và tái sử dụng; `ocr_page_batch_size=1` là default. `--full-document` đặt marker rỗng và giữ bulk/full-document behavior.

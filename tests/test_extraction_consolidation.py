@@ -35,24 +35,23 @@ def test_local_llm_contract_uses_fake_response_without_network(monkeypatch) -> N
     def fail_network(*args, **kwargs):
         raise AssertionError("Network must not be called by this contract test.")
 
-    fake_response = """```json
-    {
-      "case": {"case_type": "Synthetic", "filing_number": "SYN-001"},
-      "participants": [{
-        "procedural_role": "Bị cáo",
-        "full_name": "Người synthetic",
-        "birth_year": null,
-        "id_number": null,
-        "address": null,
-        "confidence": {"procedural_role": 0.9, "full_name": 0.9},
-        "evidence": {"procedural_role": "Bị cáo", "full_name": "Người synthetic"},
-        "warnings": []
-      }],
-      "document_warnings": []
+    fake_payload = {
+        "case": {"case_type": "Synthetic", "filing_number": "SYN-001"},
+        "participants": [{
+            "procedural_role": "Bị cáo", "full_name": "Người synthetic",
+            "birth_year": None, "id_number": None, "address": None,
+            "confidence": {"procedural_role": 0.9, "full_name": 0.9},
+            "evidence": {"procedural_role": "Bị cáo", "full_name": "Người synthetic"},
+            "warnings": [],
+        }],
+        "document_warnings": [],
     }
-    ```"""
-    monkeypatch.setattr(local_llm_module, "_post_json", fail_network)
-    monkeypatch.setattr(extractor, "_call_local_model", lambda prompt: fake_response)
+    monkeypatch.setattr("urllib.request.urlopen", fail_network)
+    monkeypatch.setattr(
+        local_llm_module.LocalLLMClient,
+        "generate_json",
+        lambda self, **kwargs: fake_payload,
+    )
 
     payload = extractor.extract_from_text("Synthetic OCR contract text", case_id="synthetic_case")
 

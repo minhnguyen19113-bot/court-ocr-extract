@@ -38,10 +38,11 @@ def test_compare_runner_writes_json_excel_html_and_routes_notice(tmp_path) -> No
     payload = json.loads((tmp_path / "ab" / "compare_summary.json").read_text(encoding="utf-8"))
     assert payload["cases"][0]["segment_stop_found"] is True
     workbook = load_workbook(tmp_path / "ab" / "compare_summary.xlsx", read_only=True)
-    assert set(workbook.sheetnames) == {
-        "SUMMARY", "CASE_COMPARE", "HYBRID_FIELDS", "LLM_ONLY_FIELDS", "CONFLICTS",
-        "MISSING_FIELDS", "NEEDS_REVIEW", "EVIDENCE", "DOC_ROUTER",
-    }
+    assert {
+        "SUMMARY", "CASES", "DEFENDANTS", "PARTICIPANTS", "TRIAL_PANEL", "LLM_STATUS",
+        "FIELD_LONG", "EVIDENCE_LINES", "RAW_JSON", "CASE_COMPARE", "CONFLICTS",
+        "MISSING_FIELDS", "NEEDS_REVIEW", "DOC_ROUTER",
+    } == set(workbook.sheetnames)
 
 
 def _record(case_id, texts):

@@ -1,5 +1,14 @@
 # Testing
 
+## Local LLM budget/chunk/report tests
+
+- `test_llm_preflight.py`: `/models`, chat nhỏ và connection refused bằng fake opener.
+- `test_llm_context_budget.py`: trim trước request, inequality budget, `max_tokens>0` và context error taxonomy.
+- `test_llm_chunked_extraction.py`: nhiều defendant, partial success và chunk warning.
+- `test_compare_requires_llm.py`: fail-fast và không tạo null result giả; hybrid giữ rule output.
+- `test_structured_excel_export.py`, `test_llm_status_reporting.py`: review sheets không chứa JSON blob, `LLM_STATUS` và HTML runtime metadata.
+- Không test nào gọi vLLM/Docker/Surya/PDF/cloud thật.
+
 ## Marker early-stop tests
 
 - `tests/test_marker_detection.py`: exact, no-diacritic, noisy spacing, split/filtered-only, truncated/low-confidence và same-page trim.

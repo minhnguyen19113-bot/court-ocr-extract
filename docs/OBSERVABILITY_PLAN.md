@@ -15,6 +15,7 @@ Pipeline cần đủ quan sát để reviewer biết file nào thành công, fil
 | OCR | pages processed, OCR line count, bbox coverage, low-confidence count. |
 | Marker | marker found yes/no, marker page, missing marker count. |
 | Extraction | JSON valid, participant count, missing evidence count. |
+| Local LLM | Preflight, model/base URL, context budget, chunk count, request/response status, error type và duration; không log prompt/OCR text. |
 | Validation | warning code counts, evidence mismatch count. |
 | Excel/QA | row count, rows needing review, output path. |
 

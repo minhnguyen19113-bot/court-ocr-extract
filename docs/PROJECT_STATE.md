@@ -1,5 +1,13 @@
 # Project State
 
+## Latest Local LLM Context Budget + Chunked Extraction Fix
+
+- Default Local LLM đã chuyển sang `Qwen/Qwen2.5-3B-Instruct`, endpoint `127.0.0.1:8000/v1`, context 8192 và output 1024; Qwen2.5-7B full bf16 không dùng mặc định trên RTX 5060 Ti 16GB.
+- Client chặn request vượt budget trước HTTP, luôn gửi `max_tokens`, phân loại context/connection errors và lưu request metadata.
+- Pre-content được chunk theo metadata/panel/defendants/participants; chunk lỗi không xóa kết quả thành công, hybrid giữ rule output, `llm_only` không còn trả null giả.
+- Compare có preflight/fail-fast policy, structured Excel sheets và HTML runtime/chunk status.
+- Codex chỉ chạy mock HTTP/synthetic tests; chưa gọi vLLM/PDF/Surya/Docker/cloud thật.
+
 ## Latest OCR Marker Early Stop Fix
 
 - Marker detector mới scan filtered lines, raw lines và canonical page text; normalize Unicode/dấu/punctuation/spacing và hỗ trợ split line/truncated marker.
