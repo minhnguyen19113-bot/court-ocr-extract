@@ -1,5 +1,16 @@
 # Tasks
 
+## FINAL PREPROCESS CANDIDATE SELECTION FIX
+
+- [x] Tạo `object_seed_mask` từ union red/stroke masks.
+- [x] Sửa horizontal grouping và giữ đồng thời side seal + horizontal stamp.
+- [x] Thêm candidate metrics, safety checks và final selection.
+- [x] Ghi selected stage/reason/scores vào metadata và debug UI.
+- [x] Dùng final selected candidate làm OCR input.
+- [x] Thêm synthetic tests cho horizontal stamp, side seal, amplification và blank rejection.
+- [ ] Project Owner visual review page 1 preprocess và OCR trên VM.
+
+
 ## STAMP OBJECT ERASE FIX
 
 - [x] Thêm `stamp_object_mask` từ connected components và expanded object regions.

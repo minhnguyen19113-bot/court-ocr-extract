@@ -241,3 +241,6 @@ Review `outputs\pre_content_ab_test\index.html` và `compare_summary.xlsx`. Khô
 `red_mask` chỉ chứng minh detector đã bắt pixel đỏ; residual xám vẫn có thể còn ngoài mask. Mode khuyến nghị để kiểm tra mạnh là `--stamp-suppression aggressive --stamp-erase-mode component_white_fill --ocr-stamp-filter balanced`. Nếu mất chữ thật, dùng `--stamp-suppression balanced --stamp-erase-mode component_inpaint` và review warning/filtered lines.
 
 Luôn so sánh `red_mask`, `stamp_object_mask`, `stamp_object_erased`, `ocr_input_stamp_suppressed` và `final_preprocessed`. Khi stamp overlap chữ thật, không chấp nhận output tự động nếu chưa human review.
+## Kiểm final preprocess candidate
+
+Trong review mới, kiểm `object_seed_mask` có phủ dấu ngang chính và seal mép phải hay không. So sánh trực tiếp `stamp_object_erased` với `final_preprocessed`; metadata `final_selected_stage` phải giải thích ảnh nào được chọn. `candidate_scores` phải cho thấy candidate làm residual đậm lại hoặc mất chữ bị loại. OCR review phải ghi cùng `ocr_input_source_stage`.

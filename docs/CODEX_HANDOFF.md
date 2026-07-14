@@ -213,3 +213,8 @@ Nhánh này chưa phải production decision. Correction notice được route r
 `red_mask` không còn được xem là bằng chứng dấu mộc đã bị xóa sạch. Review mới phải kiểm `stamp_object_mask` và `stamp_object_erased`. Default erase là `component_white_fill`; khi object overlap dark text trên ngưỡng, code giữ chữ bằng fallback mask-level và yêu cầu review. Post-OCR stamp filter không bị loại bỏ.
 
 Codex chỉ chạy synthetic tests, không chạy PDF, Surya inference, Local LLM hoặc cloud API. Project Owner cần so sánh residual và false removal bằng hai command balanced/inpaint và aggressive/white-fill trong runbook.
+## Bàn giao Final Candidate Selection
+
+`final_preprocessed` không còn là stage cố định trước suppression. Bản trước selection nằm ở `final_preprocessed_candidate`; selected output được ghi vào `final_preprocessed` và `ocr_input_stamp_suppressed`. Review `object_seed_mask`, `candidate_scores`, `final_selected_stage` và `ocr_input_source_stage`. Nếu lowest-residual candidate không an toàn cho text, metadata phải ghi warning/fallback.
+
+Codex không chạy dữ liệu thật. Project Owner cần xác nhận dấu ngang chính xuất hiện trong object mask và selected final thực sự không tệ hơn `stamp_object_erased` trên page 1.

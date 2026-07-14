@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -320,7 +321,9 @@ def cmd_debug_preprocess(args) -> None:
             black_text_protection = page_dir / "black_text_protection_mask.png"
             seal_removed = page_dir / "seal_removed.png"
             text_enhanced = page_dir / "text_enhanced.png"
+            final_candidate = page_dir / "final_preprocessed_candidate.png"
             stamp_suppression_mask = page_dir / "stamp_suppression_mask.png"
+            object_seed_mask = page_dir / "object_seed_mask.png"
             stamp_object_mask = page_dir / "stamp_object_mask.png"
             stamp_object_erased = page_dir / "stamp_object_erased.png"
             ocr_input_suppressed = page_dir / "ocr_input_stamp_suppressed.png"
@@ -341,9 +344,12 @@ def cmd_debug_preprocess(args) -> None:
                 preprocess_profile=args.preprocess_profile,
                 metadata=metadata,
             )
+            if after.exists():
+                shutil.copy2(after, final_candidate)
+            candidate_input = final_candidate if final_candidate.exists() else after
             metadata.update(
                 suppress_stamp_for_ocr(
-                    after,
+                    candidate_input,
                     red_mask,
                     black_text_protection,
                     ocr_input_suppressed,
@@ -352,6 +358,12 @@ def cmd_debug_preprocess(args) -> None:
                     erase_mode=args.stamp_erase_mode,
                     stamp_object_mask_path=stamp_object_mask,
                     stamp_object_erased_path=stamp_object_erased,
+                    object_seed_mask_path=object_seed_mask,
+                    final_selected_path=after,
+                    candidate_paths={
+                        "seal_removed": seal_removed,
+                        "text_enhanced": text_enhanced,
+                    },
                 )
             )
             metadata["page_number"] = page.page_number
@@ -368,12 +380,16 @@ def cmd_debug_preprocess(args) -> None:
                 page_images.append(("text_enhanced", text_enhanced))
             if stamp_suppression_mask.exists():
                 page_images.append(("stamp_suppression_mask", stamp_suppression_mask))
+            if object_seed_mask.exists():
+                page_images.append(("object_seed_mask", object_seed_mask))
             if stamp_object_mask.exists():
                 page_images.append(("stamp_object_mask", stamp_object_mask))
             if stamp_object_erased.exists():
                 page_images.append(("stamp_object_erased", stamp_object_erased))
             if ocr_input_suppressed.exists():
                 page_images.append(("ocr_input_stamp_suppressed", ocr_input_suppressed))
+            if final_candidate.exists():
+                page_images.append(("final_preprocessed_candidate", final_candidate))
             page_images.extend([("final_preprocessed", after), ("before_after_compare", compare)])
             review_pages.append({"metadata": metadata, "images": page_images})
         review_cases.append({"case_id": case.case_id, "pages": review_pages})

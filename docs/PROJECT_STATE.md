@@ -1,5 +1,14 @@
 # Project State
 
+## Latest Final Preprocess Candidate Selection Fix
+
+- `stamp_object_mask` hiện tạo từ union seed, hỗ trợ horizontal stamp và không chỉ giữ component lớn/mép phải.
+- Thêm `object_seed_mask` và `final_preprocessed_candidate` artifacts.
+- Thêm candidate scoring/selection; `final_preprocessed` là selected output và OCR input dùng cùng stage.
+- Text enhancement residual amplification bị phát hiện qua stamp residual score và không được ưu tiên.
+- OCR stamp filter raw/filtered/excluded vẫn giữ nguyên. Tests chỉ dùng synthetic images.
+
+
 ## Latest Stamp Object Erase Fix
 
 - Đã mở rộng pixel-level stamp suppression thành component/object-level erase.

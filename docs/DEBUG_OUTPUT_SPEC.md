@@ -155,3 +155,10 @@ Moi page co the co stamp suppression mask, OCR input stamp suppressed, raw/filte
 - `stamp_object_erased` là kết quả sau object-level erase; `ocr_input_stamp_suppressed` là ảnh cuối đưa vào OCR.
 - `black_text_protection_mask` chỉ dùng bảo vệ chữ thật và tính overlap, không phải output cuối.
 - Review phải hiển thị object count, erase mode, mask ratio, dark-text overlap và warnings.
+## Final preprocess candidate selection
+
+- `object_seed_mask` là union của `red_mask` và `stamp_suppression_mask`.
+- `final_preprocessed_candidate` giữ output preprocess trước stamp selection; `final_preprocessed` là best safe candidate đã chọn.
+- `candidate_scores` phải có stamp residual, text preservation, foreground loss, dark-pixel explosion, blank và entropy metrics.
+- Debug UI phải đặt `stamp_object_erased` cạnh `final_preprocessed` và hiển thị `final_selected_stage`, `final_selection_reason`, `ocr_input_source_stage`.
+- OCR input phải giống final selected candidate, không quay lại candidate residual cao hơn.

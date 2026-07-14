@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,11 @@ def write_preprocess_review(
         "stamp_object_erased",
         "stamp_object_dark_text_overlap_ratio",
         "stamp_object_warnings",
+        "final_selected_stage",
+        "final_selection_reason",
+        "ocr_input_source_stage",
+        "text_enhance_exclude_stamp_mask",
+        "candidate_scores",
         "text_enhance_mode",
         "foreground_before_enhance",
         "foreground_after_enhance",
@@ -115,6 +121,7 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
         page_chunks = []
         for page in record.result.pages:
             artifact = _artifact_block(page.blocks)
+            input_metadata = artifact.get("ocr_input_metadata", {}) if artifact else {}
             image_html = ""
             if page.image_path:
                 image_path = Path(page.image_path)
@@ -141,12 +148,14 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                     path_value = artifact.get(key)
                     if path_value and Path(path_value).exists():
                         links.append(f'<a href="{escape(rel_link(Path(path_value), base_dir))}">{escape(label)}</a>')
-                input_metadata = artifact.get("ocr_input_metadata", {})
                 for label, key in [
                     ("red mask", "red_mask_path"),
                     ("stamp suppression mask", "stamp_suppression_mask_path"),
+                    ("object seed mask", "object_seed_mask_path"),
                     ("stamp object mask", "stamp_object_mask_path"),
                     ("stamp object erased", "stamp_object_erased_path"),
+                    ("final preprocessed candidate", "final_preprocessed_candidate_path"),
+                    ("final preprocessed selected", "final_preprocessed_path"),
                     ("black text protection mask", "black_text_protection_path"),
                     ("OCR input stamp suppressed", "ocr_input_stamp_suppressed_path"),
                 ]:
@@ -178,6 +187,10 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                 f"<p>Stamp erase mode: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_object_erase_mode', 'mask') if artifact else 'mask')} | "
                 f"Objects: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_object_count', 0) if artifact else 0)} | "
                 f"Dark overlap: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_object_dark_text_overlap_ratio', 0) if artifact else 0)}</p>"
+                f"<p>Final selected stage: <span class=\"badge\">{escape(input_metadata.get('final_selected_stage', 'n/a'))}</span> | "
+                f"OCR input stage: {escape(input_metadata.get('ocr_input_source_stage', 'n/a'))} | "
+                f"Reason: {escape(input_metadata.get('final_selection_reason', 'n/a'))}</p>"
+                f"<h4>Candidate scores</h4><pre>{escape(json.dumps(input_metadata.get('candidate_scores', {}), ensure_ascii=False, indent=2))}</pre>"
                 f"<p>Raw: {escape(artifact.get('raw_line_count', len(page.lines)) if artifact else len(page.lines))} | "
                 f"Filtered: {escape(artifact.get('filtered_line_count', len(page.lines)) if artifact else len(page.lines))} | "
                 f"Excluded stamp: {escape(artifact.get('excluded_stamp_line_count', 0) if artifact else 0)}</p>"

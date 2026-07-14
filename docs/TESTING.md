@@ -134,3 +134,6 @@ Tests không đọc PDF thật và không gọi Local LLM thật. Coverage gồm
 ## Stamp object erase synthetic tests
 
 Tests tạo ảnh/mask synthetic trong `tmp_path`: dấu đỏ có residual xám, red mask một phần, stamp overlap chữ đen, blank page và red noise nhỏ. Assertions kiểm object mask rộng hơn red mask, white-fill giảm residual hơn mask-only, overlap warning bảo toàn chữ và artifacts tồn tại. Passing tests không chứng minh threshold phù hợp với scan thật.
+## Final candidate selection synthetic tests
+
+Tests cover disconnected horizontal stamp, horizontal stamp cùng side seal, object union seed, chọn `stamp_object_erased`, loại text-enhanced residual amplification, loại blank candidate và bảo toàn overlap-text fallback. Passing tests chỉ xác nhận scoring/control flow synthetic, chưa xác nhận threshold trên scan thật.

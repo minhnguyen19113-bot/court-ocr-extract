@@ -171,3 +171,9 @@
 - Thêm expanded object region, noise/page-size guards, dark-text overlap fallback và metadata.
 - OCR filter tiếp tục hoạt động, ưu tiên object mask khi có.
 - Thêm synthetic artifacts/tests; không chạy dữ liệu thật.
+## 2026-07-14 - FINAL PREPROCESS CANDIDATE SELECTION FIX
+
+- Object seed chuyển sang union `red_mask OR stamp_suppression_mask` và morphology ưu tiên stamp ngang.
+- Thêm `object_seed_mask`, candidate scoring và selected final/OCR stage metadata.
+- Ngăn text-enhanced candidate làm residual đậm hoặc làm mất foreground được chọn làm final.
+- Thêm synthetic selection tests; không chạy PDF/OCR thật.

@@ -88,8 +88,10 @@ def test_surya_receives_final_preprocessed_image_and_writes_artifacts(tmp_path, 
     assert (preprocess_dir / "page_001_text_enhanced.png").exists()
     assert (preprocess_dir / "page_001_final_preprocessed.png").exists()
     assert (preprocess_dir / "page_001_stamp_suppression_mask.png").exists()
+    assert (preprocess_dir / "page_001_object_seed_mask.png").exists()
     assert (preprocess_dir / "page_001_stamp_object_mask.png").exists()
     assert (preprocess_dir / "page_001_stamp_object_erased.png").exists()
+    assert (preprocess_dir / "page_001_final_preprocessed_candidate.png").exists()
     assert (preprocess_dir / "page_001_ocr_input_stamp_suppressed.png").exists()
     assert (preprocess_dir / "page_001_metadata.json").exists()
     assert (ocr_dir / "page_001_ocr_input.png").exists()
@@ -97,6 +99,9 @@ def test_surya_receives_final_preprocessed_image_and_writes_artifacts(tmp_path, 
     assert manifest["metadata"]["ocr_input_source"] == "preprocessed"
     assert manifest["metadata"]["text_enhance"] == "medium"
     assert manifest["pages"][0]["artifacts"]["ocr_input_source"] == "preprocessed"
+    input_metadata = manifest["pages"][0]["artifacts"]["ocr_input_metadata"]
+    assert input_metadata["final_selected_stage"] == "final_preprocessed_candidate"
+    assert input_metadata["ocr_input_source_stage"] == input_metadata["final_selected_stage"]
 
 
 def test_surya_without_preprocess_uses_rendered_original(tmp_path, monkeypatch) -> None:

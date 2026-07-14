@@ -1,5 +1,10 @@
 # Pipeline Spec
 
+## Final preprocess selection contract
+
+Object detection dùng `red_mask OR stamp_suppression_mask`, horizontal close và light dilation trước component filtering để giữ dấu mộc ngang nhiều nét rời. Sau erase, pipeline chấm điểm `seal_removed`, `text_enhanced`, `final_preprocessed_candidate`, mask result và `stamp_object_erased`. Candidate có stamp residual thấp nhất chỉ được chọn khi text preservation an toàn. Text enhancement có residual cao hơn hoặc làm mất foreground không được chọn; OCR dùng đúng selected stage. Post-OCR stamp filter vẫn bắt buộc.
+
+
 ## Component-level stamp erase
 
 Stamp cleanup chạy `red_mask -> connected components -> grouped/expanded stamp object -> dark-text overlap check -> object erase -> OCR input`. Nếu overlap dưới ngưỡng an toàn, `component_white_fill`, `component_inpaint` hoặc `local_background` có thể xử lý toàn object. Nếu overlap cao, pipeline không white-fill object, ghi `stamp_object_overlaps_dark_text`, fallback mask-level suppression và giữ post-OCR stamp filter.

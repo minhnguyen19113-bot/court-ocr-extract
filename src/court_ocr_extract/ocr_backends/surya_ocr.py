@@ -308,7 +308,9 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
         seal_removed = preprocess_dir / f"{prefix}_seal_removed.png"
         text_enhanced = preprocess_dir / f"{prefix}_text_enhanced.png"
         final = preprocess_dir / f"{prefix}_final_preprocessed.png"
+        final_candidate = preprocess_dir / f"{prefix}_final_preprocessed_candidate.png"
         stamp_mask = preprocess_dir / f"{prefix}_stamp_suppression_mask.png"
+        object_seed_mask = preprocess_dir / f"{prefix}_object_seed_mask.png"
         stamp_object_mask = preprocess_dir / f"{prefix}_stamp_object_mask.png"
         stamp_object_erased = preprocess_dir / f"{prefix}_stamp_object_erased.png"
         suppressed = preprocess_dir / f"{prefix}_ocr_input_stamp_suppressed.png"
@@ -336,9 +338,10 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
                 "warnings": [f"preprocess_failed_using_rendered_safe_copy:{type(exc).__name__}"],
                 "fallback_source": "rendered_original_safe_copy",
             }
+        shutil.copy2(final, final_candidate)
         try:
             suppression = suppress_stamp_for_ocr(
-                final,
+                final_candidate,
                 red_mask,
                 protection,
                 suppressed,
@@ -347,6 +350,12 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
                 erase_mode=normalized["stamp_erase_mode"],
                 stamp_object_mask_path=stamp_object_mask,
                 stamp_object_erased_path=stamp_object_erased,
+                object_seed_mask_path=object_seed_mask,
+                final_selected_path=final,
+                candidate_paths={
+                    "seal_removed": seal_removed,
+                    "text_enhanced": text_enhanced,
+                },
             )
             values.update(suppression)
             values["warnings"] = _dedupe(
@@ -364,6 +373,7 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
                 **normalized,
                 "original_path": str(original),
                 "final_preprocessed_path": str(final),
+                "final_preprocessed_candidate_path": str(final_candidate),
                 "ocr_input_path": str(suppressed),
             }
         )
