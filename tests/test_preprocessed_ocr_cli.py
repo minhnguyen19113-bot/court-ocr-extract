@@ -22,6 +22,8 @@ MODE_3_ARGS = [
     "balanced",
     "--stamp-suppression",
     "balanced",
+    "--stamp-erase-mode",
+    "component_white_fill",
     "--ocr-stamp-filter",
     "balanced",
 ]
@@ -60,6 +62,7 @@ def test_debug_ocr_review_passes_mode3_preprocess_options(tmp_path, monkeypatch)
         "text_enhance": "medium",
         "preprocess_profile": "balanced",
         "stamp_suppression": "balanced",
+        "stamp_erase_mode": "component_white_fill",
         "ocr_stamp_filter": "balanced",
     }
 

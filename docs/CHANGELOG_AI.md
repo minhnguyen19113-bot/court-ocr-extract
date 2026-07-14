@@ -165,3 +165,9 @@
 - Thêm nhánh thử nghiệm so sánh hybrid rule+LLM và LLM-only trên phần trước `NỘI DUNG VỤ ÁN`.
 - Thêm document router, segmenter, schema, rule extractor, hybrid merge, prompts và compare runner.
 - Thêm review artifacts JSON/Excel/HTML và synthetic tests; không chạy PDF/Surya/Local LLM thật trong Codex.
+## 2026-07-14 - STAMP OBJECT ERASE FIX
+
+- Thêm component-level stamp object mask và erase modes.
+- Thêm expanded object region, noise/page-size guards, dark-text overlap fallback và metadata.
+- OCR filter tiếp tục hoạt động, ưu tiên object mask khi có.
+- Thêm synthetic artifacts/tests; không chạy dữ liệu thật.

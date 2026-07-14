@@ -171,7 +171,8 @@ class SuryaOCRBackend:
             page_input_metadata = input_metadata_by_page.get(page_number, metadata)
             lines, excluded_lines = filter_lines_by_stamp_mask(
                 raw_lines,
-                page_input_metadata.get("stamp_suppression_mask_path"),
+                page_input_metadata.get("stamp_object_mask_path")
+                or page_input_metadata.get("stamp_suppression_mask_path"),
                 page_input_metadata.get("black_text_protection_path"),
                 mode=str(metadata.get("ocr_stamp_filter", "off")),
             )
@@ -289,6 +290,7 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
         "text_enhance": str(options.get("text_enhance", "light")),
         "preprocess_profile": str(options.get("preprocess_profile", "conservative")),
         "stamp_suppression": str(options.get("stamp_suppression", "balanced")),
+        "stamp_erase_mode": str(options.get("stamp_erase_mode", "component_white_fill")),
         "ocr_stamp_filter": str(options.get("ocr_stamp_filter", "balanced")),
     }
     preprocess_dir = Path(work_dir) / "preprocess"
@@ -307,6 +309,8 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
         text_enhanced = preprocess_dir / f"{prefix}_text_enhanced.png"
         final = preprocess_dir / f"{prefix}_final_preprocessed.png"
         stamp_mask = preprocess_dir / f"{prefix}_stamp_suppression_mask.png"
+        stamp_object_mask = preprocess_dir / f"{prefix}_stamp_object_mask.png"
+        stamp_object_erased = preprocess_dir / f"{prefix}_stamp_object_erased.png"
         suppressed = preprocess_dir / f"{prefix}_ocr_input_stamp_suppressed.png"
         metadata_path = preprocess_dir / f"{prefix}_metadata.json"
         shutil.copy2(page.image_path, original)
@@ -326,6 +330,13 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
                 preprocess_profile=normalized["preprocess_profile"],
                 metadata=values,
             )
+        except Exception as exc:
+            shutil.copy2(page.image_path, final)
+            values = {
+                "warnings": [f"preprocess_failed_using_rendered_safe_copy:{type(exc).__name__}"],
+                "fallback_source": "rendered_original_safe_copy",
+            }
+        try:
             suppression = suppress_stamp_for_ocr(
                 final,
                 red_mask,
@@ -333,15 +344,19 @@ def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, 
                 suppressed,
                 stamp_mask,
                 mode=normalized["stamp_suppression"],
+                erase_mode=normalized["stamp_erase_mode"],
+                stamp_object_mask_path=stamp_object_mask,
+                stamp_object_erased_path=stamp_object_erased,
             )
             values.update(suppression)
+            values["warnings"] = _dedupe(
+                [str(item) for item in values.get("warnings", [])]
+                + [str(item) for item in suppression.get("stamp_suppression_warnings", [])]
+                + [str(item) for item in suppression.get("stamp_object_warnings", [])]
+            )
         except Exception as exc:
-            shutil.copy2(page.image_path, final)
             shutil.copy2(final, suppressed)
-            values = {
-                "warnings": [f"preprocess_failed_using_rendered_safe_copy:{type(exc).__name__}"],
-                "fallback_source": "rendered_original_safe_copy",
-            }
+            values.setdefault("warnings", []).append(f"stamp_suppression_failed_using_final_safe_copy:{type(exc).__name__}")
         values.update(
             {
                 "page_number": page_number,

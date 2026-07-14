@@ -1,5 +1,16 @@
 # Tasks
 
+## STAMP OBJECT ERASE FIX
+
+- [x] Thêm `stamp_object_mask` từ connected components và expanded object regions.
+- [x] Thêm bốn `stamp_erase_mode` và default `component_white_fill`.
+- [x] Thêm dark-text overlap guard, fallback và warnings.
+- [x] Nối artifacts/metadata vào debug-preprocess và Surya OCR path.
+- [x] Giữ post-OCR raw/filtered/excluded stamp lines.
+- [x] Thêm synthetic tests cho residual, low saturation, overlap, blank và noise.
+- [ ] Project Owner visual review balanced/inpaint và aggressive/white-fill trên VM.
+
+
 ## PRE-CONTENT EXTRACTION A/B TEST
 
 - [x] Thêm document router và pre-content segmenter trên filtered OCR lines.

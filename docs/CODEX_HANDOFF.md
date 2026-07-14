@@ -208,3 +208,8 @@ Codex chua chay PDF that, chua goi Surya inference/Local LLM/cloud API, va khong
 CLI mới: `court_ocr_extract.cli compare-pre-content`. Command chỉ đọc OCR cache và so sánh `hybrid_rule_llm,llm_only`; không tự OCR PDF. Output chính là `index.html`, `compare_summary.json`, `compare_summary.xlsx` và artifacts theo case.
 
 Nhánh này chưa phải production decision. Correction notice được route riêng và loại khỏi benchmark bản án chính. Project Owner cần review disagreement, evidence coverage, false rule match và LLM hallucination trên 9 PDF local trước khi chọn hướng.
+## Bàn giao Stamp Object Erase
+
+`red_mask` không còn được xem là bằng chứng dấu mộc đã bị xóa sạch. Review mới phải kiểm `stamp_object_mask` và `stamp_object_erased`. Default erase là `component_white_fill`; khi object overlap dark text trên ngưỡng, code giữ chữ bằng fallback mask-level và yêu cầu review. Post-OCR stamp filter không bị loại bỏ.
+
+Codex chỉ chạy synthetic tests, không chạy PDF, Surya inference, Local LLM hoặc cloud API. Project Owner cần so sánh residual và false removal bằng hai command balanced/inpaint và aggressive/white-fill trong runbook.

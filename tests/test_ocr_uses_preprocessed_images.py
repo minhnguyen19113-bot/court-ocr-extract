@@ -19,6 +19,7 @@ MODE_3 = {
     "text_enhance": "medium",
     "preprocess_profile": "balanced",
     "stamp_suppression": "balanced",
+    "stamp_erase_mode": "component_white_fill",
     "ocr_stamp_filter": "balanced",
 }
 
@@ -75,6 +76,7 @@ def test_surya_receives_final_preprocessed_image_and_writes_artifacts(tmp_path, 
     assert captured_options[0]["preprocess_profile"] == "balanced"
     assert result.metadata["ocr_input_source"] == "preprocessed"
     assert result.metadata["stamp_suppression"] == "balanced"
+    assert result.metadata["stamp_erase_mode"] == "component_white_fill"
     assert result.metadata["ocr_stamp_filter"] == "balanced"
     assert result.metadata["raw_line_count"] == 1
     assert result.metadata["filtered_line_count"] == 1
@@ -86,6 +88,8 @@ def test_surya_receives_final_preprocessed_image_and_writes_artifacts(tmp_path, 
     assert (preprocess_dir / "page_001_text_enhanced.png").exists()
     assert (preprocess_dir / "page_001_final_preprocessed.png").exists()
     assert (preprocess_dir / "page_001_stamp_suppression_mask.png").exists()
+    assert (preprocess_dir / "page_001_stamp_object_mask.png").exists()
+    assert (preprocess_dir / "page_001_stamp_object_erased.png").exists()
     assert (preprocess_dir / "page_001_ocr_input_stamp_suppressed.png").exists()
     assert (preprocess_dir / "page_001_metadata.json").exists()
     assert (ocr_dir / "page_001_ocr_input.png").exists()

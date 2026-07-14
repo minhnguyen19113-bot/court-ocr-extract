@@ -108,6 +108,7 @@ def _add_debug_preprocess(subparsers) -> None:
         choices=["off", "conservative", "balanced", "aggressive"],
         default="balanced",
     )
+    _add_stamp_erase_arg(parser)
     parser.set_defaults(func=cmd_debug_preprocess)
 
 
@@ -196,8 +197,17 @@ def _add_ocr_preprocess_args(parser: argparse.ArgumentParser) -> None:
         choices=["off", "conservative", "balanced", "aggressive"],
         default="balanced",
     )
+    _add_stamp_erase_arg(parser)
     parser.add_argument("--surya-docker-binary", default=None)
     parser.add_argument("--check-surya-runtime", action="store_true")
+
+
+def _add_stamp_erase_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--stamp-erase-mode",
+        choices=["mask", "component_white_fill", "component_inpaint", "local_background"],
+        default="component_white_fill",
+    )
 
 
 def _add_preview_extraction(subparsers) -> None:
@@ -311,6 +321,8 @@ def cmd_debug_preprocess(args) -> None:
             seal_removed = page_dir / "seal_removed.png"
             text_enhanced = page_dir / "text_enhanced.png"
             stamp_suppression_mask = page_dir / "stamp_suppression_mask.png"
+            stamp_object_mask = page_dir / "stamp_object_mask.png"
+            stamp_object_erased = page_dir / "stamp_object_erased.png"
             ocr_input_suppressed = page_dir / "ocr_input_stamp_suppressed.png"
             metadata_path = page_dir / "metadata.json"
             page_dir.mkdir(parents=True, exist_ok=True)
@@ -337,6 +349,9 @@ def cmd_debug_preprocess(args) -> None:
                     ocr_input_suppressed,
                     stamp_suppression_mask,
                     mode=args.stamp_suppression,
+                    erase_mode=args.stamp_erase_mode,
+                    stamp_object_mask_path=stamp_object_mask,
+                    stamp_object_erased_path=stamp_object_erased,
                 )
             )
             metadata["page_number"] = page.page_number
@@ -353,6 +368,10 @@ def cmd_debug_preprocess(args) -> None:
                 page_images.append(("text_enhanced", text_enhanced))
             if stamp_suppression_mask.exists():
                 page_images.append(("stamp_suppression_mask", stamp_suppression_mask))
+            if stamp_object_mask.exists():
+                page_images.append(("stamp_object_mask", stamp_object_mask))
+            if stamp_object_erased.exists():
+                page_images.append(("stamp_object_erased", stamp_object_erased))
             if ocr_input_suppressed.exists():
                 page_images.append(("ocr_input_stamp_suppressed", ocr_input_suppressed))
             page_images.extend([("final_preprocessed", after), ("before_after_compare", compare)])
@@ -735,6 +754,7 @@ def _ocr_preprocess_options(args) -> dict[str, Any] | None:
         "text_enhance": args.text_enhance,
         "preprocess_profile": args.preprocess_profile,
         "stamp_suppression": args.stamp_suppression,
+        "stamp_erase_mode": args.stamp_erase_mode,
         "ocr_stamp_filter": args.ocr_stamp_filter,
     }
 

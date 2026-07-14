@@ -57,6 +57,13 @@ def write_preprocess_review(
         "red_removed_ratio",
         "red_residual_ratio_estimate",
         "dark_text_overlap_ratio",
+        "stamp_suppression",
+        "stamp_object_count",
+        "stamp_object_mask_ratio",
+        "stamp_object_erase_mode",
+        "stamp_object_erased",
+        "stamp_object_dark_text_overlap_ratio",
+        "stamp_object_warnings",
         "text_enhance_mode",
         "foreground_before_enhance",
         "foreground_after_enhance",
@@ -138,6 +145,8 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                 for label, key in [
                     ("red mask", "red_mask_path"),
                     ("stamp suppression mask", "stamp_suppression_mask_path"),
+                    ("stamp object mask", "stamp_object_mask_path"),
+                    ("stamp object erased", "stamp_object_erased_path"),
                     ("black text protection mask", "black_text_protection_path"),
                     ("OCR input stamp suppressed", "ocr_input_stamp_suppressed_path"),
                 ]:
@@ -166,6 +175,9 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                 f"<h4>Lines</h4>{line_table}"
                 f"<p>Stamp suppression: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_suppression', 'off') if artifact else 'off')} | "
                 f"OCR stamp filter: {escape((artifact.get('ocr_input_metadata') or {}).get('ocr_stamp_filter', 'off') if artifact else 'off')}</p>"
+                f"<p>Stamp erase mode: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_object_erase_mode', 'mask') if artifact else 'mask')} | "
+                f"Objects: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_object_count', 0) if artifact else 0)} | "
+                f"Dark overlap: {escape((artifact.get('ocr_input_metadata') or {}).get('stamp_object_dark_text_overlap_ratio', 0) if artifact else 0)}</p>"
                 f"<p>Raw: {escape(artifact.get('raw_line_count', len(page.lines)) if artifact else len(page.lines))} | "
                 f"Filtered: {escape(artifact.get('filtered_line_count', len(page.lines)) if artifact else len(page.lines))} | "
                 f"Excluded stamp: {escape(artifact.get('excluded_stamp_line_count', 0) if artifact else 0)}</p>"

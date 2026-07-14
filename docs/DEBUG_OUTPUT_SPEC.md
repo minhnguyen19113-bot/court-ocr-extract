@@ -147,3 +147,11 @@ Must show:
 ## OCR stamp review
 
 Moi page co the co stamp suppression mask, OCR input stamp suppressed, raw/filtered/excluded lines JSON, raw/text markdown va metadata. OCR review HTML hien thi mode, line counts, excluded reason va overlap de kiem false removal.
+## Stamp object erase artifacts
+
+- `red_mask` là mask pixel-level, chỉ thể hiện các pixel đỏ đã detect và không bảo đảm xóa sạch residual xám/low-saturation.
+- `stamp_suppression_mask` là mask morphology ở mức nét.
+- `stamp_object_mask` gộp connected components thành vùng object mở rộng để phủ residual quanh dấu mộc.
+- `stamp_object_erased` là kết quả sau object-level erase; `ocr_input_stamp_suppressed` là ảnh cuối đưa vào OCR.
+- `black_text_protection_mask` chỉ dùng bảo vệ chữ thật và tính overlap, không phải output cuối.
+- Review phải hiển thị object count, erase mode, mask ratio, dark-text overlap và warnings.

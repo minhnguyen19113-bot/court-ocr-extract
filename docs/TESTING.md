@@ -131,3 +131,6 @@ Synthetic tests cover Docker resolver override, Windows Docker Desktop discovery
 ## Pre-content A/B synthetic tests
 
 Tests không đọc PDF thật và không gọi Local LLM thật. Coverage gồm heading có/không dấu, missing heading fallback, correction notice router, nhiều bị cáo, participants, evidence line IDs, rule/LLM conflict, high-confidence rule protection và JSON/Excel/HTML summary artifacts.
+## Stamp object erase synthetic tests
+
+Tests tạo ảnh/mask synthetic trong `tmp_path`: dấu đỏ có residual xám, red mask một phần, stamp overlap chữ đen, blank page và red noise nhỏ. Assertions kiểm object mask rộng hơn red mask, white-fill giảm residual hơn mask-only, overlap warning bảo toàn chữ và artifacts tồn tại. Passing tests không chứng minh threshold phù hợp với scan thật.

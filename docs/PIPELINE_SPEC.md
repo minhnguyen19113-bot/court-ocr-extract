@@ -1,5 +1,10 @@
 # Pipeline Spec
 
+## Component-level stamp erase
+
+Stamp cleanup chạy `red_mask -> connected components -> grouped/expanded stamp object -> dark-text overlap check -> object erase -> OCR input`. Nếu overlap dưới ngưỡng an toàn, `component_white_fill`, `component_inpaint` hoặc `local_background` có thể xử lý toàn object. Nếu overlap cao, pipeline không white-fill object, ghi `stamp_object_overlaps_dark_text`, fallback mask-level suppression và giữ post-OCR stamp filter.
+
+
 ## Pre-content extraction A/B
 
 Nhánh thử nghiệm nhận filtered OCR lines, route document và cắt phần trước `NỘI DUNG VỤ ÁN`. Mode A chạy rule-based trước rồi Local LLM chỉ fill/repair field chưa giải quyết; mode B chạy Local LLM trên cùng pre-content input. Cả hai phải giữ evidence/warnings và không dùng nội dung sau heading. Rule-only không phải output quyết định cuối.

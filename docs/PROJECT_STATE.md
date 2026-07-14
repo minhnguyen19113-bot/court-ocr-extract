@@ -1,5 +1,14 @@
 # Project State
 
+## Latest Stamp Object Erase Fix
+
+- Đã mở rộng pixel-level stamp suppression thành component/object-level erase.
+- CLI có `--stamp-erase-mode mask|component_white_fill|component_inpaint|local_background`, default `component_white_fill`.
+- Object candidates được lọc noise, gộp morphology, mở rộng bbox và chặn vùng giống toàn trang.
+- Dark-text overlap cao sẽ chặn white-fill, ghi warning và fallback mask-level; OCR stamp filter vẫn được giữ.
+- Tests chỉ dùng synthetic images; Codex chưa chạy PDF/OCR thật.
+
+
 ## Nhánh thử nghiệm pre-content A/B
 
 - Đã thêm A/B test `hybrid_rule_llm` so với `llm_only`, chỉ xử lý phần trước heading `NỘI DUNG VỤ ÁN` từ OCR cache đã lọc.
