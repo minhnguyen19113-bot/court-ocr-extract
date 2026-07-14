@@ -16,6 +16,11 @@ PARTICIPANT_ROLE_PATTERNS = (
     ("bi hai", "Bị hại"),
 )
 
+PARTICIPANT_NUMBER_PREFIX_RE = re.compile(r"^\s*(?:(?:\d+\.){2,}|\d+[.)])\s*")
+INFORMATIONAL_ANCHOR_WARNINGS = frozenset(
+    {"standalone_page_number_removed_from_defendant_blocks"}
+)
+
 DEFENDANT_BLOCKED_TERMS = (
     "qdxx",
     "quyet dinh",
@@ -56,6 +61,7 @@ def normalize_ocr_text(value: str) -> str:
         (r"\bTHÀNH\s+PHÔ\b", "THÀNH PHỐ"),
         (r"\bhọc\s+vẫn\b", "học vấn"),
         (r"\bcầm\s+đi\s+khỏi\s+nơi\s+cư\s+trú\b", "cấm đi khỏi nơi cư trú"),
+        (r"\btam\s+giam\b", "tạm giam"),
     )
     result = value
     for pattern, replacement in replacements:
@@ -72,8 +78,15 @@ def fold_text(value: str) -> str:
 
 def participant_role(text: str) -> str | None:
     folded = fold_text(text).lstrip("- ")
-    folded = re.sub(r"^\d+[.)]\s*", "", folded)
+    folded = PARTICIPANT_NUMBER_PREFIX_RE.sub("", folded)
     return next((role for anchor, role in PARTICIPANT_ROLE_PATTERNS if folded.startswith(anchor)), None)
+
+
+def has_reviewable_warnings(warnings: list[str]) -> bool:
+    return any(
+        warning and warning not in INFORMATIONAL_ANCHOR_WARNINGS
+        for warning in warnings
+    )
 
 
 def _metadata_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -85,7 +98,7 @@ def _metadata_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ),
         len(lines),
     )
-    return lines[: min(first_entity, 100)]
+    return lines[:first_entity]
 
 
 def _trial_panel_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -159,7 +172,6 @@ def _split_defendants(lines: list[dict[str, Any]], warnings: list[str]) -> list[
 def _split_participants(lines: list[dict[str, Any]], warnings: list[str]) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     current_role: str | None = None
-    heading_line: dict[str, Any] | None = None
     current_lines: list[dict[str, Any]] = []
     split_reason = ""
 
@@ -175,35 +187,45 @@ def _split_participants(lines: list[dict[str, Any]], warnings: list[str]) -> lis
 
     for line in lines:
         text = _text(line)
+        if _is_page_number(text):
+            continue
         role = participant_role(text)
         if role:
             flush()
             current_role = role
-            heading_line = line
-            value = _participant_inline_value(text, role)
+            value = participant_inline_value(text, role)
             if value:
                 current_lines = [line]
-                split_reason = "participant_role_inline"
+                split_reason = (
+                    "numbered_participant_role_inline"
+                    if _is_numbered_participant(text)
+                    else "participant_role_inline"
+                )
             continue
-        if not current_role or _is_page_number(text):
-            continue
-        if re.match(r"^\s*\d+[.)]\s*\S", text):
+        if _is_numbered_participant(text):
+            if not current_role:
+                continue
             flush()
-            current_lines = ([heading_line] if heading_line else []) + [line]
+            current_lines = [line]
             split_reason = "numbered_participant"
             continue
+        if not current_role:
+            continue
         folded = fold_text(text)
-        if current_lines and _is_participant_continuation(folded):
-            current_lines.append(line)
+        if _is_participant_continuation(folded):
+            if current_lines:
+                current_lines.append(line)
             continue
         if not current_lines:
-            current_lines = ([heading_line] if heading_line else []) + [line]
+            current_lines = [line]
             split_reason = "participant_after_heading"
             continue
-        if current_lines and _looks_like_person_line(text):
+        if _looks_like_person_line(text):
             flush()
-            current_lines = ([heading_line] if heading_line else []) + [line]
+            current_lines = [line]
             split_reason = "unnumbered_participant"
+            continue
+        current_lines.append(line)
     flush()
     if current_role and not blocks:
         warnings.append("participant_heading_without_person_block")
@@ -241,23 +263,22 @@ def _is_defendant_intro(text: str) -> bool:
     return bool(re.match(r"^doi voi(?:(?: cac)? bi cao)?(?:\s*:.*)?$", folded))
 
 
-def _participant_inline_value(text: str, role: str) -> str | None:
-    value = _value_after_colon(text)
-    if value:
-        return value
-    folded = fold_text(text)
-    role_folded = fold_text(role)
-    if folded == role_folded:
-        return None
-    return None
+def participant_inline_value(text: str, role: str) -> str | None:
+    value = strip_participant_numbering(normalize_ocr_text(text)).lstrip("- ")
+    role_pattern = r"\s+".join(re.escape(part) for part in role.split())
+    match = re.match(rf"^{role_pattern}\s*:?[\s-]*(.*)$", value, re.I)
+    if not match:
+        return _value_after_colon(value)
+    remainder = match.group(1).strip(" -.;:")
+    return remainder or None
 
 
 def _is_participant_continuation(folded: str) -> bool:
-    return any(
-        anchor in folded
-        for anchor in (
+    return folded.startswith(
+        (
             "dia chi", "noi cu tru", "thuong tru", "noi o hien nay", "cung dia chi",
-            "co mat", "vang mat", "sinh ngay", "sinh nam", "quan he", "ghi chu",
+            "co mat", "vang mat", "co don xin vang mat", "sinh ngay", "sinh nam",
+            "quan he", "ghi chu",
         )
     )
 
@@ -265,6 +286,15 @@ def _is_participant_continuation(folded: str) -> bool:
 def _looks_like_person_line(text: str) -> bool:
     folded = fold_text(text)
     return bool(folded and not _is_participant_continuation(folded) and len(text) <= 220)
+
+
+def _is_numbered_participant(text: str) -> bool:
+    match = PARTICIPANT_NUMBER_PREFIX_RE.match(text)
+    return bool(match and text[match.end():].strip())
+
+
+def strip_participant_numbering(text: str) -> str:
+    return PARTICIPANT_NUMBER_PREFIX_RE.sub("", text, count=1).strip()
 
 
 def _normalized_line(line: dict[str, Any]) -> dict[str, Any]:

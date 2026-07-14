@@ -1,5 +1,14 @@
 # Project State
 
+## Bản Vá Rule Anchor Metadata + Participant Case001
+
+- Metadata parser không còn giới hạn cứng 100 dòng trước entity đầu tiên và chỉ lấy token số ngay sau anchor, nên `case_acceptance_number`, `trial_decision_number`, `postponement_decision_number` không nuốt phần `ngày`/`theo` phía sau.
+- Trial panel giữ newline của juror trước khi split, vì vậy mỗi juror được xuất thành một dòng `TRIAL_PANEL` riêng.
+- Participant splitter nhận numbering phân cấp như `7.1.`, ưu tiên role dài trước `Bị hại`, tạo block mới cho inline role có person và chỉ gắn address/detail vào block gần nhất.
+- Defendant parser normalize `tam giam`, xử lý `Vợ con`, nối continuation address bắt đầu bằng `số` và bỏ prefix `hiện tại:`.
+- `standalone_page_number_removed_from_defendant_blocks` vẫn xuất trong `ANCHOR_WARNINGS` nhưng là informational và không tự bật `CASES.needs_review`.
+- Codex chỉ dùng OCR-line/OCR-cache synthetic. Project Owner vẫn phải chạy lại `case_001` trên VM để xác nhận output thật; Codex không đọc PDF/cache/output thật và không gọi LLM, Surya, Docker hay cloud.
+
 ## Baseline Rule Anchor + LLM Theo Từng Block
 
 - Hướng chính cho pre-content đã chuyển từ merge `hybrid_rule_llm` sang anchor/block deterministic: `rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`.
@@ -81,9 +90,9 @@ Last updated: 2026-07-14
 
 ## Current Phase
 
-RULE ANCHOR EXTRACTOR + PER-BLOCK LLM BASELINE.
+FIX RULE ANCHOR METADATA + PARTICIPANT SPLITTER CASE001.
 
-Task này thay default pre-content compare bằng anchor/parser deterministic và LLM theo từng entity block. Không thay Surya OCR runtime, không chạy dữ liệu thật và không gọi model thật.
+Task này chỉ vá parser/splitter còn sai sau review `case_001`; không thay architecture rule-anchor, Surya OCR runtime hoặc Local LLM runtime. Không chạy dữ liệu thật và không gọi model thật.
 
 ## Active Direction
 

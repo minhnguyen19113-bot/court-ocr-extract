@@ -2,7 +2,7 @@
 
 ## Rule anchor và per-block LLM tests
 
-Sáu test modules `test_rule_anchor_*.py` dùng OCR-line dictionaries/OCR cache synthetic và fake callable. Coverage gồm judgment number/date adjacency, OCR typo, QĐXX exclusion, single/multi defendant, page-number removal, one-line panel, participant role context, validators, document routing, strategy defaults, LLM cap và Excel/HTML artifacts. Tests không đọc PDF/cache thật và không gọi Surya, Docker, Local LLM hoặc cloud.
+Mười một test modules `test_rule_anchor_*.py` với 23 cases dùng OCR-line dictionaries/OCR cache synthetic và fake callable. Coverage gồm exact metadata number tokens sau header dài, judgment number/date adjacency, OCR typo, QĐXX exclusion, single/multi defendant, page-number warning severity, one-line/newline panel, hierarchical participant numbering/inline roles, defendant spouse/children/address continuation, validators, document routing, strategy defaults, LLM cap và Excel/HTML artifacts. Tests không đọc PDF/cache thật và không gọi Surya, Docker, Local LLM hoặc cloud.
 
 ## Local LLM budget/chunk/report tests
 

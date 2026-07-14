@@ -34,6 +34,8 @@ Stamp cleanup chạy `red_mask -> connected components -> grouped/expanded stamp
 
 Nhánh chính nhận filtered OCR lines, route document và chỉ dùng phần trước `NỘI DUNG VỤ ÁN`. `rule_anchor_only` parse deterministic toàn bộ; `llm_per_block` dùng rule cho metadata/panel và model cho từng entity block; `rule_then_llm_per_block` chỉ gọi model khi entity thiếu field cốt lõi hoặc validator báo lỗi. Mọi block giữ `line_ids`, raw text, split reason, warnings và evidence. `hybrid_rule_llm`/`llm_only` vẫn có thể gọi rõ để benchmark legacy nhưng không phải default.
 
+Metadata case-number fields chỉ chứa token `number/year/suffix` ngay sau anchor và metadata region kéo dài đến entity đầu tiên, không có line cap tùy ý. Participant line có numbering phân cấp hoặc inline role/person tạo block mới; role được match longest-first và address/detail chỉ thuộc block gần nhất. Juror newline tạo nhiều row. Known standalone page-number removal warning được export nhưng không tự kích hoạt case review.
+
 ## Stamp suppression contract
 
 Khi dung preprocessed input, tao `stamp_suppression_mask` va `ocr_input_stamp_suppressed`; post-OCR filter giu raw lines, filtered lines va excluded lines co `reason`, `stamp_overlap_ratio`, `dark_text_overlap_ratio`. Khong hard-code noi dung dau moc va khong fallback sang OCR backend khac.

@@ -8,7 +8,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from court_ocr_extract.extractors.local_llm_extractor import LocalLLMExtractor
-from court_ocr_extract.extractors.pre_content_anchor_segmenter import segment_pre_content_anchors
+from court_ocr_extract.extractors.pre_content_anchor_segmenter import (
+    has_reviewable_warnings,
+    segment_pre_content_anchors,
+)
 from court_ocr_extract.extractors.pre_content_schema import (
     DEFENDANT_FIELDS,
     PARTICIPANT_FIELDS,
@@ -123,7 +126,7 @@ def run_rule_anchor_strategy(
     )
     output["status"] = _strategy_status(strategy, output["llm_status"])
     output["needs_review"] = bool(
-        output["warnings"]
+        has_reviewable_warnings(output["warnings"])
         or any(entity.get("needs_review") for entity in output["defendants"] + output["participants"])
     )
     output["anchor_segments"] = anchor

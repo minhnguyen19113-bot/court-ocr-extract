@@ -6,6 +6,8 @@ HTML phải hiển thị preflight/runtime, provider, model, base URL, context w
 
 Workbook compare có review sheets `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `LLM_STATUS`; JSON blob chỉ được giữ trong debug sheets `FIELD_LONG`, `EVIDENCE_LINES`, `RAW_JSON`, không đặt trong sheet review chính. HTML theo case phải hiển thị metadata/trial-panel lines, defendant/participant blocks, line IDs, split reasons, validator warnings, strategy outputs và LLM calls.
 
+`standalone_page_number_removed_from_defendant_blocks` phải vẫn xuất trong `ANCHOR_WARNINGS`, nhưng riêng warning informational này không được đặt `CASES.needs_review=true`. Các warning khác và entity validator failures vẫn giữ semantics review hiện tại.
+
 ## Marker và early-stop metadata
 
 OCR review phải hiển thị marker found/page/matched text/confidence, early-stop triggered, pages processed/total, pages skipped và reason. Marker line được gắn `marker_match=true` và highlight trong HTML. Cache/manifest phải giữ `metadata.marker`, `metadata.early_stop`, `pages_total` và `text_before_marker`; raw page OCR vẫn được giữ để review dù canonical extraction text đã trim.

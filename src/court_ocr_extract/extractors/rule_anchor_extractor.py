@@ -6,8 +6,11 @@ from typing import Any
 from court_ocr_extract.extractors.pre_content_anchor_segmenter import (
     DEFENDANT_BLOCKED_TERMS,
     fold_text,
+    has_reviewable_warnings,
     normalize_ocr_text,
+    participant_inline_value,
     participant_role,
+    strip_participant_numbering,
 )
 from court_ocr_extract.extractors.pre_content_schema import (
     DEFENDANT_FIELDS,
@@ -18,6 +21,14 @@ from court_ocr_extract.extractors.pre_content_schema import (
 
 DATE_RE = re.compile(r"\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b")
 JUDGMENT_NUMBER_RE = re.compile(r"Bản\s+án\s+số\s*[:.]?\s*([0-9]{1,4}/[0-9]{4}/HS-?ST)\b", re.I)
+CASE_NUMBER_TOKEN_RE = re.compile(
+    r"([0-9]{1,4}\s*/\s*[0-9]{4}\s*/\s*[0-9A-Za-zÀ-ỹĐđ-]+)",
+    re.I,
+)
+PRESENCE_SUFFIX_RE = re.compile(
+    r"\s*[-–—]?\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)\s*$",
+    re.I,
+)
 SHORT_FIELDS = ("gender", "nationality", "ethnicity", "religion", "occupation")
 
 PANEL_LABELS = (
@@ -59,7 +70,7 @@ def extract_rule_anchor_output(anchor: dict[str, Any]) -> dict[str, Any]:
     if not output["trial_panel"]["presiding_judge"]:
         output["warnings"].append("missing:trial_panel.presiding_judge")
     output["needs_review"] = bool(
-        output["warnings"]
+        has_reviewable_warnings(output["warnings"])
         or any(item.get("needs_review") for item in output["defendants"] + output["participants"])
     )
     output.update(
@@ -88,6 +99,8 @@ def parse_defendant_block(block: dict[str, Any]) -> dict[str, Any]:
     )
     result["full_name"] = _defendant_name(raw)
     _extract_defendant_labeled_values(raw, result)
+    _parse_spouse_children(raw, result)
+    _parse_current_address(raw, result)
 
     parent_match = re.search(r"con\s+ông\s+(.+?)\s+và\s+bà\s+([^,;.\n]+)", raw, re.I)
     if parent_match:
@@ -125,7 +138,8 @@ def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
         needs_review=False,
         warnings=[],
     )
-    result["full_name"] = _participant_name(raw, role)
+    primary_line = _participant_primary_line(raw, role)
+    result["full_name"] = _participant_name(primary_line)
     birth = re.search(r"\b(?:sinh\s+ngày\s+)?(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b|\bsinh\s+năm\s+(\d{4})\b", raw, re.I)
     if birth:
         result["birth_date_or_year"] = _normalize_date(birth.group(1)) if birth.group(1) else birth.group(2)
@@ -140,6 +154,12 @@ def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
     if relationship:
         result["relationship"] = _clean_value(relationship.group(1))
         result["relationship_or_note"] = result["relationship"]
+    inline_note = _participant_relationship_note(primary_line)
+    if inline_note:
+        existing = result.get("relationship_or_note")
+        combined = "; ".join(dict.fromkeys(value for value in (existing, inline_note) if value))
+        result["relationship"] = combined
+        result["relationship_or_note"] = combined
     presence_line = next(
         (line for line in raw.splitlines() if "co mat" in fold_text(line) or "vang mat" in fold_text(line)),
         None,
@@ -201,7 +221,10 @@ def _extract_trial_panel(lines: list[dict[str, Any]], output: dict[str, Any]) ->
             active_field = None
             for index, (_, end, field) in enumerate(matches):
                 next_start = matches[index + 1][0] if index + 1 < len(matches) else len(text)
-                value = _clean_panel_value(text[end:next_start])
+                value = _clean_panel_value(
+                    text[end:next_start],
+                    preserve_newlines=field == "jurors",
+                )
                 if value:
                     _set_panel(output, field, value, line)
                 else:
@@ -232,6 +255,42 @@ def _extract_defendant_labeled_values(raw: str, result: dict[str, Any]) -> None:
             result[field] = value
 
 
+def _parse_spouse_children(raw: str, result: dict[str, Any]) -> None:
+    combined = re.search(r"Vợ\s*[,/]?\s*con\s*[:：]\s*([^\n]+)", raw, re.I)
+    if not combined:
+        return
+    value = combined.group(1).strip(" .;,")
+    spouse = re.search(
+        r"\b(chưa\s+có\s+vợ|chưa\s+có\s+chồng|có\s+vợ|có\s+chồng)\b",
+        value,
+        re.I,
+    )
+    children = re.search(
+        r"\b(\d{1,2}\s+con(?:\s+sinh\s+năm\s+\d{4})?)\b",
+        value,
+        re.I,
+    )
+    result["spouse"] = _clean_value(spouse.group(1)) if spouse else None
+    result["children"] = _clean_value(children.group(1)) if children else None
+
+
+def _parse_current_address(raw: str, result: dict[str, Any]) -> None:
+    lines = raw.splitlines()
+    pattern = re.compile(
+        r"^(?:Nơi\s+ở(?:\s+hiện\s+tại|\s+hiện\s+nay)?|Chỗ\s+ở)\s*[:：]\s*(.*)$",
+        re.I,
+    )
+    for index, line in enumerate(lines):
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        value = re.sub(r"^\s*hiện\s+tại\s*[:：]\s*", "", match.group(1), flags=re.I)
+        if index + 1 < len(lines) and re.match(r"^\s*số\s+\S", lines[index + 1], re.I):
+            value = f"{value.rstrip()} {lines[index + 1].strip()}"
+        result["current_address"] = _clean_value(value)
+        return
+
+
 def _defendant_name(raw: str) -> str | None:
     for line in raw.splitlines():
         candidate = re.sub(r"^\s*\d+[.)]\s*", "", line).strip()
@@ -243,22 +302,47 @@ def _defendant_name(raw: str) -> str | None:
     return None
 
 
-def _participant_name(raw: str, role: str | None) -> str | None:
+def _participant_primary_line(raw: str, role: str | None) -> str | None:
     for line in raw.splitlines():
-        text = re.sub(r"^\s*\d+[.)]\s*", "", line).strip()
+        text = strip_participant_numbering(line).strip()
         detected_role = participant_role(text)
         if detected_role:
-            parts = re.split(r"[:：]", text, maxsplit=1)
-            if len(parts) == 1 or not parts[1].strip():
-                continue
-            text = parts[1].strip()
-        folded = fold_text(text)
-        if any(anchor in folded for anchor in ("dia chi", "noi cu tru", "thuong tru", "noi o hien nay", "cung dia chi", "co mat", "vang mat", "quan he", "ghi chu")):
+            text = participant_inline_value(text, detected_role) or ""
+        if not text or _is_participant_detail_line(text):
             continue
-        candidate = re.split(r"[,;]\s*(?:sinh|dia chi|noi cu tru|thuong tru|co mat|vang mat)", text, maxsplit=1, flags=re.I)[0].strip(" ,;:-")
-        if candidate and fold_text(candidate) != fold_text(role or ""):
-            return candidate
+        return text
     return None
+
+
+def _participant_name(primary_line: str | None) -> str | None:
+    if not primary_line:
+        return None
+    candidate = PRESENCE_SUFFIX_RE.sub("", primary_line).strip(" ,;:-")
+    candidate = re.split(r"\s*\([^)]*\)", candidate, maxsplit=1)[0]
+    candidate = re.split(r"[,;]", candidate, maxsplit=1)[0]
+    candidate = re.split(r"\s+sinh\s+(?:ngày|năm)\b", candidate, maxsplit=1, flags=re.I)[0]
+    return _clean_value(candidate)
+
+
+def _participant_relationship_note(primary_line: str | None) -> str | None:
+    if not primary_line:
+        return None
+    without_presence = PRESENCE_SUFFIX_RE.sub("", primary_line).strip(" ,;:-")
+    notes = [_clean_value(value) for value in re.findall(r"\(([^)]+)\)", without_presence)]
+    if "," in without_presence:
+        tail = _clean_value(without_presence.split(",", 1)[1])
+        if tail and not fold_text(tail).startswith(("sinh ngay", "sinh nam")):
+            notes.append(tail)
+    return "; ".join(dict.fromkeys(note for note in notes if note)) or None
+
+
+def _is_participant_detail_line(text: str) -> bool:
+    return fold_text(text).startswith(
+        (
+            "dia chi", "noi cu tru", "thuong tru", "noi o hien nay", "cung dia chi",
+            "co mat", "vang mat", "co don xin vang mat", "quan he", "ghi chu",
+        )
+    )
 
 
 def validate_defendant_entity(result: dict[str, Any]) -> dict[str, Any]:
@@ -334,23 +418,35 @@ def _set_panel(output: dict[str, Any], field: str, value: str, line: dict[str, A
         )
 
 
-def _clean_panel_value(value: str) -> str | None:
+def _clean_panel_value(value: str, *, preserve_newlines: bool = False) -> str | None:
     value = re.sub(r"^[\s:;,.\-]+", "", value)
-    value = re.sub(r"\s+", " ", value).strip(" ;,.-")
+    if preserve_newlines:
+        value = "\n".join(
+            re.sub(r"[ \t]+", " ", line).strip(" ;,.-")
+            for line in value.splitlines()
+            if line.strip(" ;,.-")
+        )
+    else:
+        value = re.sub(r"\s+", " ", value).strip(" ;,.-")
     return value or None
 
 
 def _split_panel_values(value: str) -> list[str]:
     return [
-        re.sub(r"^\s*\d+[.)]\s*", "", item).strip()
-        for item in re.split(r"[;]|,(?=\s*(?:Ông|Bà|[A-ZĐ]))", value)
+        re.sub(r"^\s*\d+[.)]\s*", "", re.sub(r"\s+", " ", item)).strip()
+        for item in re.split(r"[\n;]|,(?=\s*(?:Ông|Bà|[A-ZĐ]))", value)
         if item.strip()
     ]
 
 
 def _number_after_anchor(text: str, anchor_pattern: str) -> str | None:
-    match = re.search(anchor_pattern + r"\s*[:.]?\s*([0-9A-Za-zÀ-ỹĐđ/.-]+)", text, re.I)
-    return match.group(1).strip(" .;,:") if match else None
+    anchor = re.search(anchor_pattern + r"\s*[:.]?\s*", text, re.I)
+    if not anchor:
+        return None
+    number = CASE_NUMBER_TOKEN_RE.match(text, anchor.end())
+    if not number:
+        return None
+    return re.sub(r"\s*/\s*", "/", number.group(1)).strip(" .;,:")
 
 
 def _date_after_day_anchor(text: str) -> str | None:

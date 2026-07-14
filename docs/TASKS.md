@@ -1,5 +1,16 @@
 # Tasks
 
+## FIX RULE ANCHOR METADATA + PARTICIPANT SPLITTER CASE001
+
+- [x] Bỏ metadata line cap gây mất anchor phía cuối header và chỉ capture token số thụ lý/quyết định.
+- [x] Split juror chứa newline thành các dòng `TRIAL_PANEL` riêng.
+- [x] Sửa participant splitter cho numbering `7.x.`, inline role/person, longest-role-first và address/detail theo block gần nhất.
+- [x] Sửa participant name, presence và relationship/note cho guardian/lawyer lines.
+- [x] Sửa `tam giam`, `Vợ con`, address continuation và prefix `hiện tại:` trong defendant parser.
+- [x] Phân loại `standalone_page_number_removed_from_defendant_blocks` là informational nhưng vẫn export `ANCHOR_WARNINGS`.
+- [x] Thêm năm regression test modules synthetic; 23/23 test rule-anchor liên quan đã qua.
+- [ ] Project Owner chạy lại `case_001` theo thứ tự rule-only rồi rule + LLM và xác nhận workbook/HTML thật.
+
 ## RULE ANCHOR EXTRACTOR + PER-BLOCK LLM BASELINE
 
 - [x] Thêm `rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`; giữ strategy legacy để compare khi gọi rõ.
@@ -8,7 +19,7 @@
 - [x] Sửa document router nhận bản án thiếu/mất OCR judgment number và ưu tiên correction notice.
 - [x] Giới hạn Local LLM theo từng block ở 6000 ký tự/512 output token; không gửi full pre-content.
 - [x] Tổng quát hóa compare runner, thêm `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS` và HTML anchor review.
-- [x] Thêm sáu test modules, 15 tình huống contract và fake LLM; không có real-data/model call.
+- [x] Có 11 test modules, 23 tình huống rule-anchor contract/fake LLM; không có real-data/model call.
 - [ ] Project Owner chạy 1 case trên VM, review anchor/validator/structured output rồi mới chạy 3 case.
 
 ## LOCAL LLM CONTEXT BUDGET + CHUNKED EXTRACTION FIX

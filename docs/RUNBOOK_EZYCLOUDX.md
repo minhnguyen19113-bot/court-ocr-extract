@@ -346,33 +346,32 @@ Khong sua `.venv\Lib\site-packages` thu cong. Project tu resolve Docker qua `SUR
 OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, excluded lines, suppression mask va OCR input trong HTML review. Neu balanced con doc dau moc, review aggressive rieng; khong auto-correct ten nguoi hay noi dung bang heuristic.
 ## Chạy pre-content rule anchor trên VM
 
-Đặt PDF local tại `data\test_pdfs\pre_content_9` và dùng OCR cache early-stop đã duyệt. Chạy 1 case trước:
+Đặt PDF local tại `data\test_pdfs\pre_content_9` và dùng OCR cache early-stop đã duyệt. Sau bản vá metadata/participant, chạy `rule_anchor_only` cho 1 case trước:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
   --input-dir data\test_pdfs\pre_content_9 `
   --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
-  --output-dir outputs\pre_content_rule_anchor_check_1 `
+  --output-dir outputs\pre_content_rule_anchor_only_check_1_fix `
+  --strategies rule_anchor_only `
+  --limit 1 `
+  --open
+```
+
+Review exact metadata tokens, hai dòng juror, bốn participant blocks/roles/names, defendant spouse/children/detention/address và warning severity trong `CASES`/`ANCHOR_WARNINGS`. Chỉ khi rule-only đạt mới chạy rule + LLM:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
+  --input-dir data\test_pdfs\pre_content_9 `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
+  --output-dir outputs\pre_content_rule_anchor_check_1_fix `
   --strategies rule_anchor_only,rule_then_llm_per_block `
   --require-llm `
   --limit 1 `
   --open
 ```
 
-Review `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, judgment date, trial panel, defendant/participant roles, validator warnings và `LLM_STATUS`. Chỉ khi case đầu đạt mới đổi output thành `outputs\pre_content_rule_anchor_check_3` và `--limit 3`. Không commit PDF/output; correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark. Muốn đối chiếu lịch sử mới truyền rõ `--strategies hybrid_rule_llm,llm_only`.
-
-Sau khi case đầu đạt, chạy 3 case:
-
-```powershell
-.\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
-  --input-dir data\test_pdfs\pre_content_9 `
-  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
-  --output-dir outputs\pre_content_rule_anchor_check_3 `
-  --strategies rule_anchor_only,rule_then_llm_per_block `
-  --require-llm `
-  --limit 3 `
-  --open
-```
+Sau khi cả hai strategy đạt trên case đầu mới tăng `--limit 3` với output directory mới. Không commit PDF/output; correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark. Muốn đối chiếu lịch sử mới truyền rõ `--strategies hybrid_rule_llm,llm_only`.
 ## Review stamp object erase
 
 `red_mask` chỉ chứng minh detector đã bắt pixel đỏ; residual xám vẫn có thể còn ngoài mask. Component/object erase chỉ dành cho thử nghiệm visual có chủ đích, không phải mode vận hành mặc định. Safe OCR phải dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced` để giảm nguy cơ xóa chữ thật.

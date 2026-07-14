@@ -1,5 +1,11 @@
 # Codex Handoff
 
+## Bàn Giao Bản Vá Rule Anchor Case001
+
+Code đã có regression contract cho ba metadata case-number tokens, juror newline, bốn participant blocks theo cấu trúc `7.x.`, các field defendant nhỏ và informational warning severity. Không rebuild architecture và không thay Local LLM/Surya/Excel writer.
+
+Project Owner cần chạy lại `case_001` bằng `rule_anchor_only` trước. Kiểm `case_acceptance_number`, `postponement_decision_number`, hai dòng `juror`, bốn participant đúng role/name, `Vợ con`, detention/address và `CASES.needs_review`. Chỉ khi rule-only đạt mới chạy `rule_then_llm_per_block --require-llm`. Codex chưa đọc output thật hoặc gọi runtime thật.
+
 ## Bàn giao Rule Anchor Baseline
 
 Pre-content default hiện là `rule_anchor_only,rule_then_llm_per_block`. Anchor segmenter cắt metadata/trial-panel/defendant/participant blocks; deterministic parser sở hữu metadata, trial panel và entity fields; Local LLM chỉ repair từng block cần thiết với cap 6000 ký tự/512 token.

@@ -1,12 +1,21 @@
 # AI Changelog
 
+## 2026-07-14 - Fix Rule Anchor Metadata + Participant Splitter Case001
+
+- Bỏ metadata line cap và giới hạn các field số thụ lý/đưa ra xét xử/hoãn phiên tòa về đúng token sau anchor.
+- Tách juror theo newline để workbook có từng dòng `juror` riêng.
+- Viết lại participant boundary cho numbering phân cấp và inline role/person; parse đúng name, presence, guardian note và lawyer note theo block.
+- Sửa defendant `tam giam`, `Vợ con`, address continuation và prefix `hiện tại:`.
+- Giữ standalone page-number warning trong `ANCHOR_WARNINGS` nhưng không coi riêng warning này là lý do review.
+- Thêm năm regression test modules synthetic; không đọc PDF/cache/output thật hoặc gọi LLM, Surya, Docker, cloud.
+
 ## 2026-07-14 - Rule Anchor Extractor + LLM Theo Từng Block
 
 - Thêm anchor segmenter và deterministic parser cho metadata, trial panel, defendant, participant cùng evidence line IDs/validators.
 - Thêm `rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`; đổi default compare sang rule-anchor và giữ `hybrid_rule_llm`/`llm_only` làm legacy benchmark.
 - LLM mới chỉ nhận từng entity block, cap input 6000 ký tự và output 512 token; không gửi full pre-content.
 - Tổng quát hóa JSON/Excel/HTML compare, thêm `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS` và anchor review theo case.
-- Thêm synthetic/fake-LLM tests cho 15 tình huống; không đọc PDF thật hoặc gọi Surya/Docker/LLM/cloud thật.
+- Bộ rule-anchor hiện có 23 tình huống synthetic/fake-LLM; không đọc PDF thật hoặc gọi Surya/Docker/LLM/cloud thật.
 
 ## 2026-07-14 - Local LLM Context Budget + Chunked Extraction Fix
 
