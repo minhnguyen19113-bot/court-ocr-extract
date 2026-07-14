@@ -1,6 +1,6 @@
 # Observability Plan
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Mục tiêu
 
@@ -14,8 +14,8 @@ Pipeline cần đủ quan sát để reviewer biết file nào thành công, fil
 | Preprocess | transform applied, before/after artifact path, warning count. |
 | OCR | pages processed, OCR line count, bbox coverage, low-confidence count. |
 | Marker | marker found yes/no, marker page, missing marker count. |
-| Extraction | JSON valid, participant count, missing evidence count. |
-| Local LLM | Preflight, model/base URL, context budget, chunk count, request/response status, error type và duration; không log prompt/OCR text. |
+| Extraction | Strategy, anchor block count/type, split warning count, validator warning count, JSON valid, participant count, missing evidence count. |
+| Local LLM | Preflight, model/base URL, block ID/type, context budget, request/response status, error type và duration; không log prompt/OCR text. |
 | Validation | warning code counts, evidence mismatch count. |
 | Excel/QA | row count, rows needing review, output path. |
 
@@ -36,6 +36,8 @@ Mỗi run production nên có manifest riêng:
 - output locations.
 - warning summary.
 - acceptance status.
+
+Pre-content compare phải giữ aggregate count cho `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, số block cần repair, số LLM call thành công/lỗi và strategy. Safe log không chứa `raw_block`, raw lines hoặc extracted values.
 
 TOOLKIT-1 prediction manifest bổ sung safe run metadata:
 

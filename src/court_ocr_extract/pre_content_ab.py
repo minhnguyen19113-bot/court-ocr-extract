@@ -9,15 +9,23 @@ from openpyxl import Workbook
 
 from court_ocr_extract.extractors.hybrid_pre_content_extractor import HybridPreContentExtractor
 from court_ocr_extract.extractors.llm_only_pre_content_extractor import LLMCallable, LLMOnlyPreContentExtractor
-from court_ocr_extract.extractors.pre_content_schema import flatten_output
+from court_ocr_extract.extractors.pre_content_anchor_segmenter import segment_pre_content_anchors
+from court_ocr_extract.extractors.pre_content_schema import empty_pre_content_output, flatten_output
 from court_ocr_extract.extractors.pre_content_segmenter import segment_pre_content
+from court_ocr_extract.extractors.rule_anchor_extractor import extract_rule_anchor_output
+from court_ocr_extract.extractors.rule_anchor_strategies import (
+    RULE_ANCHOR_STRATEGIES,
+    run_rule_anchor_strategy,
+)
 from court_ocr_extract.extractors.rule_based_pre_content_extractor import extract_pre_content_rules
 from court_ocr_extract.ocr_cache import OCRCacheRecord
 from court_ocr_extract.settings import PipelineSettings
 from court_ocr_extract.visual_debug import escape, write_html
 
 
-STRATEGIES = ("hybrid_rule_llm", "llm_only")
+LEGACY_STRATEGIES = ("hybrid_rule_llm", "legacy_hybrid_rule_llm", "llm_only")
+STRATEGIES = LEGACY_STRATEGIES + RULE_ANCHOR_STRATEGIES
+DEFAULT_STRATEGIES = ("rule_anchor_only", "rule_then_llm_per_block")
 
 CASES_HEADERS = (
     "case_id", "source_file", "document_type", "ocr_status", "marker_found", "marker_page",
@@ -27,23 +35,23 @@ CASES_HEADERS = (
     "prosecutor", "needs_review", "warnings",
 )
 DEFENDANTS_HEADERS = (
-    "case_id", "defendant_index", "full_name", "alias", "birth_date_or_year", "birth_place",
-    "permanent_address", "current_address", "detention_status", "presence_status", "occupation",
-    "education", "nationality", "ethnicity", "religion", "gender", "father_name", "mother_name",
-    "spouse", "children", "criminal_record", "evidence_line_ids", "evidence_text", "needs_review",
-    "warnings",
+    "case_id", "strategy", "defendant_index", "full_name", "alias", "birth_date_or_year",
+    "birth_place", "permanent_address", "current_address", "detention_status", "presence_status",
+    "occupation", "education", "nationality", "ethnicity", "religion", "gender", "father_name",
+    "mother_name", "spouse", "children", "criminal_record", "evidence_line_ids", "evidence_text",
+    "needs_review", "warnings",
 )
 PARTICIPANTS_HEADERS = (
-    "case_id", "participant_index", "role", "full_name", "birth_date_or_year", "address",
-    "presence_status", "relationship_or_note", "evidence_line_ids", "evidence_text", "needs_review",
-    "warnings",
+    "case_id", "strategy", "participant_index", "role", "full_name", "birth_date_or_year",
+    "address", "presence_status", "relationship_or_note", "evidence_line_ids", "evidence_text",
+    "needs_review", "warnings",
 )
 TRIAL_PANEL_HEADERS = (
-    "case_id", "role", "name", "title_or_position", "organization", "evidence_line_ids",
-    "evidence_text", "warnings",
+    "case_id", "strategy", "role", "name", "title_or_position", "organization",
+    "evidence_line_ids", "evidence_text", "warnings",
 )
 LLM_STATUS_HEADERS = (
-    "case_id", "strategy", "chunk_name", "llm_required", "llm_available",
+    "case_id", "strategy", "chunk_name", "block_type", "llm_required", "llm_available",
     "llm_actually_called", "provider", "model", "base_url", "context_window", "input_chars",
     "input_tokens_estimated", "max_output_tokens", "budget_ok", "truncated", "chunked",
     "request_ok", "response_ok", "error_type", "error_message", "duration_ms",
@@ -62,54 +70,96 @@ def run_pre_content_ab_test(
     llm_available: bool | None = None,
 ) -> dict[str, Any]:
     selected = records[:limit] if limit is not None else records
-    requested = strategies or list(STRATEGIES)
+    requested = list(strategies or DEFAULT_STRATEGIES)
     unknown = [name for name in requested if name not in STRATEGIES]
     if unknown:
         raise ValueError(f"Unsupported pre-content strategies: {', '.join(unknown)}")
+    if len(requested) < 1:
+        raise ValueError("At least one pre-content strategy is required.")
+
     available = True if llm_available is None else llm_available
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     hybrid = HybridPreContentExtractor(settings, llm_callable=llm_callable)
     llm_only = LLMOnlyPreContentExtractor(settings, llm_callable=llm_callable)
-    cases = []
+    cases: list[dict[str, Any]] = []
+
     for record in selected:
         case_dir = output_dir / "cases" / record.case_id
         case_dir.mkdir(parents=True, exist_ok=True)
         segment = segment_pre_content(record.result)
-        rule = extract_pre_content_rules(segment)
+        anchor = segment_pre_content_anchors(segment, case_id=record.case_id)
+        legacy_rule = extract_pre_content_rules(segment)
         correction = segment["document_type"] == "correction_notice"
-        hybrid_output = None
-        llm_output = None
-        if correction:
-            hybrid_output = _skipped_output(segment, "correction_notice_not_in_judgment_benchmark")
-            llm_output = _skipped_output(segment, "correction_notice_not_in_judgment_benchmark")
-        elif not available:
-            if "hybrid_rule_llm" in requested:
-                hybrid_output = _hybrid_without_llm(rule, llm_preflight)
-            if "llm_only" in requested:
-                llm_output = _llm_unavailable_output(segment, llm_preflight)
-        else:
-            if "hybrid_rule_llm" in requested:
-                hybrid_output = hybrid.extract(segment, case_id=record.case_id)
-            if "llm_only" in requested:
-                llm_output = llm_only.extract(segment, case_id=record.case_id)
-        hybrid_output = hybrid_output or _skipped_output(segment, "strategy_not_requested")
-        llm_output = llm_output or _skipped_output(segment, "strategy_not_requested")
-        compare = compare_outputs(hybrid_output, llm_output)
-        metrics = _case_metrics(segment, hybrid_output, llm_output, compare)
+        outputs: dict[str, dict[str, Any]] = {}
+
+        for strategy in requested:
+            if correction:
+                outputs[strategy] = _skipped_output(
+                    segment,
+                    strategy,
+                    "correction_notice_not_in_judgment_benchmark",
+                )
+            elif strategy == "rule_anchor_only":
+                outputs[strategy] = _rule_anchor_output(anchor, record.case_id, strategy)
+            elif strategy in RULE_ANCHOR_STRATEGIES:
+                if available:
+                    outputs[strategy] = run_rule_anchor_strategy(
+                        segment,
+                        case_id=record.case_id,
+                        strategy=strategy,
+                        settings=settings,
+                        llm_callable=llm_callable,
+                    )
+                else:
+                    outputs[strategy] = _anchor_llm_unavailable(
+                        anchor,
+                        record.case_id,
+                        strategy,
+                        llm_preflight,
+                    )
+            elif strategy in {"hybrid_rule_llm", "legacy_hybrid_rule_llm"}:
+                if available:
+                    output = hybrid.extract(segment, case_id=record.case_id)
+                    output["strategy"] = strategy
+                    outputs[strategy] = output
+                else:
+                    outputs[strategy] = _hybrid_without_llm(
+                        legacy_rule,
+                        llm_preflight,
+                        strategy=strategy,
+                    )
+            elif strategy == "llm_only":
+                outputs[strategy] = (
+                    llm_only.extract(segment, case_id=record.case_id)
+                    if available
+                    else _llm_unavailable_output(segment, llm_preflight, strategy=strategy)
+                )
+                outputs[strategy]["strategy"] = strategy
+
+        left_name = requested[0]
+        right_name = requested[1] if len(requested) > 1 else requested[0]
+        compare = compare_strategy_outputs(
+            outputs[left_name],
+            outputs[right_name],
+            left_strategy=left_name,
+            right_strategy=right_name,
+        )
+        metrics = _case_metrics(segment, outputs, compare, left_name, right_name)
         case = {
             "case_id": record.case_id,
             "segmenter": segment,
+            "anchor_segments": anchor,
             "ocr": _ocr_summary(record),
-            "rule_output": rule,
-            "hybrid_output": hybrid_output,
-            "llm_only_output": llm_output,
+            "rule_output": legacy_rule,
+            "strategy_outputs": outputs,
             "compare": compare,
             "metrics": metrics,
             "benchmark_included": not correction and segment["document_type"] == "judgment_criminal_first_instance",
         }
         _write_case(case_dir, case)
         cases.append(case)
+
     summary = _summary(cases, requested, llm_preflight)
     _write_json(output_dir / "compare_summary.json", summary)
     _write_workbook(output_dir / "compare_summary.xlsx", cases, summary)
@@ -117,11 +167,17 @@ def run_pre_content_ab_test(
     return summary
 
 
-def compare_outputs(hybrid: dict[str, Any], llm_only: dict[str, Any]) -> dict[str, Any]:
-    left, right = flatten_output(hybrid), flatten_output(llm_only)
+def compare_strategy_outputs(
+    left: dict[str, Any],
+    right: dict[str, Any],
+    *,
+    left_strategy: str,
+    right_strategy: str,
+) -> dict[str, Any]:
+    left_flat, right_flat = flatten_output(left), flatten_output(right)
     rows = []
-    for field in sorted(set(left) | set(right)):
-        left_value, right_value = left.get(field), right.get(field)
+    for field in sorted(set(left_flat) | set(right_flat)):
+        left_value, right_value = left_flat.get(field), right_flat.get(field)
         if left_value in (None, "", []) and right_value in (None, "", []):
             status = "missing_both"
         elif left_value == right_value:
@@ -130,41 +186,69 @@ def compare_outputs(hybrid: dict[str, Any], llm_only: dict[str, Any]) -> dict[st
             status = "missing_one"
         else:
             status = "different"
-        rows.append({"field": field, "hybrid": left_value, "llm_only": right_value, "status": status})
+        rows.append({"field": field, "left": left_value, "right": right_value, "status": status})
     return {
+        "left_strategy": left_strategy,
+        "right_strategy": right_strategy,
         "fields": rows,
         "disagreement_count": sum(row["status"] in {"different", "missing_one"} for row in rows),
-        "conflict_count": len(hybrid.get("conflicts", [])),
+        "conflict_count": len(left.get("conflicts", [])),
     }
 
 
-def _case_metrics(segment, hybrid, llm_only, compare) -> dict[str, Any]:
-    hybrid_flat = flatten_output(hybrid)
-    present = [field for field, value in hybrid_flat.items() if value not in (None, "", [])]
-    evidence_fields = {item.get("field") for item in hybrid.get("evidence", []) if item.get("field")}
-    statuses = hybrid.get("llm_status", []) + llm_only.get("llm_status", [])
+def compare_outputs(hybrid: dict[str, Any], llm_only: dict[str, Any]) -> dict[str, Any]:
+    """Compatibility wrapper for callers of the legacy two-strategy comparison."""
+    result = compare_strategy_outputs(
+        hybrid,
+        llm_only,
+        left_strategy="hybrid_rule_llm",
+        right_strategy="llm_only",
+    )
+    for row in result["fields"]:
+        row["hybrid"] = row["left"]
+        row["llm_only"] = row["right"]
+    return result
+
+
+def _rule_anchor_output(anchor: dict[str, Any], case_id: str, strategy: str) -> dict[str, Any]:
+    output = extract_rule_anchor_output(anchor)
+    output.update(case_id=case_id, strategy=strategy)
+    return output
+
+
+def _case_metrics(segment, outputs, compare, left_name, right_name) -> dict[str, Any]:
+    primary = outputs[left_name]
+    primary_flat = flatten_output(primary)
+    present = [field for field, value in primary_flat.items() if value not in (None, "", [])]
+    evidence_fields = {item.get("field") for item in primary.get("evidence", []) if item.get("field")}
+    statuses = [status for output in outputs.values() for status in output.get("llm_status", [])]
+    secondary = outputs[right_name]
     return {
+        "primary_strategy": left_name,
+        "secondary_strategy": right_name,
         "field_present_count": len(present),
-        "field_missing_count": sum(value in (None, "", []) for value in hybrid_flat.values()),
-        "conflict_count": len(hybrid.get("conflicts", [])),
-        "needs_review_count": int(bool(hybrid.get("needs_review"))) + int(bool(llm_only.get("needs_review"))),
+        "field_missing_count": sum(value in (None, "", []) for value in primary_flat.values()),
+        "conflict_count": len(primary.get("conflicts", [])),
+        "needs_review_count": sum(int(bool(output.get("needs_review"))) for output in outputs.values()),
         "evidence_coverage_rate": round(len(evidence_fields & set(present)) / max(1, len(present)), 4),
-        "participant_count": len(hybrid.get("participants", [])),
-        "defendant_count": len(hybrid.get("defendants", [])),
+        "participant_count": len(primary.get("participants", [])),
+        "defendant_count": len(primary.get("defendants", [])),
         "document_type_detected": segment.get("document_type"),
         "segment_stop_found": bool(segment.get("stop_line_id")),
-        "llm_json_valid": bool(llm_only.get("llm_json_valid", False)),
-        "llm_only_status": llm_only.get("status", "unknown"),
+        "llm_json_valid": bool(secondary.get("llm_json_valid", False)),
+        "secondary_status": secondary.get("status", "unknown"),
+        "llm_only_status": outputs.get("llm_only", secondary).get("status", "not_requested"),
         "llm_actually_called": any(item.get("llm_actually_called") for item in statuses),
         "llm_chunk_count": len(statuses),
         "llm_chunk_error_count": sum(bool(item.get("error_type")) for item in statuses),
+        "strategy_disagreement_count": compare["disagreement_count"],
         "hybrid_vs_llm_disagreement_count": compare["disagreement_count"],
     }
 
 
 def _summary(cases, strategies, llm_preflight):
     return {
-        "task": "pre_content_extraction_ab_test",
+        "task": "pre_content_rule_anchor_comparison",
         "strategies": strategies,
         "llm_preflight": llm_preflight,
         "case_count": len(cases),
@@ -176,7 +260,7 @@ def _summary(cases, strategies, llm_preflight):
             for key in (
                 "field_present_count", "field_missing_count", "conflict_count", "needs_review_count",
                 "participant_count", "defendant_count", "llm_chunk_count", "llm_chunk_error_count",
-                "hybrid_vs_llm_disagreement_count",
+                "strategy_disagreement_count",
             )
         },
         "cases": [
@@ -189,59 +273,92 @@ def _summary(cases, strategies, llm_preflight):
 def _write_case(case_dir: Path, case: dict[str, Any]) -> None:
     (case_dir / "pre_content_text.md").write_text(case["segmenter"]["pre_content_text"], encoding="utf-8")
     for key, filename in (
-        ("segmenter", "segmenter.json"), ("rule_output", "rule_output.json"),
-        ("hybrid_output", "hybrid_output.json"), ("llm_only_output", "llm_only_output.json"),
+        ("segmenter", "segmenter.json"),
+        ("anchor_segments", "anchor_segments.json"),
+        ("rule_output", "rule_output.json"),
         ("compare", "compare.json"),
     ):
         _write_json(case_dir / filename, case[key])
+    for strategy, output in case["strategy_outputs"].items():
+        _write_json(case_dir / f"{strategy}_output.json", output)
+        if strategy in {"hybrid_rule_llm", "legacy_hybrid_rule_llm"}:
+            _write_json(case_dir / "hybrid_output.json", output)
+        elif strategy == "llm_only":
+            _write_json(case_dir / "llm_only_output.json", output)
     _write_case_review(case_dir / "review.html", case)
 
 
 def _write_case_review(path: Path, case: dict[str, Any]) -> None:
+    compare = case["compare"]
     compare_rows = "".join(
-        f'<tr><td>{escape(item["field"])}</td><td>{escape(_display(item["hybrid"]))}</td>'
-        f'<td>{escape(_display(item["llm_only"]))}</td><td>{escape(item["status"])}</td></tr>'
-        for item in case["compare"]["fields"]
+        f'<tr><td>{escape(item["field"])}</td><td>{escape(_display(item["left"]))}</td>'
+        f'<td>{escape(_display(item["right"]))}</td><td>{escape(item["status"])}</td></tr>'
+        for item in compare["fields"]
     )
     source_lines = "".join(
         f'<div id="{escape(line.get("line_id"))}"><code>{escape(line.get("line_id"))}</code> '
         f'{escape(line.get("text"))}</div>'
         for line in case["segmenter"].get("pre_content_lines", [])
     )
-    llm_output = case["llm_only_output"]
-    llm_panel = (
-        f'<pre>{escape(_display(llm_output))}</pre>'
-        if llm_output.get("result_valid")
-        else f'<p><strong>Không có output LLM-only hợp lệ.</strong> Status: {escape(llm_output.get("status"))}</p>'
+    output_panels = "".join(
+        f'<section><h2>{escape(strategy)}</h2><pre>{escape(_display(output))}</pre>'
+        f'{_evidence_table(output, strategy)}</section>'
+        for strategy, output in case["strategy_outputs"].items()
     )
     body = (
         f'<h1>{escape(case["case_id"])}</h1>'
         + _llm_runtime_html(case)
-        + '<div class="grid"><section><h2>Văn bản pre-content</h2>'
-        + f'<div>{source_lines}</div></section>'
-        + f'<section><h2>Hybrid</h2><pre>{escape(_display(case["hybrid_output"]))}</pre></section>'
-        + f'<section><h2>LLM-only</h2>{llm_panel}</section></div>'
-        + '<h2>So sánh field</h2><table><tr><th>Field</th><th>Hybrid</th><th>LLM-only</th><th>Status</th></tr>'
-        + compare_rows + '</table><h2>Evidence</h2>'
-        + _evidence_table(case["hybrid_output"], "hybrid")
-        + _evidence_table(case["llm_only_output"], "llm_only")
+        + '<section><h2>Văn bản pre-content</h2>' + source_lines + '</section>'
+        + _anchor_html(case["anchor_segments"])
+        + output_panels
+        + '<h2>So sánh field</h2><table><tr><th>Field</th>'
+        + f'<th>{escape(compare["left_strategy"])}</th><th>{escape(compare["right_strategy"])}</th><th>Status</th></tr>'
+        + compare_rows + '</table>'
     )
-    write_html(path, "Pre-content A/B review", body)
+    write_html(path, "Rule anchor pre-content review", body)
+
+
+def _anchor_html(anchor: dict[str, Any]) -> str:
+    blocks = []
+    for kind, values in (
+        ("Bị cáo", anchor.get("defendant_blocks", [])),
+        ("Người tham gia tố tụng", anchor.get("participant_blocks", [])),
+    ):
+        for block in values:
+            line_ids = ", ".join(block.get("line_ids", []))
+            blocks.append(
+                f'<h3>{escape(kind)}: {escape(block.get("block_id"))}</h3>'
+                f'<p>Role: {escape(block.get("role_hint"))}; line ids: {escape(line_ids)}; '
+                f'split: {escape(block.get("split_reason"))}</p>'
+                f'<pre>{escape(block.get("text"))}</pre>'
+            )
+    return (
+        '<section><h2>Anchor segmentation</h2>'
+        f'<h3>Metadata lines</h3><pre>{escape(_display(anchor.get("metadata_lines", [])))}</pre>'
+        f'<h3>Trial panel lines</h3><pre>{escape(_display(anchor.get("trial_panel_lines", [])))}</pre>'
+        + "".join(blocks)
+        + f'<h3>Validator/cảnh báo</h3><pre>{escape(_display(anchor.get("warnings", [])))}</pre></section>'
+    )
 
 
 def _llm_runtime_html(case: dict[str, Any]) -> str:
-    statuses = case["hybrid_output"].get("llm_status", []) + case["llm_only_output"].get("llm_status", [])
+    statuses = [
+        status
+        for output in case["strategy_outputs"].values()
+        for status in output.get("llm_status", [])
+    ]
     rows = "".join(
         f'<tr><td>{escape(item.get("strategy"))}</td><td>{escape(item.get("chunk_name"))}</td>'
-        f'<td>{escape(item.get("model"))}</td><td>{escape(item.get("base_url"))}</td>'
-        f'<td>{escape(item.get("context_window"))}</td><td>{escape(item.get("estimated_input_tokens"))}</td>'
+        f'<td>{escape(item.get("block_type"))}</td><td>{escape(item.get("model"))}</td>'
+        f'<td>{escape(item.get("base_url"))}</td><td>{escape(item.get("context_window"))}</td>'
+        f'<td>{escape(item.get("estimated_input_tokens"))}</td>'
         f'<td>{escape(item.get("llm_actually_called"))}</td><td>{escape(item.get("error_type"))}</td></tr>'
         for item in statuses
     )
     return (
-        '<section><h2>Trạng thái Local LLM</h2><table><tr><th>Strategy</th><th>Chunk</th>'
-        '<th>Model</th><th>Base URL</th><th>Context</th><th>Input token ước lượng</th>'
-        '<th>Đã gọi</th><th>Lỗi</th></tr>' + rows + '</table></section>'
+        '<section><h2>Trạng thái Local LLM</h2><table><tr><th>Strategy</th><th>Block</th>'
+        '<th>Loại block</th><th>Model</th><th>Base URL</th><th>Context</th>'
+        '<th>Input token ước lượng</th><th>Đã gọi</th><th>Lỗi</th></tr>' + rows + '</table></section>'
     )
 
 
@@ -249,28 +366,33 @@ def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, A
     runtime = preflight or {"ok": "not_run", "model": "", "base_url": ""}
     rows = "".join(
         f'<tr><td><a href="cases/{escape(case["case_id"])}/review.html">{escape(case["case_id"])}</a></td>'
-        f'<td>{escape(case["metrics"]["document_type_detected"])}</td><td>{escape(case["metrics"]["llm_only_status"])}</td>'
-        f'<td>{escape(case["metrics"]["llm_actually_called"])}</td><td>{escape(case["metrics"]["llm_chunk_count"])}</td>'
+        f'<td>{escape(case["metrics"]["document_type_detected"])}</td>'
+        f'<td>{escape(case["metrics"]["primary_strategy"])}</td>'
+        f'<td>{escape(case["metrics"]["secondary_status"])}</td>'
+        f'<td>{escape(case["metrics"]["llm_actually_called"])}</td>'
+        f'<td>{escape(case["metrics"]["llm_chunk_count"])}</td>'
         f'<td>{escape(case["metrics"]["llm_chunk_error_count"])}</td></tr>'
         for case in cases
     )
     body = (
-        '<h1>So sánh extraction pre-content</h1>'
+        '<h1>So sánh extraction pre-content theo anchor</h1>'
         f'<p>LLM preflight: <strong>{escape(runtime.get("ok"))}</strong>; model: {escape(runtime.get("model"))}; '
         f'base URL: {escape(runtime.get("base_url"))}</p>'
-        '<table><tr><th>Case</th><th>Document type</th><th>LLM-only status</th><th>Đã gọi LLM</th>'
-        '<th>Số chunk</th><th>Chunk lỗi</th></tr>' + rows + '</table>'
+        '<table><tr><th>Case</th><th>Document type</th><th>Strategy chính</th>'
+        '<th>Trạng thái strategy thứ hai</th><th>Đã gọi LLM</th><th>Số block gọi</th><th>Block lỗi</th></tr>'
+        + rows + '</table>'
     )
-    write_html(path, "Pre-content A/B test", body)
+    write_html(path, "Rule anchor pre-content comparison", body)
 
 
 def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, Any]) -> None:
     workbook = Workbook()
     workbook.remove(workbook.active)
     sheet_names = (
-        "SUMMARY", "CASES", "DEFENDANTS", "PARTICIPANTS", "TRIAL_PANEL", "LLM_STATUS",
-        "FIELD_LONG", "EVIDENCE_LINES", "RAW_JSON", "CASE_COMPARE", "CONFLICTS",
-        "MISSING_FIELDS", "NEEDS_REVIEW", "DOC_ROUTER",
+        "SUMMARY", "ANCHOR_BLOCKS", "ANCHOR_WARNINGS", "CASES", "DEFENDANTS",
+        "PARTICIPANTS", "TRIAL_PANEL", "LLM_STATUS", "FIELD_LONG", "EVIDENCE_LINES",
+        "RAW_JSON", "CASE_COMPARE", "CONFLICTS", "MISSING_FIELDS", "NEEDS_REVIEW",
+        "DOC_ROUTER",
     )
     sheets = {name: workbook.create_sheet(name) for name in sheet_names}
     sheets["SUMMARY"].append(["METRIC", "VALUE"])
@@ -278,65 +400,117 @@ def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, 
         if key != "cases":
             sheets["SUMMARY"].append([key, _display(value)])
     for name, headers in (
-        ("CASES", CASES_HEADERS), ("DEFENDANTS", DEFENDANTS_HEADERS),
-        ("PARTICIPANTS", PARTICIPANTS_HEADERS), ("TRIAL_PANEL", TRIAL_PANEL_HEADERS),
+        ("CASES", CASES_HEADERS),
+        ("DEFENDANTS", DEFENDANTS_HEADERS),
+        ("PARTICIPANTS", PARTICIPANTS_HEADERS),
+        ("TRIAL_PANEL", TRIAL_PANEL_HEADERS),
         ("LLM_STATUS", LLM_STATUS_HEADERS),
     ):
         sheets[name].append(list(headers))
+    sheets["ANCHOR_BLOCKS"].append([
+        "case_id", "block_type", "block_id", "role_hint", "line_ids", "start_line_id",
+        "end_line_id", "split_reason", "text",
+    ])
+    sheets["ANCHOR_WARNINGS"].append(["case_id", "warning"])
     sheets["FIELD_LONG"].append(["case_id", "strategy", "field", "value"])
     sheets["EVIDENCE_LINES"].append(["case_id", "strategy", "field", "value", "line_id", "text"])
     sheets["RAW_JSON"].append(["case_id", "strategy", "json"])
-    sheets["CASE_COMPARE"].append(["case_id", "field", "hybrid", "status", "llm_only"])
-    sheets["CONFLICTS"].append(["case_id", "field", "kept_value", "detail"])
-    sheets["MISSING_FIELDS"].append(["case_id", "field", "hybrid", "llm_only"])
+    sheets["CASE_COMPARE"].append(["case_id", "field", "left_strategy", "left", "status", "right_strategy", "right"])
+    sheets["CONFLICTS"].append(["case_id", "strategy", "field", "kept_value", "detail"])
+    sheets["MISSING_FIELDS"].append(["case_id", "field", "left", "right"])
     sheets["NEEDS_REVIEW"].append(["case_id", "strategy", "warnings"])
     sheets["DOC_ROUTER"].append(["case_id", "document_type", "benchmark_included", "warnings"])
 
     for case in cases:
+        _append_anchor_rows(sheets, case)
         _append_structured_rows(sheets, case)
         case_id = case["case_id"]
-        sheets["DOC_ROUTER"].append([case_id, case["segmenter"]["document_type"], case["benchmark_included"], "; ".join(case["segmenter"]["warnings"])])
-        for row in case["compare"]["fields"]:
-            sheets["CASE_COMPARE"].append([case_id, row["field"], _display(row["hybrid"]), row["status"], _display(row["llm_only"])])
+        sheets["DOC_ROUTER"].append([
+            case_id,
+            case["segmenter"]["document_type"],
+            case["benchmark_included"],
+            "; ".join(case["segmenter"]["warnings"]),
+        ])
+        compare = case["compare"]
+        for row in compare["fields"]:
+            sheets["CASE_COMPARE"].append([
+                case_id, row["field"], compare["left_strategy"], _display(row["left"]),
+                row["status"], compare["right_strategy"], _display(row["right"]),
+            ])
             if row["status"] in {"missing_both", "missing_one"}:
-                sheets["MISSING_FIELDS"].append([case_id, row["field"], _display(row["hybrid"]), _display(row["llm_only"])])
-        for conflict in case["hybrid_output"].get("conflicts", []):
-            sheets["CONFLICTS"].append([case_id, conflict.get("field"), _display(conflict.get("kept_value")), _display(conflict)])
+                sheets["MISSING_FIELDS"].append([
+                    case_id, row["field"], _display(row["left"]), _display(row["right"]),
+                ])
+        for strategy, output in case["strategy_outputs"].items():
+            for conflict in output.get("conflicts", []):
+                sheets["CONFLICTS"].append([
+                    case_id, strategy, conflict.get("field"), _display(conflict.get("kept_value")),
+                    _display(conflict),
+                ])
     workbook.save(path)
 
 
-def _append_structured_rows(sheets, case):
+def _append_anchor_rows(sheets, case) -> None:
     case_id = case["case_id"]
-    line_text = {str(line.get("line_id")): str(line.get("text") or "") for line in case["segmenter"].get("pre_content_lines", [])}
-    for strategy, output in (("hybrid_rule_llm", case["hybrid_output"]), ("llm_only", case["llm_only_output"])):
+    anchor = case["anchor_segments"]
+    for block_type, blocks in (
+        ("defendant", anchor.get("defendant_blocks", [])),
+        ("participant", anchor.get("participant_blocks", [])),
+    ):
+        for block in blocks:
+            sheets["ANCHOR_BLOCKS"].append([
+                case_id, block_type, block.get("block_id"), block.get("role_hint"),
+                "; ".join(block.get("line_ids", [])), block.get("start_line_id"),
+                block.get("end_line_id"), block.get("split_reason"), block.get("text"),
+            ])
+    for warning in anchor.get("warnings", []):
+        sheets["ANCHOR_WARNINGS"].append([case_id, warning])
+
+
+def _append_structured_rows(sheets, case) -> None:
+    case_id = case["case_id"]
+    line_text = {
+        str(line.get("line_id")): str(line.get("text") or "")
+        for line in case["segmenter"].get("pre_content_lines", [])
+    }
+    for strategy, output in case["strategy_outputs"].items():
         metadata = output.get("metadata", {})
         panel = output.get("trial_panel", {})
         ocr = case["ocr"]
         cases_row = {
-            "case_id": case_id, "source_file": ocr["source_file"], "document_type": output.get("document_type"),
-            "ocr_status": ocr["ocr_status"], "marker_found": ocr["marker_found"], "marker_page": ocr["marker_page"],
-            "early_stop_triggered": ocr["early_stop_triggered"], "pages_processed": ocr["pages_processed"],
-            "pages_total": ocr["pages_total"], "strategy_used": strategy, **metadata,
+            "case_id": case_id,
+            "source_file": ocr["source_file"],
+            "document_type": output.get("document_type"),
+            "ocr_status": ocr["ocr_status"],
+            "marker_found": ocr["marker_found"],
+            "marker_page": ocr["marker_page"],
+            "early_stop_triggered": ocr["early_stop_triggered"],
+            "pages_processed": ocr["pages_processed"],
+            "pages_total": ocr["pages_total"],
+            "strategy_used": strategy,
+            **metadata,
             "trial_date_or_location_sentence": metadata.get("trial_location_or_date_sentence"),
-            "presiding_judge": panel.get("presiding_judge"), "clerk": panel.get("clerk"),
-            "prosecutor": panel.get("prosecutor"), "needs_review": output.get("needs_review"),
+            "presiding_judge": panel.get("presiding_judge"),
+            "clerk": panel.get("clerk"),
+            "prosecutor": panel.get("prosecutor"),
+            "needs_review": output.get("needs_review"),
             "warnings": "; ".join(output.get("warnings", [])),
         }
         sheets["CASES"].append([cases_row.get(header) for header in CASES_HEADERS])
         for index, item in enumerate(output.get("defendants", []), start=1):
-            row = {"case_id": case_id, "defendant_index": index, **item}
+            row = {"case_id": case_id, "strategy": strategy, "defendant_index": index, **item}
             row["evidence_line_ids"] = "; ".join(item.get("evidence_line_ids", []))
             row["evidence_text"] = _evidence_text(item, line_text)
             row["warnings"] = "; ".join(item.get("warnings", []))
             sheets["DEFENDANTS"].append([row.get(header) for header in DEFENDANTS_HEADERS])
         for index, item in enumerate(output.get("participants", []), start=1):
-            row = {"case_id": case_id, "participant_index": index, **item}
-            row["relationship_or_note"] = item.get("relationship")
+            row = {"case_id": case_id, "strategy": strategy, "participant_index": index, **item}
+            row["relationship_or_note"] = item.get("relationship_or_note") or item.get("relationship")
             row["evidence_line_ids"] = "; ".join(item.get("evidence_line_ids", []))
             row["evidence_text"] = _evidence_text(item, line_text)
             row["warnings"] = "; ".join(item.get("warnings", []))
             sheets["PARTICIPANTS"].append([row.get(header) for header in PARTICIPANTS_HEADERS])
-        _append_trial_panel(sheets["TRIAL_PANEL"], case_id, panel)
+        _append_trial_panel(sheets["TRIAL_PANEL"], case_id, strategy, panel)
         for status in output.get("llm_status", []):
             row = {"case_id": case_id, **status}
             row["input_tokens_estimated"] = status.get("estimated_input_tokens")
@@ -344,13 +518,16 @@ def _append_structured_rows(sheets, case):
         for field, value in flatten_output(output).items():
             sheets["FIELD_LONG"].append([case_id, strategy, field, _display(value)])
         for evidence in output.get("evidence", []):
-            sheets["EVIDENCE_LINES"].append([case_id, strategy, evidence.get("field"), evidence.get("value"), evidence.get("line_id"), evidence.get("text")])
+            sheets["EVIDENCE_LINES"].append([
+                case_id, strategy, evidence.get("field"), evidence.get("value"),
+                evidence.get("line_id"), evidence.get("text"),
+            ])
         sheets["RAW_JSON"].append([case_id, strategy, _display(output)])
         if output.get("needs_review"):
             sheets["NEEDS_REVIEW"].append([case_id, strategy, "; ".join(output.get("warnings", []))])
 
 
-def _append_trial_panel(sheet, case_id, panel):
+def _append_trial_panel(sheet, case_id, strategy, panel) -> None:
     roles = [
         ("presiding_judge", panel.get("presiding_judge")),
         *(("juror", name) for name in panel.get("jurors", [])),
@@ -359,7 +536,7 @@ def _append_trial_panel(sheet, case_id, panel):
     ]
     for role, name in roles:
         if name:
-            sheet.append([case_id, role, name, None, None, None, None, None])
+            sheet.append([case_id, strategy, role, name, None, None, None, None, None])
 
 
 def _ocr_summary(record: OCRCacheRecord) -> dict[str, Any]:
@@ -377,51 +554,111 @@ def _ocr_summary(record: OCRCacheRecord) -> dict[str, Any]:
     }
 
 
-def _hybrid_without_llm(rule, preflight):
+def _anchor_llm_unavailable(anchor, case_id, strategy, preflight) -> dict[str, Any]:
+    rule = _rule_anchor_output(anchor, case_id, strategy)
+    if strategy == "llm_per_block":
+        base = empty_pre_content_output(rule["document_type"])
+        base["metadata"] = deepcopy(rule["metadata"])
+        base["trial_panel"] = deepcopy(rule["trial_panel"])
+        base["evidence"] = deepcopy(rule["evidence"])
+        base["field_meta"] = deepcopy(rule["field_meta"])
+        base["anchor_segments"] = deepcopy(anchor)
+        rule = base
+    rule.update(
+        case_id=case_id,
+        strategy=strategy,
+        status=f"{strategy}_not_run",
+        result_valid=strategy == "rule_then_llm_per_block",
+        llm_json_valid=False,
+        llm_actually_called=False,
+        chunk_count=0,
+        llm_status=[_preflight_status(strategy, preflight, required=True)],
+        needs_review=True,
+    )
+    rule["warnings"] = list(rule.get("warnings", [])) + [f"{strategy}_not_run:preflight_failed"]
+    return rule
+
+
+def _hybrid_without_llm(rule, preflight, *, strategy):
     output = deepcopy(rule)
     output.update(
-        status="hybrid_rule_only_fallback", result_valid=True, llm_json_valid=False,
-        llm_actually_called=False, chunk_count=0,
-        llm_status=[_preflight_status("hybrid_rule_llm", preflight, required=False)],
+        strategy=strategy,
+        status="hybrid_rule_only_fallback",
+        result_valid=True,
+        llm_json_valid=False,
+        llm_actually_called=False,
+        chunk_count=0,
+        llm_status=[_preflight_status(strategy, preflight, required=False)],
     )
     output["warnings"].append("hybrid_llm_unavailable_rule_output_preserved")
     output["needs_review"] = True
     return output
 
 
-def _llm_unavailable_output(segment, preflight):
+def _llm_unavailable_output(segment, preflight, *, strategy):
     return {
-        "document_type": segment.get("document_type"), "status": "llm_only_not_run",
-        "result_valid": False, "llm_json_valid": False, "llm_actually_called": False,
-        "chunk_count": 0, "llm_status": [_preflight_status("llm_only", preflight, required=True)],
-        "warnings": ["llm_only_not_run:preflight_failed"], "needs_review": True,
+        "strategy": strategy,
+        "document_type": segment.get("document_type"),
+        "status": "llm_only_not_run",
+        "result_valid": False,
+        "llm_json_valid": False,
+        "llm_actually_called": False,
+        "chunk_count": 0,
+        "llm_status": [_preflight_status(strategy, preflight, required=True)],
+        "warnings": ["llm_only_not_run:preflight_failed"],
+        "needs_review": True,
     }
 
 
 def _preflight_status(strategy, preflight, *, required):
     value = preflight or {}
     return {
-        "strategy": strategy, "chunk_name": "preflight", "llm_required": required,
-        "llm_available": False, "llm_actually_called": False, "provider": value.get("provider"),
-        "model": value.get("model"), "base_url": value.get("base_url"), "context_window": None,
-        "input_chars": 0, "estimated_input_tokens": 0, "max_output_tokens": None,
-        "budget_ok": False, "truncated": False, "chunked": False, "request_ok": False,
-        "response_ok": False, "error_type": value.get("error_type") or "llm_preflight_failed",
-        "error_message": value.get("error") or "Local LLM preflight failed.", "duration_ms": 0,
+        "strategy": strategy,
+        "chunk_name": "preflight",
+        "block_type": None,
+        "llm_required": required,
+        "llm_available": False,
+        "llm_actually_called": False,
+        "provider": value.get("provider"),
+        "model": value.get("model"),
+        "base_url": value.get("base_url"),
+        "context_window": None,
+        "input_chars": 0,
+        "estimated_input_tokens": 0,
+        "max_output_tokens": None,
+        "budget_ok": False,
+        "truncated": False,
+        "chunked": False,
+        "request_ok": False,
+        "response_ok": False,
+        "error_type": value.get("error_type") or "llm_preflight_failed",
+        "error_message": value.get("error") or "Local LLM preflight failed.",
+        "duration_ms": 0,
     }
 
 
-def _skipped_output(segment: dict[str, Any], reason: str) -> dict[str, Any]:
+def _skipped_output(segment: dict[str, Any], strategy: str, reason: str) -> dict[str, Any]:
     return {
-        "document_type": str(segment.get("document_type") or "unknown"), "status": "strategy_skipped",
-        "result_valid": False, "llm_json_valid": False, "llm_actually_called": False,
-        "chunk_count": 0, "llm_status": [], "warnings": [reason], "needs_review": True,
+        "strategy": strategy,
+        "document_type": str(segment.get("document_type") or "unknown"),
+        "status": "strategy_skipped",
+        "result_valid": False,
+        "llm_json_valid": False,
+        "llm_actually_called": False,
+        "chunk_count": 0,
+        "llm_status": [],
+        "warnings": [reason],
+        "needs_review": True,
         "skipped": True,
     }
 
 
 def _evidence_text(item, line_text):
-    return " | ".join(line_text.get(str(line_id), "") for line_id in item.get("evidence_line_ids", []) if line_text.get(str(line_id)))
+    return " | ".join(
+        line_text.get(str(line_id), "")
+        for line_id in item.get("evidence_line_ids", [])
+        if line_text.get(str(line_id))
+    )
 
 
 def _write_json(path: Path, payload: Any) -> None:

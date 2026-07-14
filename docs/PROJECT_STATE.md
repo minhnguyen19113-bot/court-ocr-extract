@@ -1,5 +1,15 @@
 # Project State
 
+## Baseline Rule Anchor + LLM Theo Từng Block
+
+- Hướng chính cho pre-content đã chuyển từ merge `hybrid_rule_llm` sang anchor/block deterministic: `rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`.
+- `pre_content_anchor_segmenter.py` giữ metadata lines, trial-panel lines, defendant blocks, participant blocks, `line_ids`, ranh giới và lý do split; không tự quyết định chất lượng OCR.
+- `rule_anchor_extractor.py` parse metadata/trial panel/entity, gắn evidence và chặn tên/field bất thường bằng validator.
+- Metadata và trial panel không gọi LLM mặc định. LLM chỉ nhận từng defendant/participant block, tổng input tối đa 6000 ký tự và output tối đa 512 token; `rule_then_llm_per_block` chỉ repair field thiếu hoặc bị validator đánh dấu.
+- `compare-pre-content` mặc định so sánh `rule_anchor_only,rule_then_llm_per_block`; `hybrid_rule_llm`, alias `legacy_hybrid_rule_llm` và `llm_only` vẫn còn để benchmark legacy khi truyền rõ.
+- Workbook có `ANCHOR_BLOCKS` và `ANCHOR_WARNINGS`; HTML hiển thị line IDs, block, rule output, warning/validator và LLM call status.
+- Codex chỉ chạy text/record synthetic và fake LLM; không đọc PDF/OCR cache thật, không gọi Surya, Docker, Local LLM hay cloud.
+
 ## Latest Local LLM Context Budget + Chunked Extraction Fix
 
 - Default Local LLM đã chuyển sang `Qwen/Qwen2.5-3B-Instruct`, endpoint `127.0.0.1:8000/v1`, context 8192 và output 1024; Qwen2.5-7B full bf16 không dùng mặc định trên RTX 5060 Ti 16GB.
@@ -49,10 +59,10 @@
 - Tests chỉ dùng synthetic images; Codex chưa chạy PDF/OCR thật.
 
 
-## Nhánh thử nghiệm pre-content A/B
+## Nhánh legacy pre-content A/B
 
-- Đã thêm A/B test `hybrid_rule_llm` so với `llm_only`, chỉ xử lý phần trước heading `NỘI DUNG VỤ ÁN` từ OCR cache đã lọc.
-- Rule-only chỉ là intermediate/debug; chưa được chọn làm hướng cuối.
+- A/B `hybrid_rule_llm` so với `llm_only` được giữ để đối chiếu lịch sử, không còn là hướng chính hoặc default CLI.
+- Baseline mới là rule anchors/block segmentation; `rule_anchor_only` là output deterministic có thể review, còn Local LLM theo block là lớp repair tùy chọn.
 - Document router phân loại `judgment_criminal_first_instance`, `correction_notice`, `unknown`; correction notice không bị ép vào schema bản án và không tính trong benchmark bản án chính.
 - Local LLM chỉ fill/repair field thiếu hoặc chạy LLM-only trên pre-content; tên người/địa danh không được tự sửa khi thiếu evidence.
 - Đây là nhánh thử nghiệm, chưa thay đổi extraction pipeline production sau `NỘI DUNG VỤ ÁN`.
@@ -67,19 +77,19 @@
 - Khong auto-correct ten nguoi, dia danh, hay noi dung OCR bang heuristic.
 - Codex chi dung synthetic tests; chua chay PDF that, Surya inference that, Local LLM, cloud API, hay full pipeline.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Current Phase
 
-PIN SURYA OCR VERSION sau OCR USES PREPROCESSED INPUT.
+RULE ANCHOR EXTRACTOR + PER-BLOCK LLM BASELINE.
 
-Task này pin `surya-ocr==0.20.0` và chặn dependency drift lên Surya 2/0.21.x trước import/runtime. Codex không chạy PDF/OCR/Surya inference, Local LLM, cloud hoặc full pipeline.
+Task này thay default pre-content compare bằng anchor/parser deterministic và LLM theo từng entity block. Không thay Surya OCR runtime, không chạy dữ liệu thật và không gọi model thật.
 
 ## Active Direction
 
 The rebuild has two approved candidate paths:
 
-1. Main candidate: PDF render -> optional preprocess -> Surya OCR -> OCR cache -> normalize/split -> rule extraction for easy fields -> local LLM extraction for hard fields -> evidence validation -> Excel -> QA report -> debug UI/human review.
+1. Main candidate: PDF render -> optional preprocess -> Surya OCR -> OCR cache -> anchor/block segmentation -> deterministic metadata/trial-panel/entity parse -> optional Local LLM repair theo block -> evidence validation -> Excel -> QA report -> debug UI/human review.
 2. Benchmark path: page image -> local VLM end-to-end extraction -> validation -> Excel -> QA report -> debug UI/human review.
 
 Tesseract is legacy only. PaddleOCR is not part of the rebuild path. Cloud OCR/extraction adapters are disabled by default and may only be used for explicit opt-in benchmarks.
@@ -249,4 +259,4 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 
 ## Next Gate
 
-Project Owner phải reinstall `.[dev,ocr]`, xác nhận installed/supported đều là `0.20.0`, rồi mới chạy lại Mode 3 OCR review trên VM.
+Project Owner chạy `compare-pre-content` với 1 case bằng `rule_anchor_only,rule_then_llm_per_block`, review `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, structured sheets và HTML; chỉ tăng lên 3 case sau khi case đầu đạt.

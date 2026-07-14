@@ -12,9 +12,14 @@ from tests.test_compare_requires_llm import _record
 def test_html_and_llm_status_sheet_show_runtime_budget_and_chunk_error(tmp_path) -> None:
     def fake_llm(prompt, text):
         request = json.loads(text)
-        if request["chunk_name"].startswith("trial_panel"):
+        if request["type"] == "participant":
             raise RuntimeError("synthetic failure")
-        return {"metadata": {"court_name": "Synthetic Court"}}
+        return {
+            "full_name": "Người Synthetic A",
+            "occupation": "Kiểm thử",
+            "permanent_address": "Vùng Synthetic A",
+            "detention_status": "Cấm đi khỏi nơi cư trú",
+        }
 
     run_pre_content_ab_test(
         [_record()], output_dir=tmp_path, settings=PipelineSettings(), llm_callable=fake_llm,
@@ -30,3 +35,5 @@ def test_html_and_llm_status_sheet_show_runtime_budget_and_chunk_error(tmp_path)
     budget_index = headers.index("budget_ok")
     assert any(row[model_index] == "Qwen/Qwen2.5-3B-Instruct" for row in rows[1:])
     assert any(row[budget_index] is True for row in rows[1:])
+    error_index = headers.index("error_type")
+    assert any(row[error_index] for row in rows[1:])

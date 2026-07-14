@@ -1,0 +1,391 @@
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from court_ocr_extract.extractors.pre_content_anchor_segmenter import (
+    DEFENDANT_BLOCKED_TERMS,
+    fold_text,
+    normalize_ocr_text,
+    participant_role,
+)
+from court_ocr_extract.extractors.pre_content_schema import (
+    DEFENDANT_FIELDS,
+    PARTICIPANT_FIELDS,
+    empty_pre_content_output,
+)
+
+
+DATE_RE = re.compile(r"\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b")
+JUDGMENT_NUMBER_RE = re.compile(r"Bản\s+án\s+số\s*[:.]?\s*([0-9]{1,4}/[0-9]{4}/HS-?ST)\b", re.I)
+SHORT_FIELDS = ("gender", "nationality", "ethnicity", "religion", "occupation")
+
+PANEL_LABELS = (
+    (re.compile(r"(?:Thẩm\s+phán(?:\s*-\s*Chủ\s+tọa\s+phiên\s+tòa)?|Chủ\s+tọa\s+phiên\s+tòa)(?=\s*(?::|$))", re.I), "presiding_judge"),
+    (re.compile(r"(?:Các\s+)?Hội\s+thẩm\s+nhân\s+dân(?=\s*(?::|$))", re.I), "jurors"),
+    (re.compile(r"Thư\s+ký\s+phiên\s+tòa(?=\s*(?::|$))", re.I), "clerk"),
+    (re.compile(r"(?:Đại\s+diện\s+Viện\s+kiểm\s+sát[^:;]*|Kiểm\s+sát\s+viên)(?=\s*(?::|$))", re.I), "prosecutor"),
+)
+
+DEFENDANT_LABELS = (
+    ("current_address", re.compile(r"Nơi\s+ở\s+(?:hiện\s+tại|hiện\s+nay)|Chỗ\s+ở", re.I)),
+    ("permanent_address", re.compile(r"Hộ\s+khẩu\s+thường\s+trú|Thường\s+trú|Nơi\s+đăng\s+ký\s+HKTT|Nơi\s+ĐKHKTT", re.I)),
+    ("education", re.compile(r"Trình\s+độ\s+(?:văn\s+hóa|học\s+vấn)", re.I)),
+    ("criminal_record", re.compile(r"Tiền\s+án\s*[,\-]\s*tiền\s+sự|Tiền\s+án|Tiền\s+sự", re.I)),
+    ("birth_place", re.compile(r"Nơi\s+sinh", re.I)),
+    ("birth_date_or_year", re.compile(r"Sinh\s+(?:ngày|năm)", re.I)),
+    ("alias", re.compile(r"Tên\s+gọi\s+khác", re.I)),
+    ("occupation", re.compile(r"Nghề\s+nghiệp", re.I)),
+    ("nationality", re.compile(r"Quốc\s+tịch", re.I)),
+    ("ethnicity", re.compile(r"Dân\s+tộc", re.I)),
+    ("religion", re.compile(r"Tôn\s+giáo", re.I)),
+    ("gender", re.compile(r"Giới\s+tính", re.I)),
+    ("father_name", re.compile(r"Họ\s+(?:và\s+)?tên\s+cha|Cha", re.I)),
+    ("mother_name", re.compile(r"Họ\s+(?:và\s+)?tên\s+mẹ|Mẹ", re.I)),
+    ("spouse", re.compile(r"Vợ\s*[,/]\s*con|Vợ|Chồng", re.I)),
+    ("children", re.compile(r"Con(?!\s+ông\b)", re.I)),
+)
+
+
+def extract_rule_anchor_output(anchor: dict[str, Any]) -> dict[str, Any]:
+    output = empty_pre_content_output(str(anchor.get("document_type") or "unknown"))
+    _extract_metadata(anchor.get("metadata_lines", []), output)
+    _extract_trial_panel(anchor.get("trial_panel_lines", []), output)
+    output["defendants"] = [parse_defendant_block(block) for block in anchor.get("defendant_blocks", [])]
+    output["participants"] = [parse_participant_block(block) for block in anchor.get("participant_blocks", [])]
+    output["warnings"].extend(anchor.get("warnings", []))
+    if not output["metadata"]["judgment_number"]:
+        output["warnings"].append("missing:metadata.judgment_number")
+    if not output["trial_panel"]["presiding_judge"]:
+        output["warnings"].append("missing:trial_panel.presiding_judge")
+    output["needs_review"] = bool(
+        output["warnings"]
+        or any(item.get("needs_review") for item in output["defendants"] + output["participants"])
+    )
+    output.update(
+        strategy="rule_anchor_only",
+        status="rule_anchor_succeeded",
+        result_valid=True,
+        llm_json_valid=False,
+        llm_actually_called=False,
+        llm_status=[],
+        chunk_count=0,
+        anchor_segments=anchor,
+    )
+    return output
+
+
+def parse_defendant_block(block: dict[str, Any]) -> dict[str, Any]:
+    result = {field: None for field in DEFENDANT_FIELDS}
+    raw_source = str(block.get("text") or "")
+    raw = normalize_ocr_text(raw_source)
+    line_ids = [str(value) for value in block.get("line_ids", []) if value]
+    result.update(
+        raw_block=raw_source,
+        evidence_line_ids=line_ids,
+        needs_review=False,
+        warnings=[],
+    )
+    result["full_name"] = _defendant_name(raw)
+    _extract_defendant_labeled_values(raw, result)
+
+    parent_match = re.search(r"con\s+ông\s+(.+?)\s+và\s+bà\s+([^,;.\n]+)", raw, re.I)
+    if parent_match:
+        result["father_name"] = _clean_value(parent_match.group(1))
+        result["mother_name"] = _clean_value(parent_match.group(2))
+    birth_place = re.search(
+        r"Sinh\s+(?:ngày\s+\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4}|năm\s+\d{4})\s+tại\s*:\s*([^;\n]+)",
+        raw,
+        re.I,
+    )
+    if birth_place and not result["birth_place"]:
+        result["birth_place"] = _clean_value(birth_place.group(1))
+    for line in raw.splitlines():
+        folded = fold_text(line)
+        if not result["detention_status"] and any(value in folded for value in ("tam giam", "tam giu", "cam di khoi noi cu tru")):
+            result["detention_status"] = line.strip()
+        if not result["presence_status"] and ("bi cao co mat" in folded or "bi cao vang mat" in folded):
+            result["presence_status"] = _presence(line)
+
+    validate_defendant_entity(result)
+    return result
+
+
+def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
+    result = {field: None for field in PARTICIPANT_FIELDS}
+    result["relationship_or_note"] = None
+    raw_source = str(block.get("text") or "")
+    raw = normalize_ocr_text(raw_source)
+    line_ids = [str(value) for value in block.get("line_ids", []) if value]
+    role = str(block.get("role_hint") or "").strip() or None
+    result.update(
+        role=role,
+        raw_block=raw_source,
+        evidence_line_ids=line_ids,
+        needs_review=False,
+        warnings=[],
+    )
+    result["full_name"] = _participant_name(raw, role)
+    birth = re.search(r"\b(?:sinh\s+ngày\s+)?(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b|\bsinh\s+năm\s+(\d{4})\b", raw, re.I)
+    if birth:
+        result["birth_date_or_year"] = _normalize_date(birth.group(1)) if birth.group(1) else birth.group(2)
+    address = re.search(
+        r"(?:Địa\s+chỉ|Nơi\s+cư\s+trú|Thường\s+trú|Nơi\s+ở\s+hiện\s+nay|Cùng\s+địa\s+chỉ)\s*[:：]?\s*([^;\n]+)",
+        raw,
+        re.I,
+    )
+    if address:
+        result["address"] = _clean_value(address.group(1))
+    relationship = re.search(r"(?:Quan\s+hệ|Ghi\s+chú)\s*[:：]\s*([^;\n]+)", raw, re.I)
+    if relationship:
+        result["relationship"] = _clean_value(relationship.group(1))
+        result["relationship_or_note"] = result["relationship"]
+    presence_line = next(
+        (line for line in raw.splitlines() if "co mat" in fold_text(line) or "vang mat" in fold_text(line)),
+        None,
+    )
+    if presence_line:
+        result["presence_status"] = _presence(presence_line)
+    validate_participant_entity(result)
+    return result
+
+
+def _extract_metadata(lines: list[dict[str, Any]], output: dict[str, Any]) -> None:
+    judgment_index = None
+    for index, line in enumerate(lines):
+        text = normalize_ocr_text(_text(line))
+        folded = fold_text(text)
+        if not output["metadata"]["court_name"] and "toa an" in folded and "cong hoa" not in folded:
+            _set(output, "metadata.court_name", text, line, 0.98)
+        judgment = JUDGMENT_NUMBER_RE.search(text)
+        if judgment and not output["metadata"]["judgment_number"]:
+            judgment_index = index
+            _set(output, "metadata.judgment_number", judgment.group(1), line, 0.99)
+            same_line_date = _date_after_day_anchor(text)
+            if same_line_date:
+                _set(output, "metadata.judgment_date", same_line_date, line, 0.98)
+        if "quyet dinh dua vu an ra xet xu so" in folded:
+            value = _number_after_anchor(text, r"Quyết\s+định\s+đưa\s+vụ\s+án\s+ra\s+xét\s+xử\s+số")
+            _set(output, "metadata.trial_decision_number", value, line, 0.97)
+        elif "quyet dinh hoan phien toa so" in folded:
+            value = _number_after_anchor(text, r"Quyết\s+định\s+hoãn\s+phiên\s+tòa\s+số")
+            _set(output, "metadata.postponement_decision_number", value, line, 0.97)
+        elif "thu ly so" in folded:
+            value = _number_after_anchor(text, r"thụ\s+lý\s+số")
+            _set(output, "metadata.case_acceptance_number", value, line, 0.96)
+        if (
+            not output["metadata"]["trial_location_or_date_sentence"]
+            and "xet xu so tham" in folded
+            and ("ngay" in folded or "tai" in folded)
+        ):
+            _set(output, "metadata.trial_location_or_date_sentence", text, line, 0.82)
+    if judgment_index is not None and not output["metadata"]["judgment_date"] and judgment_index + 1 < len(lines):
+        next_line = normalize_ocr_text(_text(lines[judgment_index + 1]))
+        if re.match(r"^\s*Ngày\s*:", next_line, re.I):
+            date = _date_after_day_anchor(next_line)
+            _set(output, "metadata.judgment_date", date, lines[judgment_index + 1], 0.97)
+    number = str(output["metadata"].get("judgment_number") or "")
+    if "HS" in number.upper():
+        output["metadata"]["case_type"] = "Hình sự sơ thẩm"
+
+
+def _extract_trial_panel(lines: list[dict[str, Any]], output: dict[str, Any]) -> None:
+    active_field: str | None = None
+    for line in lines:
+        text = normalize_ocr_text(_text(line))
+        matches = []
+        for pattern, field in PANEL_LABELS:
+            matches.extend((match.start(), match.end(), field) for match in pattern.finditer(text))
+        matches.sort()
+        if matches:
+            active_field = None
+            for index, (_, end, field) in enumerate(matches):
+                next_start = matches[index + 1][0] if index + 1 < len(matches) else len(text)
+                value = _clean_panel_value(text[end:next_start])
+                if value:
+                    _set_panel(output, field, value, line)
+                else:
+                    active_field = field
+            continue
+        if active_field and text and not re.match(r"^Thành\s+phần", text, re.I):
+            value = re.sub(r"^\s*\d+[.)]\s*", "", text).strip()
+            _set_panel(output, active_field, value, line)
+            if active_field != "jurors":
+                active_field = None
+
+
+def _extract_defendant_labeled_values(raw: str, result: dict[str, Any]) -> None:
+    matches: list[tuple[int, int, str]] = []
+    for field, pattern in DEFENDANT_LABELS:
+        matches.extend((match.start(), match.end(), field) for match in pattern.finditer(raw))
+    matches.sort()
+    for index, (_, end, field) in enumerate(matches):
+        if result.get(field):
+            continue
+        next_start = matches[index + 1][0] if index + 1 < len(matches) else len(raw)
+        value = _clean_value(raw[end:next_start])
+        if field == "birth_date_or_year":
+            date = DATE_RE.search(value or "")
+            year = re.search(r"\b(?:19|20)\d{2}\b", value or "")
+            value = _normalize_date(date.group(1)) if date else (year.group(0) if year else None)
+        if value:
+            result[field] = value
+
+
+def _defendant_name(raw: str) -> str | None:
+    for line in raw.splitlines():
+        candidate = re.sub(r"^\s*\d+[.)]\s*", "", line).strip()
+        candidate = re.sub(r"^(?:Đối\s+với(?:\s+các)?\s+bị\s+cáo|Bị\s+cáo|Họ\s+và\s+tên)\s*:\s*", "", candidate, flags=re.I)
+        candidate = re.split(r"(?:[,;]\s*|\s+)(?:sinh\s+(?:ngày|năm)|tên\s+gọi\s+khác)", candidate, maxsplit=1, flags=re.I)[0]
+        candidate = candidate.strip(" ,;:-")
+        if candidate and not any(term in fold_text(candidate) for term in DEFENDANT_BLOCKED_TERMS):
+            return candidate
+    return None
+
+
+def _participant_name(raw: str, role: str | None) -> str | None:
+    for line in raw.splitlines():
+        text = re.sub(r"^\s*\d+[.)]\s*", "", line).strip()
+        detected_role = participant_role(text)
+        if detected_role:
+            parts = re.split(r"[:：]", text, maxsplit=1)
+            if len(parts) == 1 or not parts[1].strip():
+                continue
+            text = parts[1].strip()
+        folded = fold_text(text)
+        if any(anchor in folded for anchor in ("dia chi", "noi cu tru", "thuong tru", "noi o hien nay", "cung dia chi", "co mat", "vang mat", "quan he", "ghi chu")):
+            continue
+        candidate = re.split(r"[,;]\s*(?:sinh|dia chi|noi cu tru|thuong tru|co mat|vang mat)", text, maxsplit=1, flags=re.I)[0].strip(" ,;:-")
+        if candidate and fold_text(candidate) != fold_text(role or ""):
+            return candidate
+    return None
+
+
+def validate_defendant_entity(result: dict[str, Any]) -> dict[str, Any]:
+    result.setdefault("warnings", [])
+    full_name = str(result.get("full_name") or "")
+    if full_name and any(term in fold_text(full_name) for term in DEFENDANT_BLOCKED_TERMS):
+        result["full_name"] = None
+        result["warnings"].append("defendant_name_forbidden_anchor")
+    for field in SHORT_FIELDS:
+        value = result.get(field)
+        if isinstance(value, str) and len(value) > 80:
+            result[field] = None
+            result["warnings"].append(f"field_too_long:{field}")
+    if not result.get("full_name"):
+        result["warnings"].append("defendant_name_missing")
+    result["warnings"] = list(dict.fromkeys(result["warnings"]))
+    result["needs_review"] = bool(result["warnings"])
+    return result
+
+
+def validate_participant_entity(result: dict[str, Any]) -> dict[str, Any]:
+    result.setdefault("warnings", [])
+    if not result.get("role"):
+        result["warnings"].append("participant_role_missing")
+    if not result.get("full_name"):
+        result["warnings"].append("participant_name_missing")
+    result["warnings"] = list(dict.fromkeys(result["warnings"]))
+    result["needs_review"] = bool(result["warnings"])
+    return result
+
+
+def _set(output: dict[str, Any], path: str, value: Any, line: dict[str, Any], confidence: float) -> None:
+    if value in (None, ""):
+        return
+    group, field = path.split(".", 1)
+    if output[group].get(field) not in (None, ""):
+        return
+    clean = str(value).strip(" :-.;")
+    output[group][field] = clean
+    evidence = {
+        "field": path,
+        "value": clean,
+        "line_id": _line_id(line),
+        "text": _text(line),
+        "confidence": confidence,
+        "source": "rule_anchor",
+    }
+    output["evidence"].append(evidence)
+    output["field_meta"][path] = {
+        "source": "rule_anchor",
+        "confidence": confidence,
+        "evidence_line_ids": [_line_id(line)],
+    }
+
+
+def _set_panel(output: dict[str, Any], field: str, value: str, line: dict[str, Any]) -> None:
+    values = _split_panel_values(value) if field == "jurors" else [value]
+    for clean in values:
+        if not clean:
+            continue
+        if field == "jurors":
+            if clean not in output["trial_panel"][field]:
+                output["trial_panel"][field].append(clean)
+        elif not output["trial_panel"][field]:
+            output["trial_panel"][field] = clean
+        else:
+            continue
+        output["evidence"].append(
+            {
+                "field": f"trial_panel.{field}", "value": clean, "line_id": _line_id(line),
+                "text": _text(line), "confidence": 0.94, "source": "rule_anchor",
+            }
+        )
+
+
+def _clean_panel_value(value: str) -> str | None:
+    value = re.sub(r"^[\s:;,.\-]+", "", value)
+    value = re.sub(r"\s+", " ", value).strip(" ;,.-")
+    return value or None
+
+
+def _split_panel_values(value: str) -> list[str]:
+    return [
+        re.sub(r"^\s*\d+[.)]\s*", "", item).strip()
+        for item in re.split(r"[;]|,(?=\s*(?:Ông|Bà|[A-ZĐ]))", value)
+        if item.strip()
+    ]
+
+
+def _number_after_anchor(text: str, anchor_pattern: str) -> str | None:
+    match = re.search(anchor_pattern + r"\s*[:.]?\s*([0-9A-Za-zÀ-ỹĐđ/.-]+)", text, re.I)
+    return match.group(1).strip(" .;,:") if match else None
+
+
+def _date_after_day_anchor(text: str) -> str | None:
+    day = re.search(r"\bNgày\s*[:.]?\s*" + DATE_RE.pattern, text, re.I)
+    return _normalize_date(day.group(1)) if day else None
+
+
+def _normalize_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    return re.sub(r"\s*([-])\s*", r"\1", re.sub(r"\s*/\s*", "/", value))
+
+
+def _clean_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    value = value.split("\n", 1)[0]
+    value = value.split(";", 1)[0]
+    value = re.sub(r"^[\s:;,./\-]+", "", value)
+    value = re.sub(r"\s+", " ", value).strip(" ,;:.-")
+    return value or None
+
+
+def _presence(value: str) -> str:
+    folded = fold_text(value)
+    if "co don xin vang mat" in folded:
+        return "Có đơn xin vắng mặt"
+    if "vang mat" in folded:
+        return "Vắng mặt"
+    return "Có mặt"
+
+
+def _text(line: dict[str, Any]) -> str:
+    return str(line.get("text") or "").strip()
+
+
+def _line_id(line: dict[str, Any]) -> str:
+    return str(line.get("line_id") or "")

@@ -1,5 +1,11 @@
 # Codex Handoff
 
+## Bàn giao Rule Anchor Baseline
+
+Pre-content default hiện là `rule_anchor_only,rule_then_llm_per_block`. Anchor segmenter cắt metadata/trial-panel/defendant/participant blocks; deterministic parser sở hữu metadata, trial panel và entity fields; Local LLM chỉ repair từng block cần thiết với cap 6000 ký tự/512 token.
+
+Project Owner chạy 1 case trước và review `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `LLM_STATUS` cùng HTML. Không tiếp tục 3 case nếu block boundary, full name, judgment date hoặc role participant ở case đầu chưa đúng. `hybrid_rule_llm`, `legacy_hybrid_rule_llm` và `llm_only` chỉ còn dùng khi cần benchmark lịch sử.
+
 ## Bàn giao Local LLM context budget
 
 Canonical Local LLM hiện là `Qwen/Qwen2.5-3B-Instruct` tại `http://127.0.0.1:8000/v1`, context 8192, output 1024, input 6000 và safety margin 512. Không đổi lại 7B full bf16 trên RTX 5060 Ti 16GB nếu chưa có runtime profile khác chứng minh đủ KV cache.
@@ -24,7 +30,7 @@ Surya OCR CLI hiện fail-fast qua preflight mặc định. Trước pilot, Proj
 
 Các option mới: `--skip-surya-runtime-preflight`, `--surya-runtime-check-gpu-container`, `--surya-runtime-timeout-seconds`, `--surya-startup-timeout-seconds`; env startup là `SURYA_STARTUP_TIMEOUT_SECONDS`. Codex chưa chạy Docker/PDF/Surya thật và không sửa preprocess/stamp.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Read First
 
@@ -217,21 +223,15 @@ Template report chuẩn:
 
 ## Suggested Next Step
 
-Ask Project Owner / ChatGPT to approve one next slice:
-
-1. Project Owner pull, uninstall drifted Surya và reinstall `.[dev,ocr]`.
-2. Xác nhận `check_ocr_backend` in installed/supported `0.20.0`.
-3. Sau đó mới chạy lại `debug-ocr-review --use-preprocessed` Mode 3.
+Project Owner chạy rule-anchor compare trên 1 OCR-cache case với `--require-llm`, review anchor blocks/validator/LLM status, rồi mới tăng `--limit` lên 3.
 ## Ban giao moi nhat
 
 Task hien tai da hoan thien contract cho Windows Surya runtime va stamp suppression V3. Dung `--stamp-suppression balanced` va `--ocr-stamp-filter balanced` khi co `--use-preprocessed`; dung aggressive chi sau visual review.
 
 Codex chua chay PDF that, chua goi Surya inference/Local LLM/cloud API, va khong commit/push. Project Owner can kiem balanced output, excluded stamp lines, raw-vs-filtered text va false removal tren Ezycloudx.
-## Bàn giao pre-content A/B
+## Bàn giao pre-content legacy A/B
 
-CLI mới: `court_ocr_extract.cli compare-pre-content`. Command chỉ đọc OCR cache và so sánh `hybrid_rule_llm,llm_only`; không tự OCR PDF. Output chính là `index.html`, `compare_summary.json`, `compare_summary.xlsx` và artifacts theo case.
-
-Nhánh này chưa phải production decision. Correction notice được route riêng và loại khỏi benchmark bản án chính. Project Owner cần review disagreement, evidence coverage, false rule match và LLM hallucination trên 9 PDF local trước khi chọn hướng.
+CLI `compare-pre-content` vẫn nhận `hybrid_rule_llm`, `legacy_hybrid_rule_llm` và `llm_only`, nhưng không chọn chúng mặc định. Correction notice vẫn route riêng và không tính vào judgment benchmark.
 ## Bàn giao Stamp Object Erase
 
 `red_mask` không còn được xem là bằng chứng dấu mộc đã bị xóa sạch. `stamp_object_mask` và `stamp_object_erased` chỉ phục vụ thử nghiệm/review object erase. Operational safe recipe phải truyền `--stamp-erase-mode mask`; không dựa vào parser default lịch sử `component_white_fill`. Post-OCR stamp filter vẫn được giữ.

@@ -1,5 +1,9 @@
 # Testing
 
+## Rule anchor và per-block LLM tests
+
+Sáu test modules `test_rule_anchor_*.py` dùng OCR-line dictionaries/OCR cache synthetic và fake callable. Coverage gồm judgment number/date adjacency, OCR typo, QĐXX exclusion, single/multi defendant, page-number removal, one-line panel, participant role context, validators, document routing, strategy defaults, LLM cap và Excel/HTML artifacts. Tests không đọc PDF/cache thật và không gọi Surya, Docker, Local LLM hoặc cloud.
+
 ## Local LLM budget/chunk/report tests
 
 - `test_llm_preflight.py`: `/models`, chat nhỏ và connection refused bằng fake opener.
@@ -24,7 +28,7 @@
 - `tests/test_surya_runtime_no_hang_diagnostics.py` kiểm `last_stage` và `SuryaRuntimeError` khi startup timeout.
 - Unit suite không được gọi Docker server, GPU container hoặc Surya inference thật.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Allowed In Codex
 
@@ -152,9 +156,9 @@ TOOLKIT-1 chưa có OCR CER/WER và không được dùng để kết luận rea
 ## Surya runtime va stamp suppression
 
 Synthetic tests cover Docker resolver override, Windows Docker Desktop discovery, diagnostics khong GPU mac dinh, stamp mask/suppression, protected dark text, post-OCR filter, raw/filtered/excluded artifacts va preprocessed OCR path. Passing tests khong thay the visual review OCR that tren Ezycloudx.
-## Pre-content A/B synthetic tests
+## Pre-content legacy và rule-anchor synthetic tests
 
-Tests không đọc PDF thật và không gọi Local LLM thật. Coverage gồm heading có/không dấu, missing heading fallback, correction notice router, nhiều bị cáo, participants, evidence line IDs, rule/LLM conflict, high-confidence rule protection và JSON/Excel/HTML summary artifacts.
+Tests legacy vẫn kiểm `hybrid_rule_llm`/`llm_only` khi truyền strategy rõ. Default tests kiểm `rule_anchor_only,rule_then_llm_per_block`, anchor boundaries, structured rows, runtime status và không tạo fake output khi LLM unavailable.
 ## Stamp object erase synthetic tests
 
 Tests tạo ảnh/mask synthetic trong `tmp_path`: dấu đỏ có residual xám, red mask một phần, stamp overlap chữ đen, blank page và red noise nhỏ. Assertions kiểm object mask rộng hơn red mask, white-fill giảm residual hơn mask-only, overlap warning bảo toàn chữ và artifacts tồn tại. Passing tests không chứng minh threshold phù hợp với scan thật.

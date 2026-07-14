@@ -27,12 +27,12 @@ Sau khi `ok=true`, chạy một case:
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
   --input-dir data\test_pdfs\pre_content_9 `
   --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
-  --output-dir outputs\pre_content_ab_test_llm_3b_budget_check_1 `
-  --strategies hybrid_rule_llm,llm_only `
+  --output-dir outputs\pre_content_rule_anchor_check_1 `
+  --strategies rule_anchor_only,rule_then_llm_per_block `
   --require-llm --limit 1 --open
 ```
 
-Không gửi toàn bộ pre-content trong một prompt. Mỗi request phải thỏa `estimated_input_tokens + max_output_tokens + safety_margin <= context_window`; lỗi budget/context có mã rõ. `--allow-llm-failure` chỉ dùng khi cần report strategy không chạy; mặc định và `--require-llm` đều fail-fast trước case khi preflight lỗi.
+Không gửi toàn bộ pre-content trong một prompt. Nhánh mới parse metadata/trial panel bằng rule, chỉ gọi LLM cho từng defendant/participant block cần repair; mỗi call bị cap 6000 ký tự và 512 output token. `--allow-llm-failure` chỉ dùng khi cần report strategy không chạy; mặc định và `--require-llm` đều fail-fast trước case khi preflight lỗi.
 
 ## OCR pre-content dừng sớm tại marker
 
@@ -123,7 +123,7 @@ Lệnh page 1 an toàn dùng `--stamp-suppression balanced --stamp-erase-mode ma
   --open
 ```
 
-Last updated: 2026-07-07
+Last updated: 2026-07-14
 
 Đây là target rebuild runbook sau Phase 1B default cleanup và Phase 2A Surya adapter fix.
 
@@ -344,21 +344,35 @@ Khong sua `.venv\Lib\site-packages` thu cong. Project tu resolve Docker qua `SUR
 ```
 
 OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, excluded lines, suppression mask va OCR input trong HTML review. Neu balanced con doc dau moc, review aggressive rieng; khong auto-correct ten nguoi hay noi dung bang heuristic.
-## Chạy pre-content A/B trên VM
+## Chạy pre-content rule anchor trên VM
 
-Đặt 9 PDF local tại `data\test_pdfs\pre_content_9`, tạo OCR cache bằng Surya Mode 3 đã duyệt, rồi chạy:
+Đặt PDF local tại `data\test_pdfs\pre_content_9` và dùng OCR cache early-stop đã duyệt. Chạy 1 case trước:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
   --input-dir data\test_pdfs\pre_content_9 `
-  --ocr-cache-dir outputs\ocr_cache_pre_content_9 `
-  --output-dir outputs\pre_content_ab_test `
-  --strategies hybrid_rule_llm,llm_only `
-  --limit 9 `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
+  --output-dir outputs\pre_content_rule_anchor_check_1 `
+  --strategies rule_anchor_only,rule_then_llm_per_block `
+  --require-llm `
+  --limit 1 `
   --open
 ```
 
-Review `outputs\pre_content_ab_test\index.html` và `compare_summary.xlsx`. Không commit PDF mặc định. Correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark.
+Review `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, judgment date, trial panel, defendant/participant roles, validator warnings và `LLM_STATUS`. Chỉ khi case đầu đạt mới đổi output thành `outputs\pre_content_rule_anchor_check_3` và `--limit 3`. Không commit PDF/output; correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark. Muốn đối chiếu lịch sử mới truyền rõ `--strategies hybrid_rule_llm,llm_only`.
+
+Sau khi case đầu đạt, chạy 3 case:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
+  --input-dir data\test_pdfs\pre_content_9 `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
+  --output-dir outputs\pre_content_rule_anchor_check_3 `
+  --strategies rule_anchor_only,rule_then_llm_per_block `
+  --require-llm `
+  --limit 3 `
+  --open
+```
 ## Review stamp object erase
 
 `red_mask` chỉ chứng minh detector đã bắt pixel đỏ; residual xám vẫn có thể còn ngoài mask. Component/object erase chỉ dành cho thử nghiệm visual có chủ đích, không phải mode vận hành mặc định. Safe OCR phải dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced` để giảm nguy cơ xóa chữ thật.

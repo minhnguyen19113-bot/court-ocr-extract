@@ -4,7 +4,7 @@
 
 Local LLM mặc định dùng `Qwen/Qwen2.5-3B-Instruct`, context 8192, output 1024, input tối đa 6000 token/22000 ký tự và safety margin 512. OpenAI-compatible payload luôn có `temperature=0` và `max_tokens>0`. Adapter ước lượng tiếng Việt bằng `ceil(chars/3.2)`, trim `preserve_head` trước HTTP và fail `llm_context_budget_exceeded` nếu vẫn không an toàn.
 
-Pre-content không được gửi nguyên khối. Extractor chia request thành document metadata, trial panel, từng defendant và participants; mỗi chunk có status/budget/error riêng. Kết quả thành công được merge và de-duplicate; một chunk lỗi không xóa chunk khác. Hybrid giữ rule output khi LLM lỗi. Nếu mọi chunk `llm_only` lỗi, status là `llm_only_failed`, `result_valid=false`; schema null/rỗng không được coi là model output hợp lệ.
+Pre-content không được gửi nguyên khối. Main baseline cắt deterministic metadata lines, trial-panel lines, từng defendant block và participant block. Metadata/trial panel được rule parser xử lý; Local LLM chỉ nhận một entity block cần repair, tổng input tối đa 6000 ký tự và output tối đa 512 token. Một block lỗi không xóa rule output hoặc block thành công khác. Strategy không chạy phải có status rõ; schema null/rỗng không được coi là model output hợp lệ.
 
 `compare-pre-content` preflight `/models` và chat nhỏ trước vòng case. `--require-llm` fail-fast, `--allow-llm-failure` ghi strategy không chạy, `--skip-llm-preflight` là opt-out rõ ràng.
 
@@ -30,15 +30,15 @@ Object detection dùng `red_mask OR stamp_suppression_mask`, horizontal close v�
 Stamp cleanup chạy `red_mask -> connected components -> grouped/expanded stamp object -> dark-text overlap check -> object erase -> OCR input`. Nếu overlap dưới ngưỡng an toàn, `component_white_fill`, `component_inpaint` hoặc `local_background` có thể xử lý toàn object. Nếu overlap cao, pipeline không white-fill object, ghi `stamp_object_overlaps_dark_text`, fallback mask-level suppression và giữ post-OCR stamp filter.
 
 
-## Pre-content extraction A/B
+## Pre-content rule anchor baseline
 
-Nhánh thử nghiệm nhận filtered OCR lines, route document và cắt phần trước `NỘI DUNG VỤ ÁN`. Mode A chạy rule-based trước rồi Local LLM chỉ fill/repair field chưa giải quyết; mode B chạy Local LLM trên cùng pre-content input. Cả hai phải giữ evidence/warnings và không dùng nội dung sau heading. Rule-only không phải output quyết định cuối.
+Nhánh chính nhận filtered OCR lines, route document và chỉ dùng phần trước `NỘI DUNG VỤ ÁN`. `rule_anchor_only` parse deterministic toàn bộ; `llm_per_block` dùng rule cho metadata/panel và model cho từng entity block; `rule_then_llm_per_block` chỉ gọi model khi entity thiếu field cốt lõi hoặc validator báo lỗi. Mọi block giữ `line_ids`, raw text, split reason, warnings và evidence. `hybrid_rule_llm`/`llm_only` vẫn có thể gọi rõ để benchmark legacy nhưng không phải default.
 
 ## Stamp suppression contract
 
 Khi dung preprocessed input, tao `stamp_suppression_mask` va `ocr_input_stamp_suppressed`; post-OCR filter giu raw lines, filtered lines va excluded lines co `reason`, `stamp_overlap_ratio`, `dark_text_overlap_ratio`. Khong hard-code noi dung dau moc va khong fallback sang OCR backend khac.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 This is the target rebuild spec. Phase 1B cleaned defaults to match this spec but did not implement real runtime changes.
 

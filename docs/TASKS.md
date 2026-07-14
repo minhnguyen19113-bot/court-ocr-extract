@@ -1,5 +1,16 @@
 # Tasks
 
+## RULE ANCHOR EXTRACTOR + PER-BLOCK LLM BASELINE
+
+- [x] Thêm `rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`; giữ strategy legacy để compare khi gọi rõ.
+- [x] Thêm anchor segmenter cho metadata, trial panel, defendant và participant blocks với line IDs/split reasons.
+- [x] Thêm deterministic metadata/trial-panel/defendant/participant parsers và validators.
+- [x] Sửa document router nhận bản án thiếu/mất OCR judgment number và ưu tiên correction notice.
+- [x] Giới hạn Local LLM theo từng block ở 6000 ký tự/512 output token; không gửi full pre-content.
+- [x] Tổng quát hóa compare runner, thêm `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS` và HTML anchor review.
+- [x] Thêm sáu test modules, 15 tình huống contract và fake LLM; không có real-data/model call.
+- [ ] Project Owner chạy 1 case trên VM, review anchor/validator/structured output rồi mới chạy 3 case.
+
 ## LOCAL LLM CONTEXT BUDGET + CHUNKED EXTRACTION FIX
 
 - [x] Chuyển default VM sang Qwen2.5-3B, context 8192 và output 1024.
@@ -68,7 +79,7 @@
 - [x] Thêm `llm_only` với prompt giới hạn pre-content và JSON repair.
 - [x] Thêm `compare-pre-content` cùng JSON, Excel, HTML artifacts.
 - [x] Thêm synthetic tests cho segmenter, rule, hybrid và compare.
-- [ ] Project Owner chạy A/B trên 9 PDF và quyết định hướng tiếp theo.
+- [x] Reviewer quyết định không dùng hai strategy này làm hướng chính; giữ làm legacy comparison.
 
 ## SURYA WINDOWS RUNTIME + OCR STAMP SUPPRESSION V3
 
@@ -80,7 +91,7 @@
 - [x] Khong auto-correct ten nguoi/dia danh/noi dung bang heuristic.
 - [ ] Project Owner review balanced/aggressive tren Ezycloudx voi PDF that.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Phase 1A
 

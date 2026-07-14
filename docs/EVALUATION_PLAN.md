@@ -1,6 +1,6 @@
 # Evaluation Plan
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Mục tiêu
 
@@ -43,6 +43,8 @@ TOOLKIT-1 đã implement aggregate contract metrics:
 - Participant row correctness.
 - Duplicate/role/date/id warning rate.
 - Rows with `NEEDS_REVIEW`.
+- Document router accuracy, anchor block boundary accuracy và defendant/participant count theo block.
+- Metadata/trial-panel exactness tách khỏi entity repair; so sánh `rule_anchor_only` với `rule_then_llm_per_block` trên cùng OCR cache.
 
 TOOLKIT-1 đã implement field/participant/evidence metrics:
 
@@ -73,5 +75,7 @@ CLI không có default vào `data/`, `data_private/`, `outputs/` hoặc pipeline
 ## Không kết luận từ synthetic
 
 Synthetic fixtures chỉ trả lời câu hỏi “pipeline contract có chạy không”. Chúng không trả lời “OCR có đọc đúng án thật không” hoặc “Local LLM có extract đúng dữ liệu thật không”.
+
+Gate pilot mới: review 1 case trước, xác nhận judgment date không lấy từ ngày sinh/quyết định, không có defendant giả từ QĐXX, participant role đúng và block boundary đủ evidence; chỉ sau đó mới chạy 3 case. Hai strategy legacy không được dùng làm baseline chính.
 
 TOOLKIT-1 chưa tính OCR CER/WER vì repo không có và Codex không được đọc line-level gold text thật. Human review và real gold evaluation do Project Owner thực hiện ngoài Codex.

@@ -1,5 +1,13 @@
 # AI Changelog
 
+## 2026-07-14 - Rule Anchor Extractor + LLM Theo Từng Block
+
+- Thêm anchor segmenter và deterministic parser cho metadata, trial panel, defendant, participant cùng evidence line IDs/validators.
+- Thêm `rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`; đổi default compare sang rule-anchor và giữ `hybrid_rule_llm`/`llm_only` làm legacy benchmark.
+- LLM mới chỉ nhận từng entity block, cap input 6000 ký tự và output 512 token; không gửi full pre-content.
+- Tổng quát hóa JSON/Excel/HTML compare, thêm `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS` và anchor review theo case.
+- Thêm synthetic/fake-LLM tests cho 15 tình huống; không đọc PDF thật hoặc gọi Surya/Docker/LLM/cloud thật.
+
 ## 2026-07-14 - Local LLM Context Budget + Chunked Extraction Fix
 
 - Chuyển default Local LLM sang Qwen2.5-3B/8192 và thêm toàn bộ env budget/chunk.

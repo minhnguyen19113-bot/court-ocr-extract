@@ -4,7 +4,7 @@
 
 HTML phải hiển thị preflight/runtime, provider, model, base URL, context window, input token ước lượng, chunk count, `llm_actually_called` và chunk errors. `llm_only_failed`/`llm_only_not_run` phải hiện “không có output hợp lệ”, không render schema null như kết quả model.
 
-Workbook compare có review sheets `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `LLM_STATUS`; JSON blob chỉ được giữ trong debug sheets `FIELD_LONG`, `EVIDENCE_LINES`, `RAW_JSON`, không đặt trong sheet review chính.
+Workbook compare có review sheets `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `LLM_STATUS`; JSON blob chỉ được giữ trong debug sheets `FIELD_LONG`, `EVIDENCE_LINES`, `RAW_JSON`, không đặt trong sheet review chính. HTML theo case phải hiển thị metadata/trial-panel lines, defendant/participant blocks, line IDs, split reasons, validator warnings, strategy outputs và LLM calls.
 
 ## Marker và early-stop metadata
 
@@ -17,7 +17,7 @@ OCR review phải hiển thị marker found/page/matched text/confidence, early-
 - Stage chuẩn: `stage_01_render_pdf`, `stage_02_preprocess`, `stage_03_resolve_docker`, `stage_04_patch_surya_resolver`, `stage_05_import_surya`, `stage_06_create_predictor`, `stage_07_predictor_call`, `stage_08_parse_predictions`.
 - Log terminal chỉ nêu trạng thái runtime, không in OCR text hoặc dữ liệu nhạy cảm.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 Debug output is mandatory for reviewer trust. It must be safe by default and should never print or expose full real OCR text in logs.
 

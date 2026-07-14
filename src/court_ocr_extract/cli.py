@@ -285,7 +285,7 @@ def _add_compare_pre_content(subparsers) -> None:
     parser.add_argument("--ocr-cache-dir", required=True)
     parser.add_argument("--input-dir", default=None, help="Optional source directory for operator traceability; PDFs are not read by this command.")
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--strategies", default="hybrid_rule_llm,llm_only")
+    parser.add_argument("--strategies", default="rule_anchor_only,rule_then_llm_per_block")
     parser.add_argument("--limit", type=int, default=None)
     llm_policy = parser.add_mutually_exclusive_group()
     llm_policy.add_argument("--require-llm", action="store_true")
@@ -706,7 +706,16 @@ def cmd_compare_pre_content(args) -> None:
     strategies = [value.strip() for value in args.strategies.split(",") if value.strip()]
     llm_preflight = None
     llm_available = True
-    needs_llm = any(value in {"hybrid_rule_llm", "llm_only"} for value in strategies)
+    needs_llm = any(
+        value in {
+            "hybrid_rule_llm",
+            "legacy_hybrid_rule_llm",
+            "llm_only",
+            "llm_per_block",
+            "rule_then_llm_per_block",
+        }
+        for value in strategies
+    )
     if needs_llm and args.skip_llm_preflight:
         if args.require_llm:
             raise RuntimeError("--require-llm cannot be combined with --skip-llm-preflight.")

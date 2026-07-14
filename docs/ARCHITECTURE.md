@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Target Principles
 
@@ -25,9 +25,10 @@ PDF
 -> bbox/text/layout/reading order
 -> OCRCacheRecord/text cache
 -> normalize text
--> section split
--> rule-based extraction for easy fields
--> local LLM extraction for hard fields
+-> pre-content anchor/block segmentation
+-> deterministic metadata and trial-panel extraction
+-> deterministic defendant/participant block parsing + validators
+-> optional Local LLM repair for one entity block at a time
 -> evidence validation
 -> Excel
 -> QA report
@@ -70,6 +71,7 @@ Likely main candidates:
 - Surya/OCR cache: `src/court_ocr_extract/ocr/`, `src/court_ocr_extract/ocr_backends/surya_ocr.py`, `src/court_ocr_extract/ocr_cache.py`
 - Extraction orchestrator: canonical `src/court_ocr_extract/extraction_pipeline.py`.
 - Extractor backends: canonical `src/court_ocr_extract/extractors/`; Local LLM backend ở `extractors/local_llm_extractor.py`, rule helper ở `extractors/rule_support.py`.
+- Pre-content baseline: `extractors/pre_content_anchor_segmenter.py`, `extractors/rule_anchor_extractor.py`, `extractors/rule_anchor_strategies.py`; legacy hybrid/LLM-only modules chỉ phục vụ explicit comparison.
 - Local LLM client/parser: `src/court_ocr_extract/local_llm/`.
 - Typed merge/schema/validation compatibility: `src/court_ocr_extract/extraction/`; package này không còn sở hữu extractor backend.
 - Validation/QA: `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/extraction/validators.py`, `src/court_ocr_extract/qa.py`.

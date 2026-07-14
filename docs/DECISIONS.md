@@ -1,9 +1,10 @@
 # Decisions
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 | ID | Status | Decision | Reason |
 | --- | --- | --- | --- |
+| D-041 | Accepted | Pre-content main baseline dùng rule-based anchors/block segmentation: deterministic metadata/trial panel/entity parse, optional Local LLM repair từng block. Default compare là `rule_anchor_only,rule_then_llm_per_block`; `hybrid_rule_llm`/`llm_only` là legacy comparison. | Review thực tế cho thấy hybrid giữ rule value bẩn còn LLM-only thiếu metadata/panel; block boundary và validator cần deterministic ownership trước khi gọi model. |
 | D-040 | Accepted | Local LLM mặc định trên RTX 5060 Ti 16GB là `Qwen/Qwen2.5-3B-Instruct`, context 8192/output 1024; pre-content phải chunk và mọi request phải qua budget + preflight. LLM-only lỗi không phải output hợp lệ. | Project Owner đã chạy vLLM 3B thành công; 7B full bf16 hết KV cache và request pre-content nguyên khối vượt context 8192. |
 | D-039 | Accepted | Pre-content OCR mặc định scan và dừng theo từng page tại high/medium marker; predictor được tái sử dụng, batch mặc định 1, extraction dùng `text_before_marker`. `--full-document` là explicit override. | Project Owner xác nhận OCR đọc được marker nhưng bulk inference chỉ check sau toàn PDF, gây OCR thừa và tốn thời gian VM. |
 | D-037 | Accepted | Windows/Ezycloudx Surya runtime chuẩn dùng Docker shim không có khoảng trắng, vLLM keep-alive, Docker named pipe và cold-start timeout 900 giây; không stop container đã warm. | Project Owner đã xác nhận OCR page 1 thành công; timeout 300 giây có thể kết thúc trước khi container cold start xuất hiện. |

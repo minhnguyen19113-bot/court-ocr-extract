@@ -12,14 +12,25 @@ from court_ocr_extract.settings import PipelineSettings
 
 def test_compare_runner_writes_json_excel_html_and_routes_notice(tmp_path) -> None:
     def fake_llm(prompt, text):
-        return {
-            "document_type": "judgment_criminal_first_instance",
-            "metadata": {"judgment_number": "01/2026/HS-ST"},
-            "trial_panel": {}, "defendants": [], "participants": [], "evidence": [],
-        }
+        request = json.loads(text)
+        if request["type"] == "defendant":
+            return {"full_name": "Người Synthetic A", "occupation": "Kiểm thử"}
+        return {"role": request["role_hint"], "full_name": "Người Synthetic P"}
 
     records = [
-        _record("case_judgment", ["Bản án số: 01/2026/HS-ST", "NHÂN DANH", "NỘI DUNG VỤ ÁN"]),
+        _record(
+            "case_judgment",
+            [
+                "Bản án số: 01/2026/HS-ST",
+                "NHÂN DANH",
+                "Thẩm phán - Chủ tọa phiên tòa: Thẩm Phán Synthetic",
+                "Đối với bị cáo:",
+                "Người Synthetic A, sinh năm 1990",
+                "Bị hại:",
+                "Người Synthetic P",
+                "NỘI DUNG VỤ ÁN",
+            ],
+        ),
         _record("case_notice", ["THÔNG BÁO", "SỬA CHỮA BỔ SUNG BẢN ÁN", "NỘI DUNG VỤ ÁN"]),
     ]
 
@@ -41,8 +52,8 @@ def test_compare_runner_writes_json_excel_html_and_routes_notice(tmp_path) -> No
     assert {
         "SUMMARY", "CASES", "DEFENDANTS", "PARTICIPANTS", "TRIAL_PANEL", "LLM_STATUS",
         "FIELD_LONG", "EVIDENCE_LINES", "RAW_JSON", "CASE_COMPARE", "CONFLICTS",
-        "MISSING_FIELDS", "NEEDS_REVIEW", "DOC_ROUTER",
-    } == set(workbook.sheetnames)
+        "MISSING_FIELDS", "NEEDS_REVIEW", "DOC_ROUTER", "ANCHOR_BLOCKS", "ANCHOR_WARNINGS",
+    } <= set(workbook.sheetnames)
 
 
 def _record(case_id, texts):

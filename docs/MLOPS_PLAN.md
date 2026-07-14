@@ -1,6 +1,6 @@
 # MLOps Plan
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Mục tiêu
 
@@ -21,13 +21,14 @@ Quản trị version, runtime, benchmark, và rollback cho Surya OCR, local LLM,
 - Main adapter đã pin `surya-ocr==0.20.0`; guard fail mọi version khác trước runtime. Surya 2/0.21.x cần phase/runtime governance riêng.
 - Local LLM runtime mặc định đã xác nhận là `Qwen/Qwen2.5-3B-Instruct`, vLLM OpenAI-compatible, context 8192/output 1024 trên RTX 5060 Ti 16GB. Qwen2.5-7B full bf16 không là default vì thiếu KV cache.
 - Manifest/report phải giữ context window, input token estimate, output budget, chunk name, truncation, request status và error type; không lưu prompt/OCR text trong log an toàn.
+- Pre-content baseline version phải ghi strategy (`rule_anchor_only`, `llm_per_block`, `rule_then_llm_per_block`), anchor/parser/prompt version và validator warning taxonomy. Per-block runtime cap là 6000 ký tự/512 output token dù global Local LLM budget lớn hơn.
 - Ghi model/runtime version vào run manifest.
 - Khi prompt/schema đổi, cập nhật `docs/CHANGELOG_AI.md` và evaluation baseline.
 - Không thay default sang cloud model nếu không có explicit opt-in decision.
 
 ## Benchmark policy
 
-- Surya OCR + local LLM là main candidate.
+- Surya OCR + deterministic rule anchors/block parser + optional Local LLM repair theo block là main candidate.
 - Local VLM là benchmark path, phải dùng cùng validation/evidence/QA rule.
 - Benchmark chỉ có ý nghĩa khi chạy trên gold/pilot dataset do Project Owner quản trị ngoài Codex.
 

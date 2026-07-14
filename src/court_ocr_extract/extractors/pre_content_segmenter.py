@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from typing import Any
 
+from court_ocr_extract.extractors.pre_content_anchor_segmenter import fold_text, normalize_ocr_text
 from court_ocr_extract.ocr_backends.base import OCRResult
 
 
@@ -11,15 +11,29 @@ DOCUMENT_TYPES = ("judgment_criminal_first_instance", "correction_notice", "unkn
 
 
 def route_document(text: str) -> dict[str, Any]:
-    normalized = _fold(text)
-    has_judgment = bool(re.search(r"\bban an\s*(?:so)?\b", normalized))
-    has_people = "nhan danh" in normalized
-    has_notice = bool(re.search(r"\bthong bao\b", normalized))
-    has_correction = "sua chua bo sung ban an" in normalized or "sua chua, bo sung ban an" in normalized
-    if has_notice and has_correction:
+    normalized = fold_text(normalize_ocr_text(text))
+    has_judgment_number = bool(re.search(r"\bban an\s+so\b", normalized))
+    has_correction = bool(
+        re.search(r"\bsua chua\s*,?\s*bo sung ban an\b", normalized)
+        or re.search(r"\bscbs\b", normalized)
+    )
+    if has_correction:
         return {"document_type": "correction_notice", "needs_review": False, "warnings": []}
-    if has_judgment and has_people:
+    if has_judgment_number:
         return {"document_type": "judgment_criminal_first_instance", "needs_review": False, "warnings": []}
+    anchors = (
+        "nhan danh" in normalized,
+        "thanh phan hoi dong xet xu" in normalized or "tham phan" in normalized,
+        "thu ly so" in normalized,
+        "doi voi bi cao" in normalized or "doi voi cac bi cao" in normalized,
+        "noi dung vu an" in normalized,
+    )
+    if sum(anchors) >= 3:
+        return {
+            "document_type": "judgment_criminal_first_instance",
+            "needs_review": True,
+            "warnings": ["judgment_number_missing_or_ocr_lost"],
+        }
     return {
         "document_type": "unknown",
         "needs_review": True,
@@ -72,14 +86,7 @@ def _filtered_lines(result: OCRResult) -> list[dict[str, Any]]:
 
 
 def _is_stop_heading(text: str) -> bool:
-    folded = _fold(text).strip(" .:-_")
+    folded = fold_text(text).strip(" .:-_")
     folded = re.sub(r"\s+", " ", folded)
     # A heading may contain numbering, but should not contain surrounding prose.
     return bool(re.fullmatch(r"(?:[ivx0-9]+[.)-]?\s*)?noi dung vu an", folded))
-
-
-def _fold(value: str) -> str:
-    value = unicodedata.normalize("NFD", value.lower().replace("đ", "d"))
-    value = "".join(char for char in value if unicodedata.category(char) != "Mn")
-    value = re.sub(r"[^a-z0-9,.:;()\-/\s]", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
