@@ -4,6 +4,7 @@ Last updated: 2026-07-10
 
 | ID | Status | Decision | Reason |
 | --- | --- | --- | --- |
+| D-036 | Accepted | Surya CLI phải preflight runtime mặc định và predictor startup phải có timeout/stage diagnostics. GPU smoke chỉ chạy khi được yêu cầu nhưng phải thực thi thật và trả `checked=true`. | Tránh treo mù và lãng phí thời gian VM khi Docker/GPU/vLLM chưa sẵn sàng. |
 | D-001 | Accepted | Project Owner owns direction, real-data runs, output review, and quality acceptance. | Keeps sensitive data and acceptance decisions outside Codex. |
 | D-002 | Accepted | Codex is Repo Manager / Implementation Agent. | Codex manages files, docs, tests, and scoped implementation only. |
 | D-003 | Accepted | ChatGPT is Architect / Reviewer / Prompt Designer. | Architectural direction is reviewed before repo changes. |

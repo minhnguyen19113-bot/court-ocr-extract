@@ -1,5 +1,43 @@
 # Ezycloudx Runbook
 
+## Kiểm tra Surya runtime bắt buộc
+
+Chạy hai lệnh sau trước pilot OCR:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m scripts.check_surya_runtime_backend
+.\.venv\Scripts\python.exe -B -m scripts.check_surya_runtime_backend --check-gpu-container
+```
+
+Lệnh thứ hai phải trả `gpu_container.checked=true` và `gpu_container.ok=true`. Nếu `checked=false` hoặc `ok=false`, không chạy OCR. Có thể điều chỉnh bằng `--gpu-container-timeout-seconds 180`, `--gpu-test-image` và `--surya-docker-binary`.
+
+`debug-ocr-review` và `ocr` chạy preflight nhẹ mặc định gồm Docker resolver, `docker --version`, `docker info`, Surya version và API. Chỉ dùng `--skip-surya-runtime-preflight` khi chẩn đoán có chủ đích. GPU smoke trong OCR chỉ chạy khi có `--surya-runtime-check-gpu-container`.
+
+Lệnh page 1 an toàn dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced`, `--surya-runtime-check-gpu-container` và `--surya-startup-timeout-seconds 300`. Khi lỗi hoặc timeout, xem `surya_runtime_preflight.json` và `<case>/surya_runtime_diagnostics.json` trước khi chạy lại.
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-ocr-review `
+  --input data\raw_pdfs\pilot_one `
+  --limit 1 `
+  --review-sample-size 1 `
+  --ocr-backend surya `
+  --pages 1 `
+  --use-preprocessed `
+  --deskew off `
+  --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance medium `
+  --preprocess-profile balanced `
+  --stamp-suppression balanced `
+  --stamp-erase-mode mask `
+  --ocr-stamp-filter balanced `
+  --surya-docker-binary "C:\Program Files\Docker\Docker\resources\bin\docker.exe" `
+  --surya-runtime-check-gpu-container `
+  --surya-startup-timeout-seconds 300 `
+  --output outputs\debug_visual_ocr_safe_mask_page1 `
+  --open
+```
+
 Last updated: 2026-07-07
 
 Đây là target rebuild runbook sau Phase 1B default cleanup và Phase 2A Surya adapter fix.

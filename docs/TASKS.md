@@ -1,5 +1,14 @@
 # Tasks
 
+## SURYA RUNTIME PREFLIGHT + NO-HANG FIX
+
+- [x] Chuẩn hóa GPU container smoke output và timeout.
+- [x] Dùng resolver cho CLI option, env, PATH và Windows Docker Desktop.
+- [x] Gắn preflight mặc định vào `debug-ocr-review` và `ocr` trước predictor.
+- [x] Thêm startup timeout, container spawn check và 8-stage diagnostics.
+- [x] Thêm synthetic tests cho checked true/false, success/failure/timeout và fail-fast.
+- [ ] Project Owner chạy hai runtime checks và OCR page 1 trên VM.
+
 ## FINAL PREPROCESS CANDIDATE SELECTION FIX
 
 - [x] Tạo `object_seed_mask` từ union red/stroke masks.

@@ -1,5 +1,12 @@
 # AI Changelog
 
+## 2026-07-14 - Surya Runtime Preflight No-Hang Fix
+
+- Sửa GPU Docker smoke để có `checked=true`, command, return code, output tail và timeout khi được yêu cầu.
+- Thêm Docker/Surya preflight mặc định cho `debug-ocr-review` và `ocr`.
+- Thêm `surya_runtime_preflight.json`, `surya_runtime_diagnostics.json`, 8 stage và startup timeout.
+- Thêm unit tests monkeypatch; không chạy Docker, PDF, Surya inference, Local LLM hoặc cloud API thật.
+
 ## 2026-07-10 - Pin Surya OCR Version
 
 - Pin `surya-ocr==0.20.0` trong `pyproject.toml` và `requirements.txt`.

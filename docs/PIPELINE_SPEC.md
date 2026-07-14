@@ -1,5 +1,11 @@
 # Pipeline Spec
 
+## Surya runtime preflight và no-hang contract
+
+Hai CLI `debug-ocr-review` và `ocr` phải chạy preflight trước discover/render/predictor khi backend là Surya. Preflight kiểm Docker binary đã resolve, `docker --version`, `docker info`, Surya version và API; failure phải dừng trước inference. GPU container smoke không chạy mặc định, nhưng khi bật phải thực thi thật với timeout và trả `checked=true`.
+
+Surya adapter ghi các stage từ `stage_01_render_pdf` đến `stage_08_parse_predictions` vào `surya_runtime_diagnostics.json`. Constructor/predictor call bị giới hạn bởi `SURYA_STARTUP_TIMEOUT_SECONDS` hoặc `--surya-startup-timeout-seconds`; timeout raise `SuryaRuntimeError`, giữ `last_stage`, Docker diagnostics và hành động đề xuất. Không fallback sang OCR backend khác một cách âm thầm.
+
 ## Final preprocess selection contract
 
 Object detection dùng `red_mask OR stamp_suppression_mask`, horizontal close và light dilation trước component filtering để giữ dấu mộc ngang nhiều nét rời. Sau erase, pipeline chấm điểm `seal_removed`, `text_enhanced`, `final_preprocessed_candidate`, mask result và `stamp_object_erased`. Candidate có stamp residual thấp nhất chỉ được chọn khi text preservation an toàn. Text enhancement có residual cao hơn hoặc làm mất foreground không được chọn; OCR dùng đúng selected stage. Post-OCR stamp filter vẫn bắt buộc.

@@ -4,8 +4,11 @@ import importlib
 import importlib.util
 import inspect
 import json
+import os
+import queue
 import shutil
 import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from html import unescape
@@ -21,7 +24,12 @@ from court_ocr_extract.image_preprocess import preprocess_image
 from court_ocr_extract.image_processing.stamp_suppression import suppress_stamp_for_ocr
 from court_ocr_extract.ocr_backends.base import OCRBackendStatus, OCRPage, OCRResult
 from court_ocr_extract.ocr_backends.stamp_filter import filter_lines_by_stamp_mask
-from court_ocr_extract.ocr_backends.surya_runtime import patch_surya_docker_resolver_if_needed
+from court_ocr_extract.ocr_backends.surya_runtime import (
+    check_docker_cli,
+    check_running_surya_containers,
+    patch_surya_docker_resolver_if_needed,
+    resolve_docker_binary,
+)
 from court_ocr_extract.pdf_render import render_pdf_pages
 from court_ocr_extract.review_html import write_ocr_review, write_run_index
 from court_ocr_extract.settings import PipelineSettings
@@ -39,6 +47,40 @@ class SuryaAPIDetection:
     kind: str
     version: str
     details: str
+
+
+class _RuntimeDiagnostics:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.payload: dict[str, Any] = {
+            "status": "started",
+            "last_stage": None,
+            "stages": [],
+            "warnings": [],
+        }
+        self._lock = threading.Lock()
+        self._write()
+
+    def stage(self, name: str, **details: Any) -> None:
+        with self._lock:
+            self.payload["last_stage"] = name
+            self.payload["stages"].append({"stage": name, "timestamp": time.time(), **details})
+            self.payload.update(details)
+            self._write()
+
+    def annotate(self, **details: Any) -> None:
+        with self._lock:
+            self.payload.update(details)
+            self._write()
+
+    def warning(self, value: str) -> None:
+        with self._lock:
+            self.payload["warnings"].append(value)
+            self._write()
+
+    def _write(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 class SuryaOCRBackend:
@@ -87,6 +129,9 @@ class SuryaOCRBackend:
         debug_visual: bool = False,
         work_dir: Path | None = None,
         preprocess_options: dict[str, Any] | None = None,
+        docker_binary: str | None = None,
+        startup_timeout_seconds: int | None = None,
+        container_spawn_check_seconds: int = 60,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -98,8 +143,18 @@ class SuryaOCRBackend:
             temp_context = tempfile.TemporaryDirectory(prefix="court_ocr_surya_")
             work_dir = Path(temp_context.name)
         work_dir.mkdir(parents=True, exist_ok=True)
+        diagnostics = _RuntimeDiagnostics(work_dir / "surya_runtime_diagnostics.json")
+        startup_timeout_seconds = int(
+            startup_timeout_seconds or os.environ.get("SURYA_STARTUP_TIMEOUT_SECONDS", "600")
+        )
+        diagnostics.annotate(
+            docker_binary=resolve_docker_binary(docker_binary),
+            startup_timeout_seconds=startup_timeout_seconds,
+            gpu_container_checked=False,
+        )
 
         try:
+            diagnostics.stage("stage_01_render_pdf")
             rendered_pages = render_pdf_pages(
                 pdf_path,
                 work_dir / "01_rendered",
@@ -109,6 +164,7 @@ class SuryaOCRBackend:
             image_paths = [page.image_path for page in rendered_pages]
             input_metadata_by_page: dict[int, dict[str, Any]] = {}
             result_metadata: dict[str, Any] = {"ocr_input_source": "rendered_original"}
+            diagnostics.stage("stage_02_preprocess", enabled=preprocess_options is not None)
             if preprocess_options is not None:
                 image_paths, input_metadata_by_page, result_metadata = _preprocess_ocr_pages(
                     rendered_pages,
@@ -124,9 +180,17 @@ class SuryaOCRBackend:
                 warn_if_marker_missing=bool(stop_marker and max_pages is not None),
                 metadata=result_metadata,
                 input_metadata_by_page=input_metadata_by_page,
+                runtime_diagnostics=diagnostics,
+                docker_binary=docker_binary,
+                startup_timeout_seconds=startup_timeout_seconds,
+                container_spawn_check_seconds=container_spawn_check_seconds,
             )
             result.timing["total_seconds"] = time.perf_counter() - start
+            diagnostics.annotate(status="success")
             return result
+        except Exception as exc:
+            diagnostics.annotate(status="failed", error=f"{type(exc).__name__}: {exc}")
+            raise
         finally:
             if temp_context is not None:
                 temp_context.cleanup()
@@ -142,6 +206,10 @@ class SuryaOCRBackend:
         warn_if_marker_missing: bool = False,
         metadata: dict[str, Any] | None = None,
         input_metadata_by_page: dict[int, dict[str, Any]] | None = None,
+        runtime_diagnostics: _RuntimeDiagnostics | None = None,
+        docker_binary: str | None = None,
+        startup_timeout_seconds: int = 600,
+        container_spawn_check_seconds: int = 60,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -150,7 +218,20 @@ class SuryaOCRBackend:
         start = time.perf_counter()
         image_paths = [Path(path) for path in image_paths]
         page_numbers = page_numbers or list(range(1, len(image_paths) + 1))
-        predictions = self._run_surya_on_images(image_paths)
+        runner = self._run_surya_on_images
+        runner_parameters = inspect.signature(runner).parameters
+        if "diagnostics" in runner_parameters:
+            predictions = runner(
+                image_paths,
+                diagnostics=runtime_diagnostics,
+                docker_binary=docker_binary,
+                startup_timeout_seconds=startup_timeout_seconds,
+                container_spawn_check_seconds=container_spawn_check_seconds,
+            )
+        else:
+            predictions = runner(image_paths)
+        if runtime_diagnostics is not None:
+            runtime_diagnostics.stage("stage_08_parse_predictions")
 
         artifacts_dir = None
         if debug_visual and work_dir is not None:
@@ -254,21 +335,48 @@ class SuryaOCRBackend:
             write_surya_run_artifacts(artifacts_dir, result, case_id=case_id)
         return result
 
-    def _run_surya_on_images(self, image_paths: list[Path]) -> list[Any]:
+    def _run_surya_on_images(
+        self,
+        image_paths: list[Path],
+        *,
+        diagnostics: _RuntimeDiagnostics | None = None,
+        docker_binary: str | None = None,
+        startup_timeout_seconds: int = 600,
+        container_spawn_check_seconds: int = 60,
+    ) -> list[Any]:
         if not image_paths:
             return []
-        patch_surya_docker_resolver_if_needed()
+        binary = resolve_docker_binary(docker_binary)
+        if diagnostics is not None:
+            diagnostics.stage("stage_03_resolve_docker", docker_binary=binary)
+        docker_status = check_docker_cli(binary, timeout_seconds=min(30, startup_timeout_seconds))
+        if diagnostics is not None:
+            diagnostics.annotate(docker_info_ok=docker_status.get("info_ok"))
+            diagnostics.stage("stage_04_patch_surya_resolver")
+        patch_result = patch_surya_docker_resolver_if_needed(binary)
+        if diagnostics is not None:
+            diagnostics.annotate(surya_resolver_patch=patch_result)
         images: list[Image.Image] = []
         try:
             images = [Image.open(path).convert("RGB") for path in image_paths]
+            if diagnostics is not None:
+                diagnostics.stage("stage_05_import_surya")
             detection = _detect_supported_surya_api()
             if detection.kind == "unsupported":
                 raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
             try:
-                return _run_detected_surya_api(
-                    images,
-                    self.settings.surya_language_list,
-                    detection,
+                return _run_with_startup_timeout(
+                    lambda: _run_detected_surya_api(
+                        images,
+                        self.settings.surya_language_list,
+                        detection,
+                        stage_callback=diagnostics.stage if diagnostics is not None else None,
+                    ),
+                    timeout_seconds=startup_timeout_seconds,
+                    diagnostics=diagnostics,
+                    docker_binary=binary,
+                    check_container=bool(patch_result.get("patched")),
+                    container_spawn_check_seconds=container_spawn_check_seconds,
                 )
             except SuryaRuntimeError:
                 raise
@@ -539,30 +647,45 @@ def _run_detected_surya_api(
     images: list[Image.Image],
     languages: list[str],
     detection: SuryaAPIDetection,
+    *,
+    stage_callback=None,
 ) -> list[Any]:
     if detection.kind == "recognition_full_page":
-        return _run_surya_recognition_full_page(images)
+        return _run_surya_recognition_full_page(images, stage_callback=stage_callback)
     if detection.kind == "recognition_with_detection":
-        return _run_surya_recognition_with_detection(images, languages)
+        return _run_surya_recognition_with_detection(images, languages, stage_callback=stage_callback)
     if detection.kind == "legacy_run_ocr":
-        return _run_surya_legacy(images, languages)
+        return _run_surya_legacy(images, languages, stage_callback=stage_callback)
     raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
 
 
-def _run_surya_recognition_full_page(images: list[Image.Image]) -> list[Any]:
+def _run_surya_recognition_full_page(images: list[Image.Image], *, stage_callback=None) -> list[Any]:
     from surya.recognition import RecognitionPredictor
 
+    if stage_callback:
+        stage_callback("stage_06_create_predictor")
     predictor = RecognitionPredictor()
+    if stage_callback:
+        stage_callback("stage_07_predictor_call")
     return list(predictor(images, full_page=True))
 
 
-def _run_surya_recognition_with_detection(images: list[Image.Image], languages: list[str]) -> list[Any]:
+def _run_surya_recognition_with_detection(
+    images: list[Image.Image],
+    languages: list[str],
+    *,
+    stage_callback=None,
+) -> list[Any]:
     from surya.detection import DetectionPredictor
     from surya.recognition import RecognitionPredictor
 
+    if stage_callback:
+        stage_callback("stage_06_create_predictor")
     recognition_predictor = RecognitionPredictor()
     detection_predictor = DetectionPredictor()
     lang_lists = [languages for _ in images]
+    if stage_callback:
+        stage_callback("stage_07_predictor_call")
     try:
         return list(recognition_predictor(images, lang_lists, detection_predictor))
     except TypeError as first_exc:
@@ -576,23 +699,90 @@ def _run_surya_recognition_with_detection(images: list[Image.Image], languages: 
             ) from second_exc
 
 
-def _run_surya_legacy(images: list[Image.Image], languages: list[str]) -> list[Any]:
+def _run_surya_legacy(images: list[Image.Image], languages: list[str], *, stage_callback=None) -> list[Any]:
     from surya.model.detection.model import load_model as load_det_model
     from surya.model.detection.model import load_processor as load_det_processor
     from surya.model.recognition.model import load_model as load_rec_model
     from surya.model.recognition.processor import load_processor as load_rec_processor
     from surya.ocr import run_ocr
 
+    if stage_callback:
+        stage_callback("stage_06_create_predictor")
+    det_model = load_det_model()
+    det_processor = load_det_processor()
+    rec_model = load_rec_model()
+    rec_processor = load_rec_processor()
+    if stage_callback:
+        stage_callback("stage_07_predictor_call")
     return list(
         run_ocr(
             images,
             [languages for _ in images],
-            load_det_model(),
-            load_det_processor(),
-            load_rec_model(),
-            load_rec_processor(),
+            det_model,
+            det_processor,
+            rec_model,
+            rec_processor,
         )
     )
+
+
+def _run_with_startup_timeout(
+    operation,
+    *,
+    timeout_seconds: int,
+    diagnostics: _RuntimeDiagnostics | None,
+    docker_binary: str | None,
+    check_container: bool,
+    container_spawn_check_seconds: int,
+) -> list[Any]:
+    outcomes: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+
+    def target() -> None:
+        try:
+            outcomes.put(("result", operation()))
+        except BaseException as exc:
+            outcomes.put(("error", exc))
+
+    worker = threading.Thread(target=target, name="surya-predictor-startup", daemon=True)
+    worker.start()
+    started = time.monotonic()
+    container_checked = False
+    while True:
+        elapsed = time.monotonic() - started
+        remaining = timeout_seconds - elapsed
+        if remaining <= 0:
+            last_stage = diagnostics.payload.get("last_stage") if diagnostics is not None else "unknown"
+            if diagnostics is not None:
+                diagnostics.annotate(
+                    status="timeout",
+                    timeout_seconds=timeout_seconds,
+                    possible_next_action=(
+                        "Run scripts.check_surya_runtime_backend --check-gpu-container, then inspect "
+                        "Docker Desktop/daemon logs and image/model download status."
+                    ),
+                )
+            raise SuryaRuntimeError(
+                f"Surya startup timed out after {timeout_seconds} seconds at {last_stage}. "
+                f"Docker binary: {docker_binary or 'not found'}. "
+                "Inspect surya_runtime_diagnostics.json and run the GPU container runtime check."
+            )
+        if check_container and not container_checked and elapsed >= container_spawn_check_seconds:
+            container_status = check_running_surya_containers(
+                docker_binary,
+                timeout_seconds=min(15, max(1, int(remaining))),
+            )
+            container_checked = True
+            if diagnostics is not None:
+                diagnostics.annotate(gpu_container_checked=True, container_spawn_check=container_status)
+                if not container_status.get("found"):
+                    diagnostics.warning("surya_vllm_container_not_visible_during_startup")
+        try:
+            kind, value = outcomes.get(timeout=min(0.25, max(0.01, remaining)))
+        except queue.Empty:
+            continue
+        if kind == "error":
+            raise value
+        return list(value)
 
 
 def installed_surya_ocr_version() -> str:

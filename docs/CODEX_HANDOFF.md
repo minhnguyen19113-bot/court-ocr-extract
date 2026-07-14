@@ -1,5 +1,11 @@
 # Codex Handoff
 
+## Bàn giao Surya runtime preflight
+
+Surya OCR CLI hiện fail-fast qua preflight mặc định. Trước pilot, Project Owner phải chạy `scripts.check_surya_runtime_backend` và lệnh có `--check-gpu-container`; lệnh thứ hai chỉ đạt khi `gpu_container.checked=true` và `ok=true`. Khi OCR timeout, đọc `surya_runtime_preflight.json` và `<case>/surya_runtime_diagnostics.json`, đặc biệt `last_stage`.
+
+Các option mới: `--skip-surya-runtime-preflight`, `--surya-runtime-check-gpu-container`, `--surya-runtime-timeout-seconds`, `--surya-startup-timeout-seconds`; env startup là `SURYA_STARTUP_TIMEOUT_SECONDS`. Codex chưa chạy Docker/PDF/Surya thật và không sửa preprocess/stamp.
+
 Last updated: 2026-07-10
 
 ## Read First

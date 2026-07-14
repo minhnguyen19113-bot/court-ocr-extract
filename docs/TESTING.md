@@ -1,5 +1,12 @@
 # Testing
 
+## Surya runtime tests
+
+- `tests/test_surya_runtime_backend_check.py` kiểm GPU flag, success/failure và subprocess timeout bằng monkeypatch.
+- `tests/test_surya_runtime_preflight_cli.py` kiểm Docker binary override, thứ tự preflight và predictor không chạy khi preflight fail.
+- `tests/test_surya_runtime_no_hang_diagnostics.py` kiểm `last_stage` và `SuryaRuntimeError` khi startup timeout.
+- Unit suite không được gọi Docker server, GPU container hoặc Surya inference thật.
+
 Last updated: 2026-07-10
 
 ## Allowed In Codex

@@ -1,5 +1,12 @@
 # Debug Output Spec
 
+## Surya runtime artifacts
+
+- `surya_runtime_preflight.json`: kết quả Docker/Surya API trước OCR; có `gpu_container.checked` và command output tail khi GPU smoke được yêu cầu.
+- `<case>/surya_runtime_diagnostics.json`: journal có `last_stage`, stage history, Docker binary, startup timeout, container spawn check, warning và lỗi cuối.
+- Stage chuẩn: `stage_01_render_pdf`, `stage_02_preprocess`, `stage_03_resolve_docker`, `stage_04_patch_surya_resolver`, `stage_05_import_surya`, `stage_06_create_predictor`, `stage_07_predictor_call`, `stage_08_parse_predictions`.
+- Log terminal chỉ nêu trạng thái runtime, không in OCR text hoặc dữ liệu nhạy cảm.
+
 Last updated: 2026-07-10
 
 Debug output is mandatory for reviewer trust. It must be safe by default and should never print or expose full real OCR text in logs.

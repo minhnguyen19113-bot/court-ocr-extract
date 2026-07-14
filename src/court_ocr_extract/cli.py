@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import shutil
@@ -18,7 +19,7 @@ from court_ocr_extract.extraction_preview import write_extraction_preview
 from court_ocr_extract.image_preprocess import make_before_after_compare, preprocess_image
 from court_ocr_extract.image_processing.stamp_suppression import suppress_stamp_for_ocr
 from court_ocr_extract.ocr_backends import get_ocr_backend
-from court_ocr_extract.ocr_backends.surya_runtime import check_docker_cli
+from court_ocr_extract.ocr_backends.surya_runtime import collect_surya_runtime_diagnostics
 from court_ocr_extract.ocr_backends.base import OCRResult
 from court_ocr_extract.ocr_cache import (
     OCRCacheRecord,
@@ -132,7 +133,7 @@ def _add_debug_ocr_review(subparsers) -> None:
     parser.add_argument("--ocr-backend", default=None)
     _add_full_document_args(parser)
     _add_ocr_preprocess_args(parser)
-    parser.set_defaults(func=cmd_debug_ocr_review)
+    parser.set_defaults(func=cmd_debug_ocr_review, surya_startup_timeout_seconds=300)
 
 
 def _add_debug_marker(subparsers) -> None:
@@ -156,7 +157,7 @@ def _add_ocr(subparsers) -> None:
     parser.add_argument("--debug-visual", action="store_true")
     _add_full_document_args(parser)
     _add_ocr_preprocess_args(parser)
-    parser.set_defaults(func=cmd_ocr)
+    parser.set_defaults(func=cmd_ocr, surya_startup_timeout_seconds=600)
 
 
 def _add_full_document_args(parser: argparse.ArgumentParser) -> None:
@@ -200,7 +201,11 @@ def _add_ocr_preprocess_args(parser: argparse.ArgumentParser) -> None:
     )
     _add_stamp_erase_arg(parser)
     parser.add_argument("--surya-docker-binary", default=None)
-    parser.add_argument("--check-surya-runtime", action="store_true")
+    parser.add_argument("--check-surya-runtime", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--skip-surya-runtime-preflight", action="store_true")
+    parser.add_argument("--surya-runtime-check-gpu-container", action="store_true")
+    parser.add_argument("--surya-runtime-timeout-seconds", type=int, default=30)
+    parser.add_argument("--surya-startup-timeout-seconds", type=int, default=None)
 
 
 def _add_stamp_erase_arg(parser: argparse.ArgumentParser) -> None:
@@ -452,10 +457,11 @@ def cmd_ocr(args) -> None:
     status = backend.check_available()
     if not status.available:
         raise RuntimeError(status.reason)
-    paths = discover_pdfs(args.input_dir, limit=args.limit)
-    cases = case_files_for_paths(paths)
     cache_dir = Path(args.cache_dir)
     debug_run_dir = make_run_dir(settings.debug_visual_dir) if args.debug_visual else None
+    _run_surya_runtime_preflight(args, backend, output_dir=debug_run_dir)
+    paths = discover_pdfs(args.input_dir, limit=args.limit)
+    cases = case_files_for_paths(paths)
     max_pages = _resolve_ocr_page_limit(args, settings)
     stop_marker = _resolve_stop_marker(args, settings)
     records: list[OCRCacheRecord] = []
@@ -470,6 +476,7 @@ def cmd_ocr(args) -> None:
                 debug_visual=bool(debug_run_dir),
                 work_dir=work_dir,
                 preprocess_options=_ocr_preprocess_options(args),
+                runtime_options=_surya_runtime_options(args),
             )
         except Exception:
             if not args.fallback_ocr_backend:
@@ -483,6 +490,7 @@ def cmd_ocr(args) -> None:
                 debug_visual=bool(debug_run_dir),
                 work_dir=work_dir,
                 preprocess_options=_ocr_preprocess_options(args),
+                runtime_options=_surya_runtime_options(args),
             )
         record = OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result)
         write_ocr_cache_record(record, cache_dir)
@@ -716,6 +724,7 @@ def _run_sample_ocr(args, run_dir: Path) -> list[OCRCacheRecord]:
     status = backend.check_available()
     if not status.available:
         raise RuntimeError(status.reason)
+    _run_surya_runtime_preflight(args, backend, output_dir=run_dir)
     cases = _sample_case_files(args)
     max_pages = _resolve_ocr_page_limit(args, settings)
     stop_marker = _resolve_stop_marker(args, settings)
@@ -729,6 +738,7 @@ def _run_sample_ocr(args, run_dir: Path) -> list[OCRCacheRecord]:
             debug_visual=True,
             work_dir=run_dir / case.case_id,
             preprocess_options=_ocr_preprocess_options(args),
+            runtime_options=_surya_runtime_options(args),
         )
         records.append(OCRCacheRecord(case.case_id, case.source_index, case.pdf_hash, result))
     return records
@@ -757,10 +767,6 @@ def _resolve_ocr_page_limit(args, settings) -> int | None:
 def _ocr_preprocess_options(args) -> dict[str, Any] | None:
     if getattr(args, "surya_docker_binary", None):
         os.environ["SURYA_DOCKER_BINARY"] = args.surya_docker_binary
-    if getattr(args, "check_surya_runtime", False):
-        docker = check_docker_cli()
-        if not docker["available"]:
-            raise RuntimeError(f"Surya Docker runtime check failed: {docker['error']}")
     if not getattr(args, "use_preprocessed", False):
         return None
     return {
@@ -775,6 +781,55 @@ def _ocr_preprocess_options(args) -> dict[str, Any] | None:
     }
 
 
+def _surya_runtime_options(args) -> dict[str, Any]:
+    return {
+        "docker_binary": getattr(args, "surya_docker_binary", None),
+        "startup_timeout_seconds": int(getattr(args, "surya_startup_timeout_seconds", None) or 600),
+        "container_spawn_check_seconds": min(
+            120,
+            max(1, int(getattr(args, "surya_startup_timeout_seconds", None) or 600) // 5),
+        ),
+    }
+
+
+def _run_surya_runtime_preflight(args, backend, *, output_dir: Path | None) -> dict[str, Any] | None:
+    if getattr(backend, "name", "") not in {"surya", "surya_optional"}:
+        return None
+    if getattr(args, "skip_surya_runtime_preflight", False):
+        print("Surya runtime preflight skipped by explicit user option.")
+        return {"ok": None, "skipped": True}
+    diagnostics = collect_surya_runtime_diagnostics(
+        check_gpu_container=bool(getattr(args, "surya_runtime_check_gpu_container", False)),
+        docker_binary=getattr(args, "surya_docker_binary", None),
+        runtime_timeout_seconds=int(getattr(args, "surya_runtime_timeout_seconds", 30)),
+        gpu_container_timeout_seconds=int(getattr(args, "surya_runtime_timeout_seconds", 30)),
+    )
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "surya_runtime_preflight.json").write_text(
+            json.dumps(diagnostics, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    if not diagnostics["ok"]:
+        docker = diagnostics.get("docker", {})
+        api = diagnostics.get("surya_api", {})
+        raise RuntimeError(
+            "Surya runtime preflight failed before OCR predictor call. "
+            f"Docker binary: {docker.get('binary') or 'not found'}; "
+            f"Docker error: {docker.get('error') or 'none'}; "
+            f"Surya API: {api.get('kind', 'unknown')}; "
+            f"GPU container checked: {diagnostics.get('gpu_container', {}).get('checked', False)}. "
+            "Run `python -m scripts.check_surya_runtime_backend --check-gpu-container` for full diagnostics."
+        )
+    print(
+        "Surya runtime preflight passed: "
+        f"docker={diagnostics['docker'].get('binary')}, "
+        f"api={diagnostics['surya_api'].get('kind')}, "
+        f"gpu_checked={diagnostics['gpu_container'].get('checked', False)}"
+    )
+    return diagnostics
+
+
 def _run_ocr_backend(
     backend,
     pdf_path: Path,
@@ -784,7 +839,21 @@ def _run_ocr_backend(
     debug_visual: bool,
     work_dir: Path | None,
     preprocess_options: dict[str, Any] | None,
+    runtime_options: dict[str, Any] | None = None,
 ) -> OCRResult:
+    runtime_options = runtime_options or {}
+    if getattr(backend, "name", "") not in {"surya", "surya_optional"}:
+        runtime_options = {}
+    else:
+        signature = inspect.signature(backend.ocr_pdf_prefix)
+        accepts_kwargs = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in signature.parameters.values()
+        )
+        if not accepts_kwargs:
+            runtime_options = {
+                key: value for key, value in runtime_options.items() if key in signature.parameters
+            }
     if preprocess_options is None:
         return backend.ocr_pdf_prefix(
             pdf_path,
@@ -792,6 +861,7 @@ def _run_ocr_backend(
             stop_marker=stop_marker,
             debug_visual=debug_visual,
             work_dir=work_dir,
+            **runtime_options,
         )
     if getattr(backend, "name", "") not in {"surya", "surya_optional"}:
         raise RuntimeError("--use-preprocessed currently requires the Surya OCR backend.")
@@ -802,6 +872,7 @@ def _run_ocr_backend(
         debug_visual=debug_visual,
         work_dir=work_dir,
         preprocess_options=preprocess_options,
+        **runtime_options,
     )
 
 

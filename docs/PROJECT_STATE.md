@@ -1,5 +1,12 @@
 # Project State
 
+## Latest Surya Runtime Preflight No-Hang Fix
+
+- `check_surya_runtime_backend --check-gpu-container` thực thi GPU Docker smoke với command/return code/stdout/stderr tail và timeout rõ; không còn hợp lệ nếu trả `checked=false` khi có flag.
+- `debug-ocr-review` và `ocr` chạy preflight nhẹ mặc định trước đường predictor; Docker path CLI được ưu tiên hơn env/PATH.
+- Surya adapter ghi 8 stage vào `surya_runtime_diagnostics.json`, giới hạn startup bằng timeout và kiểm tra container khi dùng vLLM Docker resolver.
+- Unit tests chỉ monkeypatch Docker/Surya; Codex không chạy PDF, Docker GPU smoke hoặc inference thật.
+
 ## Latest Final Preprocess Candidate Selection Fix
 
 - `stamp_object_mask` hiện tạo từ union seed, hỗ trợ horizontal stamp và không chỉ giữ component lớn/mép phải.

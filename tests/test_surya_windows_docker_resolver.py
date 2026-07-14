@@ -25,7 +25,7 @@ def test_windows_desktop_path_is_used_when_path_is_empty(monkeypatch) -> None:
 def test_runtime_diagnostics_does_not_check_gpu_by_default(monkeypatch) -> None:
     calls: list[list[str | None]] = []
 
-    monkeypatch.setattr(surya_runtime, "check_docker_cli", lambda: {
+    monkeypatch.setattr(surya_runtime, "check_docker_cli", lambda *args, **kwargs: {
         "available": True, "binary": "docker", "version": "synthetic", "info_ok": True, "error": None
     })
     monkeypatch.setattr(surya_runtime, "_run", lambda command, timeout=20: calls.append(command) or {

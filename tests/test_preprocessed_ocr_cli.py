@@ -104,6 +104,7 @@ def _stub_common(monkeypatch, tmp_path, backend) -> None:
     monkeypatch.setattr(cli, "write_run_index", lambda run_dir, links: Path(run_dir) / "index.html")
     monkeypatch.setattr(cli, "_maybe_open", lambda path, enabled: None)
     monkeypatch.setattr(cli, "_print_phase_result", lambda name, run_dir: None)
+    monkeypatch.setattr(cli, "_run_surya_runtime_preflight", lambda *args, **kwargs: {"ok": True})
 
 
 def _case(tmp_path):

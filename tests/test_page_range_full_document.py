@@ -147,6 +147,7 @@ def test_ocr_full_document_passes_none_and_empty_marker(tmp_path, monkeypatch) -
     monkeypatch.setattr(cli, "case_files_for_paths", lambda paths: [case])
     monkeypatch.setattr(cli, "make_run_dir", lambda output: tmp_path / "ocr_debug")
     monkeypatch.setattr(cli, "get_ocr_backend", lambda name, settings: _FakeOCRBackend(captured))
+    monkeypatch.setattr(cli, "_run_surya_runtime_preflight", lambda *args, **kwargs: {"ok": True})
     monkeypatch.setattr(cli, "_print_ocr_case_summary", lambda case_id, result, cache_dir, work_dir: None)
 
     cli.main(
@@ -185,6 +186,7 @@ def _stub_review_command(monkeypatch, tmp_path, case) -> None:
     monkeypatch.setattr(cli, "write_run_index", lambda run_dir, links: Path(run_dir) / "index.html")
     monkeypatch.setattr(cli, "_maybe_open", lambda path, enabled: None)
     monkeypatch.setattr(cli, "_print_phase_result", lambda name, run_dir: None)
+    monkeypatch.setattr(cli, "_run_surya_runtime_preflight", lambda *args, **kwargs: {"ok": True})
 
 
 class _FakeOCRBackend:
