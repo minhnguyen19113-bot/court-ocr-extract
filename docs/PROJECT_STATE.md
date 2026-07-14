@@ -1,5 +1,21 @@
 # Project State
 
+## Latest OCR Marker Early Stop Fix
+
+- Marker detector mới scan filtered lines, raw lines và canonical page text; normalize Unicode/dấu/punctuation/spacing và hỗ trợ split line/truncated marker.
+- Surya pre-content path render/preprocess/OCR theo batch page, mặc định 1, với một predictor runner được tái sử dụng cho toàn PDF.
+- Không có `--full-document`: dừng tại high/medium marker và trim `text_before_marker`. Có `--full-document`: OCR toàn file, không early-stop.
+- Cache/debug có marker và early-stop metadata, pages total/skipped và marker highlight. Extraction ưu tiên `metadata.text_before_marker`.
+- Codex chỉ chạy synthetic tests; không đọc 9 PDF/OCR cache thật và không gọi Surya/Docker/LLM.
+
+## Surya/vLLM Windows Runtime Đã Được Project Owner Xác Nhận
+
+- Project Owner đã chạy thành công OCR page 1 với shim `C:\court-ocr-extract\tools\docker.cmd`, vLLM backend, Docker named pipe và GPU smoke đạt `checked=true`, `ok=true`.
+- Nguyên nhân khựng là cold start Surya/vLLM lần đầu; container có thể xuất hiện sau timeout 300 giây. Runtime recipe mới dùng 900 giây và giữ `surya-vllm-*` warm bằng `SURYA_INFERENCE_KEEP_ALIVE=1`.
+- Safe OCR mode dùng balanced preprocess/suppression, `--stamp-erase-mode mask` và balanced post-OCR filter. Component/object erase không còn là khuyến nghị vận hành mặc định vì có thể xóa chữ thật.
+- Thêm `scripts/setup_surya_windows_runtime.ps1`; script chỉ tạo shim, set env và in command, không tự chạy Docker/OCR.
+- Kết quả runtime trên là xác nhận của Project Owner; Codex không chạy hoặc đọc dữ liệu thật.
+
 ## Latest Surya Runtime Preflight No-Hang Fix
 
 - `check_surya_runtime_backend --check-gpu-container` thực thi GPU Docker smoke với command/return code/stdout/stderr tail và timeout rõ; không còn hợp lệ nếu trả `checked=false` khi có flag.
@@ -19,7 +35,7 @@
 ## Latest Stamp Object Erase Fix
 
 - Đã mở rộng pixel-level stamp suppression thành component/object-level erase.
-- CLI có `--stamp-erase-mode mask|component_white_fill|component_inpaint|local_background`, default `component_white_fill`.
+- CLI có `--stamp-erase-mode mask|component_white_fill|component_inpaint|local_background`. Ghi chú parser default `component_white_fill` là lịch sử triển khai object-erase; operational safe recipe hiện phải truyền rõ `--stamp-erase-mode mask`.
 - Object candidates được lọc noise, gộp morphology, mở rộng bbox và chặn vùng giống toàn trang.
 - Dark-text overlap cao sẽ chặn white-fill, ghi warning và fallback mask-level; OCR stamp filter vẫn được giữ.
 - Tests chỉ dùng synthetic images; Codex chưa chạy PDF/OCR thật.

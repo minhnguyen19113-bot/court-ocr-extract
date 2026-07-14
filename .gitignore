@@ -27,6 +27,7 @@ outputs/extraction_draft/
 logs/
 cache/
 work/
+/tools/docker.cmd
 .streamlit/secrets.toml
 court_ocr_gpu_worker/
 *.pdf

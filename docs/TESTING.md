@@ -1,5 +1,13 @@
 # Testing
 
+## Marker early-stop tests
+
+- `tests/test_marker_detection.py`: exact, no-diacritic, noisy spacing, split/filtered-only, truncated/low-confidence và same-page trim.
+- `tests/test_ocr_marker_early_stop.py`: predictor runner tạo một lần, stop page 3, marker-missing full scan và full-document override.
+- `tests/test_ocr_cache_marker_metadata.py`: cache round-trip và HTML summary/highlight.
+- `tests/test_pre_content_uses_text_before_marker.py`: extraction không nhận full OCR text khi cache có `text_before_marker`.
+- Toàn bộ test dùng synthetic images/lines và monkeypatch, không gọi PDF/Surya/Docker thật.
+
 ## Surya runtime tests
 
 - `tests/test_surya_runtime_backend_check.py` kiểm GPU flag, success/failure và subprocess timeout bằng monkeypatch.

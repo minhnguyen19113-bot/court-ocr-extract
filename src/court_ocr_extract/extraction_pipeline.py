@@ -31,7 +31,11 @@ def extract_from_ocr_cache_records(
     drafts: list[dict[str, Any]] = []
     for record in track(records, "Extracting", total=len(records)):
         try:
-            payload = extractor.extract_from_text(record.result.text, case_id=record.case_id)
+            text_before_marker = record.result.metadata.get("text_before_marker")
+            extraction_text = (
+                text_before_marker if isinstance(text_before_marker, str) else record.result.text
+            )
+            payload = extractor.extract_from_text(extraction_text, case_id=record.case_id)
             payload = validate_extraction_payload(payload)
             status_value = "success"
             error = None

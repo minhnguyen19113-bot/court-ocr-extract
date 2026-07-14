@@ -1,5 +1,56 @@
 # Ezycloudx Runbook
 
+## OCR pre-content dừng sớm tại marker
+
+Command `ocr` mặc định scan từng page và dừng sau page chứa `NỘI DUNG VỤ ÁN`. Không truyền `--max-pages` thì OCR tiếp tục đến marker hoặc hết file; không còn giới hạn ngầm 7 page. Predictor/vLLM được khởi tạo một lần và giữ warm giữa các page. Batch mặc định là 1 để dừng chính xác.
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli ocr `
+  --input-dir data\test_pdfs\pre_content_9 `
+  --limit 1 `
+  --cache-dir outputs\ocr_cache_pre_content_early_stop_1 `
+  --ocr-backend surya `
+  --debug-visual `
+  --use-preprocessed `
+  --deskew off `
+  --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance medium `
+  --preprocess-profile balanced `
+  --stamp-suppression balanced `
+  --stamp-erase-mode mask `
+  --ocr-stamp-filter balanced `
+  --surya-docker-binary "C:\court-ocr-extract\tools\docker.cmd" `
+  --surya-startup-timeout-seconds 900
+```
+
+Cache phải có `metadata.marker`, `metadata.early_stop`, `pages_total` và `text_before_marker`. Muốn OCR toàn bộ file, truyền `--full-document`; khi đó marker không trim text và không kích hoạt early-stop. Có thể tăng `--ocr-page-batch-size`, nhưng batch lớn có thể OCR thừa page sau marker.
+
+## Cấu hình Surya/vLLM đã xác nhận trên Windows VM
+
+Project Owner đã xác nhận OCR page 1 chạy thành công với Docker shim không có khoảng trắng và vLLM container được giữ warm. Đây là runtime recipe chuẩn cho Windows/Ezycloudx; kết quả chất lượng OCR vẫn cần human review.
+
+```powershell
+cd C:\court-ocr-extract
+.\scripts\setup_surya_windows_runtime.ps1
+```
+
+Script tạo local shim `C:\court-ocr-extract\tools\docker.cmd`, set env trong session hiện tại và in lệnh runtime/OCR tiếp theo. Dùng `-PersistUserEnvironment` nếu muốn lưu env ở User scope. Script không tự chạy Docker hoặc OCR.
+
+Thiết lập tương đương:
+
+```powershell
+$env:SURYA_INFERENCE_BACKEND = "vllm"
+$env:SURYA_INFERENCE_KEEP_ALIVE = "1"
+$env:SURYA_DOCKER_BINARY = "C:\court-ocr-extract\tools\docker.cmd"
+$env:DOCKER_BINARY = "C:\court-ocr-extract\tools\docker.cmd"
+$env:DOCKER_HOST = "npipe:////./pipe/docker_engine"
+```
+
+Không stop container `surya-vllm-*` sau khi đã warm. Cold start đầu tiên có thể tạo container sau mốc 300 giây, vì vậy OCR page 1 dùng timeout 900 giây. Nếu Windows Firewall hoặc Docker hỏi quyền network trên VM, allow cả Private và Public.
+
+Kết luận vận hành: lỗi đã quan sát thuộc Surya/vLLM cold start, không thuộc preprocess/stamp. Safe OCR mode bắt buộc truyền `--stamp-erase-mode mask`; không dùng component/object erase làm mode vận hành mặc định vì có thể xóa chữ thật.
+
 ## Kiểm tra Surya runtime bắt buộc
 
 Chạy hai lệnh sau trước pilot OCR:
@@ -13,7 +64,7 @@ Lệnh thứ hai phải trả `gpu_container.checked=true` và `gpu_container.ok
 
 `debug-ocr-review` và `ocr` chạy preflight nhẹ mặc định gồm Docker resolver, `docker --version`, `docker info`, Surya version và API. Chỉ dùng `--skip-surya-runtime-preflight` khi chẩn đoán có chủ đích. GPU smoke trong OCR chỉ chạy khi có `--surya-runtime-check-gpu-container`.
 
-Lệnh page 1 an toàn dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced`, `--surya-runtime-check-gpu-container` và `--surya-startup-timeout-seconds 300`. Khi lỗi hoặc timeout, xem `surya_runtime_preflight.json` và `<case>/surya_runtime_diagnostics.json` trước khi chạy lại.
+Lệnh page 1 an toàn dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced`, `--surya-runtime-check-gpu-container` và `--surya-startup-timeout-seconds 900`. Khi lỗi hoặc timeout, xem `surya_runtime_preflight.json` và `<case>/surya_runtime_diagnostics.json` trước khi chạy lại.
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli debug-ocr-review `
@@ -31,9 +82,9 @@ Lệnh page 1 an toàn dùng `--stamp-suppression balanced --stamp-erase-mode ma
   --stamp-suppression balanced `
   --stamp-erase-mode mask `
   --ocr-stamp-filter balanced `
-  --surya-docker-binary "C:\Program Files\Docker\Docker\resources\bin\docker.exe" `
+  --surya-docker-binary "C:\court-ocr-extract\tools\docker.cmd" `
   --surya-runtime-check-gpu-container `
-  --surya-startup-timeout-seconds 300 `
+  --surya-startup-timeout-seconds 900 `
   --output outputs\debug_visual_ocr_safe_mask_page1 `
   --open
 ```
@@ -212,7 +263,7 @@ Nếu thiếu Surya hoặc VM đã drift lên 0.21.x, reinstall đúng pin:
 .\.venv\Scripts\python.exe -B -m scripts.check_ocr_backend --backend surya
 ```
 
-Main path chỉ hỗ trợ `surya-ocr==0.20.0`. Không dùng Surya 2 / `surya-ocr>=0.21.0` trong phase này vì runtime đó cần inference backend riêng như vLLM/llama.cpp/Docker. Guard sẽ fail trước import/runtime nếu version sai.
+Main path vẫn pin `surya-ocr==0.20.0`; guard sẽ fail trước import/runtime nếu version sai. Trên Windows VM đã xác nhận, package/API được hỗ trợ chạy qua vLLM/Docker với shim path không có khoảng trắng, `SURYA_INFERENCE_KEEP_ALIVE=1` và timeout cold start 900 giây.
 
 Command target để review OCR:
 
@@ -276,7 +327,7 @@ OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, 
 Review `outputs\pre_content_ab_test\index.html` và `compare_summary.xlsx`. Không commit PDF mặc định. Correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark.
 ## Review stamp object erase
 
-`red_mask` chỉ chứng minh detector đã bắt pixel đỏ; residual xám vẫn có thể còn ngoài mask. Mode khuyến nghị để kiểm tra mạnh là `--stamp-suppression aggressive --stamp-erase-mode component_white_fill --ocr-stamp-filter balanced`. Nếu mất chữ thật, dùng `--stamp-suppression balanced --stamp-erase-mode component_inpaint` và review warning/filtered lines.
+`red_mask` chỉ chứng minh detector đã bắt pixel đỏ; residual xám vẫn có thể còn ngoài mask. Component/object erase chỉ dành cho thử nghiệm visual có chủ đích, không phải mode vận hành mặc định. Safe OCR phải dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced` để giảm nguy cơ xóa chữ thật.
 
 Luôn so sánh `red_mask`, `stamp_object_mask`, `stamp_object_erased`, `ocr_input_stamp_suppressed` và `final_preprocessed`. Khi stamp overlap chữ thật, không chấp nhận output tự động nếu chưa human review.
 ## Kiểm final preprocess candidate

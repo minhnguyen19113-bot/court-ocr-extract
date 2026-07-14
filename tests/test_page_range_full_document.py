@@ -94,7 +94,7 @@ def test_full_document_helpers_disable_page_limit_and_marker() -> None:
     assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=True, max_pages=20), settings) is None
     assert cli._resolve_stop_marker(SimpleNamespace(full_document=True), settings) == ""
     assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, max_pages=20), settings) == 20
-    assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, max_pages=None), settings) == 3
+    assert cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, max_pages=None), settings) is None
     assert cli._resolve_stop_marker(SimpleNamespace(full_document=False), settings) == "NỘI DUNG VỤ ÁN"
 
 
@@ -110,6 +110,31 @@ def test_ocr_review_rejects_non_prefix_page_range() -> None:
 
     with pytest.raises(ValueError, match="prefix starting at page 1"):
         cli._resolve_ocr_page_limit(SimpleNamespace(full_document=False, pages="2", max_pages=None), settings)
+
+
+def test_marker_cli_helpers_support_override_and_default_batch() -> None:
+    settings = SimpleNamespace(stop_marker="NỘI DUNG VỤ ÁN")
+
+    assert cli._resolve_stop_marker(
+        SimpleNamespace(full_document=False, stop_at_marker=True, marker_text="CUSTOM MARKER"),
+        settings,
+    ) == "CUSTOM MARKER"
+    assert cli._resolve_stop_marker(
+        SimpleNamespace(full_document=False, stop_at_marker=False, marker_text=None),
+        settings,
+    ) == ""
+    options = cli._surya_runtime_options(
+        SimpleNamespace(
+            surya_docker_binary=None,
+            surya_startup_timeout_seconds=900,
+            marker_include_page=True,
+            marker_trim_after_marker=True,
+            ocr_page_batch_size=1,
+        )
+    )
+    assert options["marker_include_page"] is True
+    assert options["marker_trim_after_marker"] is True
+    assert options["ocr_page_batch_size"] == 1
 
 
 def test_debug_ocr_review_full_document_passes_none_and_empty_marker(tmp_path, monkeypatch) -> None:

@@ -1,5 +1,20 @@
 # AI Changelog
 
+## 2026-07-14 - OCR Marker Early Stop Fix
+
+- Thêm shared marker detector có Unicode folding, diacritic-insensitive matching, spacing/split-line tolerance và confidence.
+- Chuyển Surya pre-content OCR sang page batch loop mặc định 1, tái sử dụng predictor và dừng ngay sau marker page.
+- Bỏ page limit ngầm khi không truyền `--max-pages`; `--full-document` vẫn là explicit full OCR override.
+- Thêm marker/early-stop/text-before-marker cache metadata, HTML summary/highlight và extraction wiring.
+- Thêm synthetic tests; không chạy PDF, Docker, Surya inference, Local LLM hoặc cloud API thật.
+
+## 2026-07-14 - Lưu Runtime Recipe Surya/vLLM Windows Đã Xác Nhận
+
+- Ghi nhận Project Owner đã chạy thành công OCR page 1 với Docker shim không khoảng trắng, vLLM keep-alive, Docker named pipe và timeout 900 giây.
+- Chuyển safe OCR operational recipe sang `--stamp-erase-mode mask`; component/object erase chỉ dành cho thử nghiệm có review.
+- Thêm `scripts/setup_surya_windows_runtime.ps1` để tạo local shim, set env và in command runtime/OCR chuẩn mà không tự thực thi.
+- Thêm ignore cho generated `tools/docker.cmd`; không chạy PDF, Docker, Surya inference, Local LLM hoặc cloud API trong Codex.
+
 ## 2026-07-14 - Surya Runtime Preflight No-Hang Fix
 
 - Sửa GPU Docker smoke để có `checked=true`, command, return code, output tail và timeout khi được yêu cầu.

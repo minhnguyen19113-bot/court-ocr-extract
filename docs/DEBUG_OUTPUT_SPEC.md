@@ -1,5 +1,9 @@
 # Debug Output Spec
 
+## Marker và early-stop metadata
+
+OCR review phải hiển thị marker found/page/matched text/confidence, early-stop triggered, pages processed/total, pages skipped và reason. Marker line được gắn `marker_match=true` và highlight trong HTML. Cache/manifest phải giữ `metadata.marker`, `metadata.early_stop`, `pages_total` và `text_before_marker`; raw page OCR vẫn được giữ để review dù canonical extraction text đã trim.
+
 ## Surya runtime artifacts
 
 - `surya_runtime_preflight.json`: kết quả Docker/Surya API trước OCR; có `gpu_container.checked` và command output tail khi GPU smoke được yêu cầu.

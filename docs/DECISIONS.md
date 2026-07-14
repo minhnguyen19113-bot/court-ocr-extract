@@ -4,6 +4,9 @@ Last updated: 2026-07-10
 
 | ID | Status | Decision | Reason |
 | --- | --- | --- | --- |
+| D-039 | Accepted | Pre-content OCR mặc định scan và dừng theo từng page tại high/medium marker; predictor được tái sử dụng, batch mặc định 1, extraction dùng `text_before_marker`. `--full-document` là explicit override. | Project Owner xác nhận OCR đọc được marker nhưng bulk inference chỉ check sau toàn PDF, gây OCR thừa và tốn thời gian VM. |
+| D-037 | Accepted | Windows/Ezycloudx Surya runtime chuẩn dùng Docker shim không có khoảng trắng, vLLM keep-alive, Docker named pipe và cold-start timeout 900 giây; không stop container đã warm. | Project Owner đã xác nhận OCR page 1 thành công; timeout 300 giây có thể kết thúc trước khi container cold start xuất hiện. |
+| D-038 | Accepted | Safe OCR operational recipe phải truyền `--stamp-erase-mode mask`; component/object erase chỉ dùng thử nghiệm có visual review. | Object erase có thể xóa chữ thật, trong khi lỗi runtime đã xác định không liên quan preprocess/stamp. |
 | D-036 | Accepted | Surya CLI phải preflight runtime mặc định và predictor startup phải có timeout/stage diagnostics. GPU smoke chỉ chạy khi được yêu cầu nhưng phải thực thi thật và trả `checked=true`. | Tránh treo mù và lãng phí thời gian VM khi Docker/GPU/vLLM chưa sẵn sàng. |
 | D-001 | Accepted | Project Owner owns direction, real-data runs, output review, and quality acceptance. | Keeps sensitive data and acceptance decisions outside Codex. |
 | D-002 | Accepted | Codex is Repo Manager / Implementation Agent. | Codex manages files, docs, tests, and scoped implementation only. |

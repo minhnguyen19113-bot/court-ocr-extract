@@ -206,6 +206,11 @@ def _add_ocr_preprocess_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--surya-runtime-check-gpu-container", action="store_true")
     parser.add_argument("--surya-runtime-timeout-seconds", type=int, default=30)
     parser.add_argument("--surya-startup-timeout-seconds", type=int, default=None)
+    parser.add_argument("--stop-at-marker", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--marker-text", default=None)
+    parser.add_argument("--marker-include-page", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--marker-trim-after-marker", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--ocr-page-batch-size", type=int, default=1)
 
 
 def _add_stamp_erase_arg(parser: argparse.ArgumentParser) -> None:
@@ -519,6 +524,10 @@ def _print_ocr_case_summary(case_id: str, result: OCRResult, cache_dir: Path, wo
     print(f"Pages with warnings: {warning_pages}")
     print(f"Low confidence lines: {low_confidence}")
     print(f"Marker found: {'yes' if result.marker_found else 'no'}")
+    early_stop = result.metadata.get("early_stop", {})
+    print(f"Early stop triggered: {'yes' if early_stop.get('triggered') else 'no'}")
+    print(f"Pages total: {result.metadata.get('pages_total', result.pages_processed)}")
+    print(f"Pages skipped after marker: {early_stop.get('pages_skipped_after_marker', 0)}")
     print(f"Output OCR cache: {cache_dir}")
     if work_dir:
         surya_dir = work_dir / "ocr_surya"
@@ -761,7 +770,7 @@ def _resolve_ocr_page_limit(args, settings) -> int | None:
     max_pages = getattr(args, "max_pages", None)
     if max_pages is not None:
         return max_pages
-    return settings.max_pages_before_marker
+    return None
 
 
 def _ocr_preprocess_options(args) -> dict[str, Any] | None:
@@ -789,6 +798,9 @@ def _surya_runtime_options(args) -> dict[str, Any]:
             120,
             max(1, int(getattr(args, "surya_startup_timeout_seconds", None) or 600) // 5),
         ),
+        "marker_include_page": bool(getattr(args, "marker_include_page", True)),
+        "marker_trim_after_marker": bool(getattr(args, "marker_trim_after_marker", True)),
+        "ocr_page_batch_size": max(1, int(getattr(args, "ocr_page_batch_size", 1))),
     }
 
 
@@ -877,9 +889,9 @@ def _run_ocr_backend(
 
 
 def _resolve_stop_marker(args, settings) -> str:
-    if getattr(args, "full_document", False):
+    if getattr(args, "full_document", False) or not getattr(args, "stop_at_marker", True):
         return ""
-    return settings.stop_marker
+    return getattr(args, "marker_text", None) or settings.stop_marker
 
 
 def _sample_records(records: list[OCRCacheRecord], args) -> list[OCRCacheRecord]:

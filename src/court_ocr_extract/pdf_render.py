@@ -12,6 +12,16 @@ class RenderedPage:
     height: int
 
 
+def get_pdf_page_count(pdf_path: str | Path) -> int:
+    import fitz
+
+    document = fitz.open(Path(pdf_path))
+    try:
+        return int(document.page_count)
+    finally:
+        document.close()
+
+
 def parse_page_range(value: str | None) -> list[int] | None:
     if value is None:
         return None

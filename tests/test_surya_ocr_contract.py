@@ -139,9 +139,9 @@ def test_surya_ocr_pdf_prefix_uses_rendered_pages_and_creates_artifacts(tmp_path
     Image.new("RGB", (320, 220), "white").save(rendered_image)
     synthetic_pdf = tmp_path / "synthetic_contract.pdf"
 
-    def fake_render_pdf_pages(pdf_path, output_dir, dpi, max_pages):
+    def fake_render_pdf_pages(pdf_path, output_dir, dpi, page_numbers):
         assert pdf_path == synthetic_pdf
-        assert max_pages == 1
+        assert page_numbers == [1]
         output_dir.mkdir(parents=True, exist_ok=True)
         return [SimpleNamespace(image_path=rendered_image, page_number=1)]
 
@@ -152,10 +152,11 @@ def test_surya_ocr_pdf_prefix_uses_rendered_pages_and_creates_artifacts(tmp_path
         lambda: OCRBackendStatus("surya", True, "synthetic available"),
     )
     monkeypatch.setattr(surya_ocr, "render_pdf_pages", fake_render_pdf_pages)
+    monkeypatch.setattr(surya_ocr, "get_pdf_page_count", lambda path: 1)
     monkeypatch.setattr(
         backend,
-        "_run_surya_on_images",
-        lambda image_paths: [
+        "_create_surya_page_runner",
+        lambda **kwargs: lambda image_paths: [
             {
                 "blocks": [
                     {

@@ -1,5 +1,11 @@
 # Pipeline Spec
 
+## Marker detection và page-level early-stop
+
+Pre-content OCR mặc định chạy `render page/batch -> preprocess -> predictor call -> normalize raw/filtered lines -> marker detection -> cache/debug -> break`. Predictor Surya được tạo một lần cho mỗi PDF và tái sử dụng; `ocr_page_batch_size=1` là default. `--full-document` đặt marker rỗng và giữ bulk/full-document behavior.
+
+Detector dùng NFKC/NFKD, lowercase, bỏ dấu, punctuation/whitespace collapse và chịu được OCR spacing/split-line. High/medium confidence mới được dừng; `noi dung` đơn lẻ là low-confidence candidate và không dừng. Cache giữ raw review lines nhưng `result.text`/`metadata.text_before_marker` được trim trước marker. Không tìm thấy marker thì OCR hết selected file và ghi warning.
+
 ## Surya runtime preflight và no-hang contract
 
 Hai CLI `debug-ocr-review` và `ocr` phải chạy preflight trước discover/render/predictor khi backend là Surya. Preflight kiểm Docker binary đã resolve, `docker --version`, `docker info`, Surya version và API; failure phải dừng trước inference. GPU container smoke không chạy mặc định, nhưng khi bật phải thực thi thật với timeout và trả `checked=true`.

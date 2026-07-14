@@ -1,5 +1,24 @@
 # Tasks
 
+## OCR MARKER EARLY STOP FIX
+
+- [x] Thêm shared marker detector cho raw/filtered/page text và noisy Unicode/spacing.
+- [x] Refactor Surya thành page loop mặc định batch 1, giữ một predictor runner warm.
+- [x] Dừng sau marker page; `--full-document` vẫn OCR toàn file.
+- [x] Ghi marker/early-stop/pages/text-before-marker metadata vào cache/debug.
+- [x] Cho extraction ưu tiên `text_before_marker`.
+- [x] Thêm synthetic tests cho detector, stop/full override, cache, extraction và HTML.
+- [ ] Project Owner chạy lại 1 PDF rồi 9 PDF trên VM và xác nhận tổng pages giảm.
+
+## SURYA/VLLM WINDOWS RUNTIME RECIPE
+
+- [x] Project Owner xác nhận GPU container smoke `checked=true`, `ok=true`.
+- [x] Project Owner xác nhận OCR page 1 với Docker shim không khoảng trắng và timeout 900 giây.
+- [x] Ghi env vLLM keep-alive, Docker named pipe, firewall và warm-container guidance vào runbook/memory.
+- [x] Chốt safe OCR operational mode dùng `--stamp-erase-mode mask`.
+- [x] Thêm setup helper tạo shim, set env và in command; không tự chạy runtime.
+- [ ] Project Owner tiếp tục human review chất lượng OCR và giữ container warm trong cùng VM session.
+
 ## SURYA RUNTIME PREFLIGHT + NO-HANG FIX
 
 - [x] Chuẩn hóa GPU container smoke output và timeout.
@@ -7,7 +26,7 @@
 - [x] Gắn preflight mặc định vào `debug-ocr-review` và `ocr` trước predictor.
 - [x] Thêm startup timeout, container spawn check và 8-stage diagnostics.
 - [x] Thêm synthetic tests cho checked true/false, success/failure/timeout và fail-fast.
-- [ ] Project Owner chạy hai runtime checks và OCR page 1 trên VM.
+- [x] Project Owner đã chạy hai runtime checks và OCR page 1 trên VM.
 
 ## FINAL PREPROCESS CANDIDATE SELECTION FIX
 
@@ -23,7 +42,7 @@
 ## STAMP OBJECT ERASE FIX
 
 - [x] Thêm `stamp_object_mask` từ connected components và expanded object regions.
-- [x] Thêm bốn `stamp_erase_mode` và default `component_white_fill`.
+- [x] Thêm bốn `stamp_erase_mode`; operational safe recipe mới luôn truyền rõ `mask`, không dùng parser default object erase.
 - [x] Thêm dark-text overlap guard, fallback và warnings.
 - [x] Nối artifacts/metadata vào debug-preprocess và Surya OCR path.
 - [x] Giữ post-OCR raw/filtered/excluded stamp lines.

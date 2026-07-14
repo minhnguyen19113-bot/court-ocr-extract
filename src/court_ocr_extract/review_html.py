@@ -118,6 +118,21 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
     base_dir = Path(base_dir)
     sections = ["<h1>OCR Review</h1>"]
     for record in records:
+        marker = record.result.metadata.get("marker", {})
+        early_stop = record.result.metadata.get("early_stop", {})
+        summary = (
+            "<table>"
+            f"<tr><th>Marker found</th><td>{escape(record.result.marker_found)}</td></tr>"
+            f"<tr><th>Marker page</th><td>{escape(record.result.marker_page)}</td></tr>"
+            f"<tr><th>Marker matched text</th><td>{escape(marker.get('matched_text'))}</td></tr>"
+            f"<tr><th>Marker confidence</th><td>{escape(marker.get('confidence'))}</td></tr>"
+            f"<tr><th>Early stop triggered</th><td>{escape(early_stop.get('triggered', False))}</td></tr>"
+            f"<tr><th>Pages processed / total</th><td>{escape(record.result.pages_processed)} / "
+            f"{escape(record.result.metadata.get('pages_total', record.result.pages_processed))}</td></tr>"
+            f"<tr><th>Pages skipped</th><td>{escape(early_stop.get('pages_skipped_after_marker', 0))}</td></tr>"
+            f"<tr><th>Reason</th><td>{escape(early_stop.get('reason'))}</td></tr>"
+            "</table>"
+        )
         page_chunks = []
         for page in record.result.pages:
             artifact = _artifact_block(page.blocks)
@@ -198,7 +213,9 @@ def write_ocr_review(output_path: str | Path, records: list[OCRCacheRecord], *, 
                 f"<h4>Page text</h4><pre>{escape(numbered_text)}</pre>"
                 "</section>"
             )
-        sections.append(f"<section><h2>{escape(record.case_id)}</h2>{''.join(page_chunks)}</section>")
+        sections.append(
+            f"<section><h2>{escape(record.case_id)}</h2>{summary}{''.join(page_chunks)}</section>"
+        )
     return write_html(output_path, "OCR Review", "\n".join(sections))
 
 
@@ -214,10 +231,13 @@ def _line_table(lines: list[dict[str, Any]]) -> str:
         "<tr><th>line_id</th><th>text</th><th>bbox</th><th>confidence</th><th>warning</th></tr>"
     ]
     for line in lines or []:
+        text = escape(line.get("text"))
+        if line.get("marker_match"):
+            text = f"<mark>{text}</mark>"
         rows.append(
             "<tr>"
             f"<td>{escape(line.get('line_id'))}</td>"
-            f"<td>{escape(line.get('text'))}</td>"
+            f"<td>{text}</td>"
             f"<td>{escape(line.get('bbox'))}</td>"
             f"<td>{escape(line.get('confidence'))}</td>"
             f"<td>{escape('; '.join(str(item) for item in line.get('warnings', [])))}</td>"
@@ -251,14 +271,22 @@ def _excluded_stamp_table(lines: list[dict[str, Any]]) -> str:
 
 def write_marker_report(output_path: str | Path, records: list[OCRCacheRecord]) -> Path:
     rows = [
-        "<tr><th>CASE_ID</th><th>MARKER_FOUND</th><th>MARKER_PAGE</th><th>STATUS</th><th>WARNINGS</th></tr>"
+        "<tr><th>CASE_ID</th><th>MARKER_FOUND</th><th>MARKER_PAGE</th><th>MATCHED_TEXT</th>"
+        "<th>CONFIDENCE</th><th>EARLY_STOP</th><th>PAGES</th><th>SKIPPED</th><th>STATUS</th><th>WARNINGS</th></tr>"
     ]
     for record in records:
+        marker = record.result.metadata.get("marker", {})
+        early_stop = record.result.metadata.get("early_stop", {})
         rows.append(
             "<tr>"
             f"<td>{escape(record.case_id)}</td>"
             f"<td>{escape(record.result.marker_found)}</td>"
             f"<td>{escape(record.result.marker_page)}</td>"
+            f"<td>{escape(marker.get('matched_text'))}</td>"
+            f"<td>{escape(marker.get('confidence'))}</td>"
+            f"<td>{escape(early_stop.get('triggered', False))}</td>"
+            f"<td>{escape(record.result.pages_processed)} / {escape(record.result.metadata.get('pages_total', record.result.pages_processed))}</td>"
+            f"<td>{escape(early_stop.get('pages_skipped_after_marker', 0))}</td>"
             f"<td>{escape(record.result.status)}</td>"
             f"<td>{escape('; '.join(record.result.warnings))}</td>"
             "</tr>"

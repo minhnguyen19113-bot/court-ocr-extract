@@ -19,7 +19,6 @@ from typing import Any
 from PIL import Image
 
 from court_ocr_extract.bbox import draw_bbox_overlay
-from court_ocr_extract.early_stop import find_marker_in_text
 from court_ocr_extract.image_preprocess import preprocess_image
 from court_ocr_extract.image_processing.stamp_suppression import suppress_stamp_for_ocr
 from court_ocr_extract.ocr_backends.base import OCRBackendStatus, OCRPage, OCRResult
@@ -30,7 +29,8 @@ from court_ocr_extract.ocr_backends.surya_runtime import (
     patch_surya_docker_resolver_if_needed,
     resolve_docker_binary,
 )
-from court_ocr_extract.pdf_render import render_pdf_pages
+from court_ocr_extract.marker_detection import MarkerResult, detect_page_marker
+from court_ocr_extract.pdf_render import get_pdf_page_count, render_pdf_pages
 from court_ocr_extract.review_html import write_ocr_review, write_run_index
 from court_ocr_extract.settings import PipelineSettings
 
@@ -132,6 +132,9 @@ class SuryaOCRBackend:
         docker_binary: str | None = None,
         startup_timeout_seconds: int | None = None,
         container_spawn_check_seconds: int = 60,
+        marker_include_page: bool = True,
+        marker_trim_after_marker: bool = True,
+        ocr_page_batch_size: int = 1,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -154,6 +157,25 @@ class SuryaOCRBackend:
         )
 
         try:
+            if stop_marker:
+                result = self._ocr_pdf_with_early_stop(
+                    pdf_path,
+                    max_pages=max_pages,
+                    stop_marker=stop_marker,
+                    debug_visual=debug_visual,
+                    work_dir=work_dir,
+                    preprocess_options=preprocess_options,
+                    diagnostics=diagnostics,
+                    docker_binary=docker_binary,
+                    startup_timeout_seconds=startup_timeout_seconds,
+                    container_spawn_check_seconds=container_spawn_check_seconds,
+                    marker_include_page=marker_include_page,
+                    marker_trim_after_marker=marker_trim_after_marker,
+                    ocr_page_batch_size=ocr_page_batch_size,
+                )
+                result.timing["total_seconds"] = time.perf_counter() - start
+                diagnostics.annotate(status="success")
+                return result
             diagnostics.stage("stage_01_render_pdf")
             rendered_pages = render_pdf_pages(
                 pdf_path,
@@ -184,6 +206,8 @@ class SuryaOCRBackend:
                 docker_binary=docker_binary,
                 startup_timeout_seconds=startup_timeout_seconds,
                 container_spawn_check_seconds=container_spawn_check_seconds,
+                marker_include_page=marker_include_page,
+                marker_trim_after_marker=marker_trim_after_marker,
             )
             result.timing["total_seconds"] = time.perf_counter() - start
             diagnostics.annotate(status="success")
@@ -194,6 +218,139 @@ class SuryaOCRBackend:
         finally:
             if temp_context is not None:
                 temp_context.cleanup()
+
+    def _ocr_pdf_with_early_stop(
+        self,
+        pdf_path: Path,
+        *,
+        max_pages: int | None,
+        stop_marker: str,
+        debug_visual: bool,
+        work_dir: Path,
+        preprocess_options: dict[str, Any] | None,
+        diagnostics: _RuntimeDiagnostics,
+        docker_binary: str | None,
+        startup_timeout_seconds: int,
+        container_spawn_check_seconds: int,
+        marker_include_page: bool,
+        marker_trim_after_marker: bool,
+        ocr_page_batch_size: int,
+    ) -> OCRResult:
+        pages_total = get_pdf_page_count(pdf_path)
+        selected_total = min(pages_total, max_pages) if max_pages is not None else pages_total
+        batch_size = max(1, int(ocr_page_batch_size))
+        page_runner = None
+        pages: list[OCRPage] = []
+        text_parts: list[str] = []
+        warnings: list[str] = []
+        marker = MarkerResult(found=False)
+        aggregate_metadata: dict[str, Any] = {"ocr_input_source": "rendered_original"}
+        raw_line_count = filtered_line_count = excluded_line_count = 0
+
+        for first_page in range(1, selected_total + 1, batch_size):
+            page_numbers = list(range(first_page, min(first_page + batch_size, selected_total + 1)))
+            diagnostics.stage("stage_01_render_pdf", page_numbers=page_numbers)
+            rendered_pages = render_pdf_pages(
+                pdf_path,
+                work_dir / "01_rendered",
+                dpi=self.settings.ocr_dpi,
+                page_numbers=page_numbers,
+            )
+            image_paths = [page.image_path for page in rendered_pages]
+            input_metadata_by_page: dict[int, dict[str, Any]] = {}
+            batch_metadata: dict[str, Any] = {"ocr_input_source": "rendered_original"}
+            diagnostics.stage(
+                "stage_02_preprocess",
+                enabled=preprocess_options is not None,
+                page_numbers=page_numbers,
+            )
+            if preprocess_options is not None:
+                image_paths, input_metadata_by_page, batch_metadata = _preprocess_ocr_pages(
+                    rendered_pages,
+                    work_dir=work_dir,
+                    options=preprocess_options,
+                )
+            if page_runner is None:
+                page_runner = self._create_surya_page_runner(
+                    diagnostics=diagnostics,
+                    docker_binary=docker_binary,
+                    startup_timeout_seconds=startup_timeout_seconds,
+                    container_spawn_check_seconds=container_spawn_check_seconds,
+                )
+            aggregate_metadata.update(
+                {key: value for key, value in batch_metadata.items() if key != "preprocess_warnings"}
+            )
+            warnings.extend(batch_metadata.get("preprocess_warnings", []))
+            batch_result = self.ocr_images(
+                image_paths,
+                stop_marker=stop_marker,
+                debug_visual=debug_visual,
+                work_dir=work_dir,
+                page_numbers=[page.page_number for page in rendered_pages],
+                metadata=batch_metadata,
+                input_metadata_by_page=input_metadata_by_page,
+                runtime_diagnostics=diagnostics,
+                prediction_runner=page_runner,
+                marker_include_page=marker_include_page,
+                marker_trim_after_marker=marker_trim_after_marker,
+                pages_total=pages_total,
+            )
+            pages.extend(batch_result.pages)
+            if batch_result.text:
+                text_parts.append(batch_result.text)
+            warnings.extend(batch_result.warnings)
+            raw_line_count += int(batch_result.metadata.get("raw_line_count", 0))
+            filtered_line_count += int(batch_result.metadata.get("filtered_line_count", 0))
+            excluded_line_count += int(batch_result.metadata.get("excluded_stamp_line_count", 0))
+            marker_payload = batch_result.metadata.get("marker", {})
+            if marker_payload.get("found") and marker_payload.get("confidence") in {"high", "medium"}:
+                marker = MarkerResult(**marker_payload)
+                break
+
+        pages_processed = len(pages)
+        triggered = marker.should_stop
+        if not triggered:
+            warnings.append("Marker not found after OCR page scan.")
+        reason = "marker_found" if triggered else (
+            "marker_not_found" if selected_total >= pages_total else "page_limit_reached"
+        )
+        pages_skipped = max(0, pages_total - (marker.page_number or pages_processed)) if triggered else 0
+        aggregate_metadata.update(
+            {
+                "raw_line_count": raw_line_count,
+                "filtered_line_count": filtered_line_count,
+                "excluded_stamp_line_count": excluded_line_count,
+                "marker": marker.to_dict() if triggered else {"found": False},
+                "early_stop": {
+                    "enabled": True,
+                    "triggered": triggered,
+                    "stopped_after_page": marker.page_number if triggered else None,
+                    "pages_skipped_after_marker": pages_skipped,
+                    "reason": reason,
+                    "page_batch_size": batch_size,
+                    "include_marker_page": marker_include_page,
+                    "trim_after_marker": marker_trim_after_marker,
+                },
+                "pages_processed": pages_processed,
+                "pages_total": pages_total,
+                "text_before_marker": "\n\n".join(text_parts).strip(),
+            }
+        )
+        result = OCRResult(
+            backend=self.name,
+            status="success" if pages else "failed",
+            pages_processed=pages_processed,
+            marker_found=triggered,
+            marker_page=marker.page_number if triggered else None,
+            text=aggregate_metadata["text_before_marker"],
+            pages=pages,
+            warnings=_dedupe(warnings),
+            metadata=aggregate_metadata,
+        )
+        artifacts_dir = work_dir / "ocr_surya"
+        if debug_visual and artifacts_dir.exists():
+            write_surya_run_artifacts(artifacts_dir, result, case_id=work_dir.name)
+        return result
 
     def ocr_images(
         self,
@@ -210,6 +367,10 @@ class SuryaOCRBackend:
         docker_binary: str | None = None,
         startup_timeout_seconds: int = 600,
         container_spawn_check_seconds: int = 60,
+        prediction_runner=None,
+        marker_include_page: bool = True,
+        marker_trim_after_marker: bool = True,
+        pages_total: int | None = None,
     ) -> OCRResult:
         status = self.check_available()
         if not status.available:
@@ -218,18 +379,21 @@ class SuryaOCRBackend:
         start = time.perf_counter()
         image_paths = [Path(path) for path in image_paths]
         page_numbers = page_numbers or list(range(1, len(image_paths) + 1))
-        runner = self._run_surya_on_images
-        runner_parameters = inspect.signature(runner).parameters
-        if "diagnostics" in runner_parameters:
-            predictions = runner(
-                image_paths,
-                diagnostics=runtime_diagnostics,
-                docker_binary=docker_binary,
-                startup_timeout_seconds=startup_timeout_seconds,
-                container_spawn_check_seconds=container_spawn_check_seconds,
-            )
+        if prediction_runner is not None:
+            predictions = prediction_runner(image_paths)
         else:
-            predictions = runner(image_paths)
+            runner = self._run_surya_on_images
+            runner_parameters = inspect.signature(runner).parameters
+            if "diagnostics" in runner_parameters:
+                predictions = runner(
+                    image_paths,
+                    diagnostics=runtime_diagnostics,
+                    docker_binary=docker_binary,
+                    startup_timeout_seconds=startup_timeout_seconds,
+                    container_spawn_check_seconds=container_spawn_check_seconds,
+                )
+            else:
+                predictions = runner(image_paths)
         if runtime_diagnostics is not None:
             runtime_diagnostics.stage("stage_08_parse_predictions")
 
@@ -242,8 +406,7 @@ class SuryaOCRBackend:
         metadata = dict(metadata or {"ocr_input_source": "rendered_original"})
         input_metadata_by_page = input_metadata_by_page or {}
         warnings: list[str] = list(metadata.get("preprocess_warnings", []))
-        marker_found = False
-        marker_page = None
+        marker = MarkerResult(found=False)
         raw_line_count = filtered_line_count = excluded_line_count = 0
 
         for image_path, page_number, prediction in zip(image_paths, page_numbers, predictions):
@@ -264,11 +427,28 @@ class SuryaOCRBackend:
                 page_warnings.append("stamp_lines_excluded")
             page_text = "\n".join(line["text"] for line in lines if line.get("text"))
             raw_page_text = "\n".join(line["text"] for line in raw_lines if line.get("text"))
-            marker = find_marker_in_text(page_text, stop_marker) if stop_marker else None
-            text_for_cache = marker.before_text if marker and marker.found else page_text
-            if marker and marker.found:
-                marker_found = True
-                marker_page = page_number
+            page_marker = (
+                detect_page_marker(
+                    page_number=page_number,
+                    marker_text=stop_marker,
+                    page_text=page_text,
+                    raw_lines=raw_lines,
+                    filtered_lines=lines,
+                )
+                if stop_marker
+                else MarkerResult(found=False, page_number=page_number, before_text=page_text)
+            )
+            if page_marker.found and page_marker.confidence == "low":
+                page_warnings.append("low_confidence_marker_candidate_not_used_for_early_stop")
+            if page_marker.should_stop:
+                marker = page_marker
+                if page_marker.line_index is not None and page_marker.line_index < len(lines):
+                    lines[page_marker.line_index]["marker_match"] = True
+            text_for_cache = page_text
+            if page_marker.should_stop and marker_trim_after_marker:
+                text_for_cache = page_marker.before_text
+            if page_marker.should_stop and not marker_include_page:
+                text_for_cache = ""
 
             artifact_block: dict[str, Any] | None = None
             image_for_review: str | None = str(image_path) if debug_visual else None
@@ -297,7 +477,7 @@ class SuryaOCRBackend:
                 )
             )
             warnings.extend(page_warnings)
-            if marker and marker.found:
+            if page_marker.should_stop:
                 break
 
         combined_text = "\n\n".join(page.text for page in pages if page.text.strip())
@@ -311,10 +491,29 @@ class SuryaOCRBackend:
                     or metadata.get("preprocess_warnings")
                     or any("stamp" in warning for warning in warnings)
                 ),
+                "marker": marker.to_dict() if marker.should_stop else {"found": False},
+                "early_stop": {
+                    "enabled": bool(stop_marker),
+                    "triggered": marker.should_stop,
+                    "stopped_after_page": marker.page_number if marker.should_stop else None,
+                    "pages_skipped_after_marker": (
+                        max(0, (pages_total or len(image_paths)) - (marker.page_number or 0))
+                        if marker.should_stop
+                        else 0
+                    ),
+                    "reason": "marker_found" if marker.should_stop else (
+                        "marker_not_found" if stop_marker else "full_document_override"
+                    ),
+                    "include_marker_page": marker_include_page,
+                    "trim_after_marker": marker_trim_after_marker,
+                },
+                "pages_processed": len(pages),
+                "pages_total": pages_total or len(image_paths),
+                "text_before_marker": combined_text,
             }
         )
         result_status = "success" if pages else "failed"
-        if warn_if_marker_missing and pages and not marker_found and len(pages) >= len(image_paths):
+        if warn_if_marker_missing and pages and not marker.should_stop and len(pages) >= len(image_paths):
             result_status = "partial"
             warnings.append("Marker not found before max page limit.")
 
@@ -322,8 +521,8 @@ class SuryaOCRBackend:
             backend=self.name,
             status=result_status,
             pages_processed=len(pages),
-            marker_found=marker_found,
-            marker_page=marker_page,
+            marker_found=marker.should_stop,
+            marker_page=marker.page_number if marker.should_stop else None,
             text=combined_text,
             pages=pages,
             warnings=_dedupe(warnings),
@@ -346,6 +545,22 @@ class SuryaOCRBackend:
     ) -> list[Any]:
         if not image_paths:
             return []
+        runner = self._create_surya_page_runner(
+            diagnostics=diagnostics,
+            docker_binary=docker_binary,
+            startup_timeout_seconds=startup_timeout_seconds,
+            container_spawn_check_seconds=container_spawn_check_seconds,
+        )
+        return runner(image_paths)
+
+    def _create_surya_page_runner(
+        self,
+        *,
+        diagnostics: _RuntimeDiagnostics | None = None,
+        docker_binary: str | None = None,
+        startup_timeout_seconds: int = 600,
+        container_spawn_check_seconds: int = 60,
+    ):
         binary = resolve_docker_binary(docker_binary)
         if diagnostics is not None:
             diagnostics.stage("stage_03_resolve_docker", docker_binary=binary)
@@ -356,38 +571,48 @@ class SuryaOCRBackend:
         patch_result = patch_surya_docker_resolver_if_needed(binary)
         if diagnostics is not None:
             diagnostics.annotate(surya_resolver_patch=patch_result)
-        images: list[Image.Image] = []
+            diagnostics.stage("stage_05_import_surya")
+        detection = _detect_supported_surya_api()
+        if detection.kind == "unsupported":
+            raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
         try:
-            images = [Image.open(path).convert("RGB") for path in image_paths]
-            if diagnostics is not None:
-                diagnostics.stage("stage_05_import_surya")
-            detection = _detect_supported_surya_api()
-            if detection.kind == "unsupported":
-                raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
+            api_runner = _run_with_startup_timeout(
+                lambda: _create_detected_surya_runner(
+                    self.settings.surya_language_list,
+                    detection,
+                    stage_callback=diagnostics.stage if diagnostics is not None else None,
+                ),
+                timeout_seconds=startup_timeout_seconds,
+                diagnostics=diagnostics,
+                docker_binary=binary,
+                check_container=bool(patch_result.get("patched")),
+                container_spawn_check_seconds=container_spawn_check_seconds,
+            )
+        except SuryaRuntimeError:
+            raise
+        except Exception as exc:
+            raise SuryaRuntimeError(
+                "Surya OCR predictor initialization failed while using the supported adapter path. "
+                f"Detected {detection.details}. Original error: {exc}"
+            ) from exc
+
+        def run_page_batch(paths: list[Path]) -> list[Any]:
+            images: list[Image.Image] = []
             try:
+                images = [Image.open(path).convert("RGB") for path in paths]
                 return _run_with_startup_timeout(
-                    lambda: _run_detected_surya_api(
-                        images,
-                        self.settings.surya_language_list,
-                        detection,
-                        stage_callback=diagnostics.stage if diagnostics is not None else None,
-                    ),
+                    lambda: api_runner(images),
                     timeout_seconds=startup_timeout_seconds,
                     diagnostics=diagnostics,
                     docker_binary=binary,
                     check_container=bool(patch_result.get("patched")),
                     container_spawn_check_seconds=container_spawn_check_seconds,
                 )
-            except SuryaRuntimeError:
-                raise
-            except Exception as exc:
-                raise SuryaRuntimeError(
-                    "Surya OCR runtime failed while using the supported adapter path. "
-                    f"Detected {detection.details}. Original error: {exc}"
-                ) from exc
-        finally:
-            for image in images:
-                image.close()
+            finally:
+                for image in images:
+                    image.close()
+
+        return run_page_batch
 
 
 def _preprocess_ocr_pages(rendered_pages, *, work_dir: Path, options: dict[str, Any]):
@@ -650,12 +875,87 @@ def _run_detected_surya_api(
     *,
     stage_callback=None,
 ) -> list[Any]:
+    return _create_detected_surya_runner(
+        languages,
+        detection,
+        stage_callback=stage_callback,
+    )(images)
+
+
+def _create_detected_surya_runner(
+    languages: list[str],
+    detection: SuryaAPIDetection,
+    *,
+    stage_callback=None,
+):
     if detection.kind == "recognition_full_page":
-        return _run_surya_recognition_full_page(images, stage_callback=stage_callback)
+        from surya.recognition import RecognitionPredictor
+
+        if stage_callback:
+            stage_callback("stage_06_create_predictor")
+        predictor = RecognitionPredictor()
+
+        def run_full_page(images: list[Image.Image]) -> list[Any]:
+            if stage_callback:
+                stage_callback("stage_07_predictor_call")
+            return list(predictor(images, full_page=True))
+
+        return run_full_page
     if detection.kind == "recognition_with_detection":
-        return _run_surya_recognition_with_detection(images, languages, stage_callback=stage_callback)
+        from surya.detection import DetectionPredictor
+        from surya.recognition import RecognitionPredictor
+
+        if stage_callback:
+            stage_callback("stage_06_create_predictor")
+        recognition_predictor = RecognitionPredictor()
+        detection_predictor = DetectionPredictor()
+
+        def run_with_detection(images: list[Image.Image]) -> list[Any]:
+            if stage_callback:
+                stage_callback("stage_07_predictor_call")
+            lang_lists = [languages for _ in images]
+            try:
+                return list(recognition_predictor(images, lang_lists, detection_predictor))
+            except TypeError as first_exc:
+                try:
+                    return list(recognition_predictor(images, detection_predictor, lang_lists))
+                except TypeError as second_exc:
+                    raise SuryaRuntimeError(
+                        "Surya package is installed but this adapter does not support the installed API. "
+                        "Detected recognition/detection API but could not call it. "
+                        f"First call error: {first_exc}; second call error: {second_exc}"
+                    ) from second_exc
+
+        return run_with_detection
     if detection.kind == "legacy_run_ocr":
-        return _run_surya_legacy(images, languages, stage_callback=stage_callback)
+        from surya.model.detection.model import load_model as load_det_model
+        from surya.model.detection.model import load_processor as load_det_processor
+        from surya.model.recognition.model import load_model as load_rec_model
+        from surya.model.recognition.processor import load_processor as load_rec_processor
+        from surya.ocr import run_ocr
+
+        if stage_callback:
+            stage_callback("stage_06_create_predictor")
+        det_model = load_det_model()
+        det_processor = load_det_processor()
+        rec_model = load_rec_model()
+        rec_processor = load_rec_processor()
+
+        def run_legacy(images: list[Image.Image]) -> list[Any]:
+            if stage_callback:
+                stage_callback("stage_07_predictor_call")
+            return list(
+                run_ocr(
+                    images,
+                    [languages for _ in images],
+                    det_model,
+                    det_processor,
+                    rec_model,
+                    rec_processor,
+                )
+            )
+
+        return run_legacy
     raise SuryaRuntimeError(_unsupported_surya_api_message(detection))
 
 
@@ -734,7 +1034,7 @@ def _run_with_startup_timeout(
     docker_binary: str | None,
     check_container: bool,
     container_spawn_check_seconds: int,
-) -> list[Any]:
+) -> Any:
     outcomes: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
 
     def target() -> None:
@@ -782,7 +1082,7 @@ def _run_with_startup_timeout(
             continue
         if kind == "error":
             raise value
-        return list(value)
+        return value
 
 
 def installed_surya_ocr_version() -> str:

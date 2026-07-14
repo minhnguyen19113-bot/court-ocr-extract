@@ -1,5 +1,17 @@
 # Codex Handoff
 
+## Bàn giao OCR marker early-stop
+
+Surya `ocr` hiện mặc định xử lý từng page với một predictor runner dùng lại và dừng ở high/medium marker `NỘI DUNG VỤ ÁN`. Không truyền `--max-pages` nghĩa là chạy đến marker hoặc hết file. `--full-document` là override duy nhất để không dừng/trim.
+
+Kiểm cache `metadata.marker`, `metadata.early_stop`, `pages_total`, `text_before_marker`; kiểm HTML marker highlight và pages skipped. Low-confidence `noi dung` đơn lẻ không kích hoạt stop. Project Owner cần giữ vLLM container warm và chạy lại 1 PDF trước, sau đó mới chạy 9 PDF.
+
+## Bàn giao runtime Windows đã chạy thành công
+
+Project Owner đã xác nhận OCR page 1 chạy được với `C:\court-ocr-extract\tools\docker.cmd`, `SURYA_INFERENCE_BACKEND=vllm`, `SURYA_INFERENCE_KEEP_ALIVE=1`, Docker named pipe và startup timeout 900 giây. GPU checker phải trả `checked=true`, `ok=true`; giữ container `surya-vllm-*` warm và allow cả Private/Public nếu Windows Firewall/Docker hỏi trên VM.
+
+Dùng `scripts/setup_surya_windows_runtime.ps1` để tái tạo shim/env và in command chuẩn. Safe OCR bắt buộc dùng `--stamp-erase-mode mask`; không đổi sang component/object erase nếu chưa có visual review riêng. Lỗi khựng đã xác định là vLLM cold start, không phải preprocess/stamp.
+
 ## Bàn giao Surya runtime preflight
 
 Surya OCR CLI hiện fail-fast qua preflight mặc định. Trước pilot, Project Owner phải chạy `scripts.check_surya_runtime_backend` và lệnh có `--check-gpu-container`; lệnh thứ hai chỉ đạt khi `gpu_container.checked=true` và `ok=true`. Khi OCR timeout, đọc `surya_runtime_preflight.json` và `<case>/surya_runtime_diagnostics.json`, đặc biệt `last_stage`.
@@ -216,7 +228,7 @@ CLI mới: `court_ocr_extract.cli compare-pre-content`. Command chỉ đọc OCR
 Nhánh này chưa phải production decision. Correction notice được route riêng và loại khỏi benchmark bản án chính. Project Owner cần review disagreement, evidence coverage, false rule match và LLM hallucination trên 9 PDF local trước khi chọn hướng.
 ## Bàn giao Stamp Object Erase
 
-`red_mask` không còn được xem là bằng chứng dấu mộc đã bị xóa sạch. Review mới phải kiểm `stamp_object_mask` và `stamp_object_erased`. Default erase là `component_white_fill`; khi object overlap dark text trên ngưỡng, code giữ chữ bằng fallback mask-level và yêu cầu review. Post-OCR stamp filter không bị loại bỏ.
+`red_mask` không còn được xem là bằng chứng dấu mộc đã bị xóa sạch. `stamp_object_mask` và `stamp_object_erased` chỉ phục vụ thử nghiệm/review object erase. Operational safe recipe phải truyền `--stamp-erase-mode mask`; không dựa vào parser default lịch sử `component_white_fill`. Post-OCR stamp filter vẫn được giữ.
 
 Codex chỉ chạy synthetic tests, không chạy PDF, Surya inference, Local LLM hoặc cloud API. Project Owner cần so sánh residual và false removal bằng hai command balanced/inpaint và aggressive/white-fill trong runbook.
 ## Bàn giao Final Candidate Selection
