@@ -9,6 +9,9 @@ def test_dedup_uses_case_name_and_normalized_role() -> None:
         "document_type": "judgment_criminal_first_instance",
         "metadata": {},
         "trial_panel": {},
+        "defendants": [
+            {"full_name": "Người Synthetic A"},
+        ],
         "participants": [
             {"role": "Bị hại", "full_name": "Người Synthetic A"},
             {"role": "Bị hại", "full_name": "Người Synthetic A"},
@@ -23,6 +26,6 @@ def test_dedup_uses_case_name_and_normalized_role() -> None:
 
     assert len(rows) == 2
     assert [row["TƯ CÁCH TỐ TỤNG"] for row in rows] == [
+        "Bị cáo",
         "Bị hại",
-        "Người có quyền lợi, nghĩa vụ liên quan",
     ]

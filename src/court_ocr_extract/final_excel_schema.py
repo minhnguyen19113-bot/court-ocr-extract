@@ -5,6 +5,8 @@ FINAL_EXCEL_SHEET_NAME = "FINAL_EXCEL"
 
 FINAL_EXCEL_COLUMNS = [
     "LOẠI ÁN",
+    "SỐ BẢN ÁN",
+    "NGÀY TUYÊN ÁN (DD/MM/YYYY)",
     "SỐ THỤ LÝ",
     "NGÀY THỤ LÝ (DD/MM/YYYY)",
     "QUAN HỆ PHÁP LUẬT",

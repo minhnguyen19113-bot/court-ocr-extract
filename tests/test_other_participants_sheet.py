@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from openpyxl import load_workbook
 
+from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
 from court_ocr_extract.ocr_backends.base import OCRPage, OCRResult
 from court_ocr_extract.ocr_cache import OCRCacheRecord
 from court_ocr_extract.other_participants_builder import (
@@ -32,6 +33,7 @@ def test_other_participants_are_user_facing_but_not_in_final_excel(tmp_path) -> 
         output_dir=tmp_path,
         settings=PipelineSettings(),
         strategies=["rule_anchor_only"],
+        include_other_participants_output=True,
     )
 
     workbook = load_workbook(tmp_path / "compare_summary.xlsx", read_only=True)
@@ -41,12 +43,18 @@ def test_other_participants_are_user_facing_but_not_in_final_excel(tmp_path) -> 
         OTHER_PARTICIPANT_COLUMNS
     )
     assert workbook[OTHER_PARTICIPANTS_SHEET_NAME].max_row == 4
+    final_header_index = {
+        value: index for index, value in enumerate(FINAL_EXCEL_COLUMNS)
+    }
     final_roles = {
-        row[4]
+        row[final_header_index["TƯ CÁCH TỐ TỤNG"]]
         for row in workbook["FINAL_EXCEL"].iter_rows(min_row=2, values_only=True)
     }
+    other_header_index = {
+        value: index for index, value in enumerate(OTHER_PARTICIPANT_COLUMNS)
+    }
     other_roles = {
-        row[2]
+        row[other_header_index["TƯ CÁCH TỐ TỤNG"]]
         for row in workbook[OTHER_PARTICIPANTS_SHEET_NAME].iter_rows(
             min_row=2, values_only=True
         )

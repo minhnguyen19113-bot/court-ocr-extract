@@ -7,7 +7,10 @@ from typing import Any
 
 from openpyxl import Workbook
 
-from court_ocr_extract.charge_parser import parse_explicit_decision_charges
+from court_ocr_extract.charge_parser import (
+    iter_verdict_blocks,
+    parse_explicit_decision_charges,
+)
 from court_ocr_extract.decision_tail import DecisionTailRecord
 from court_ocr_extract.excel_writer import (
     format_final_excel_sheet,
@@ -52,7 +55,10 @@ DEFAULT_STRATEGIES = ("rule_anchor_only", "rule_then_llm_per_block")
 CASES_HEADERS = (
     "case_id", "source_file", "document_type", "ocr_status", "marker_found", "marker_page",
     "early_stop_triggered", "pages_processed", "pages_total", "strategy_used",
-    "decision_tail_status", "case_charges", "charge_warnings", "court_name",
+    "decision_tail_status", "decision_heading_found", "decision_heading_page",
+    "decision_tail_line_count", "verdict_candidate_count", "parsed_charge_count",
+    "mapped_defendant_count", "unmapped_verdict_count",
+    "case_charges", "charge_warnings", "court_name",
     "judgment_number", "judgment_date", "case_type", "legal_relationship",
     "case_acceptance_number", "case_acceptance_date", "trial_decision_number",
     "postponement_decision_number", "trial_date_or_location_sentence", "presiding_judge", "clerk",
@@ -95,6 +101,7 @@ def run_pre_content_ab_test(
     llm_preflight: dict[str, Any] | None = None,
     llm_available: bool | None = None,
     decision_tail_records: dict[str, DecisionTailRecord] | None = None,
+    include_other_participants_output: bool = False,
 ) -> dict[str, Any]:
     selected = records[:limit] if limit is not None else records
     requested = list(strategies or DEFAULT_STRATEGIES)
@@ -196,13 +203,27 @@ def run_pre_content_ab_test(
                 else None
             ),
         }
-        _write_case(case_dir, case)
+        _write_case(
+            case_dir,
+            case,
+            include_other_participants_output=include_other_participants_output,
+        )
         cases.append(case)
 
     summary = _summary(cases, requested, llm_preflight)
     _write_json(output_dir / "compare_summary.json", summary)
-    _write_workbook(output_dir / "compare_summary.xlsx", cases, summary)
-    _write_index(output_dir / "index.html", cases, llm_preflight)
+    _write_workbook(
+        output_dir / "compare_summary.xlsx",
+        cases,
+        summary,
+        include_other_participants_output=include_other_participants_output,
+    )
+    _write_index(
+        output_dir / "index.html",
+        cases,
+        llm_preflight,
+        include_other_participants_output=include_other_participants_output,
+    )
     return summary
 
 
@@ -309,7 +330,12 @@ def _summary(cases, strategies, llm_preflight):
     }
 
 
-def _write_case(case_dir: Path, case: dict[str, Any]) -> None:
+def _write_case(
+    case_dir: Path,
+    case: dict[str, Any],
+    *,
+    include_other_participants_output: bool,
+) -> None:
     (case_dir / "pre_content_text.md").write_text(case["segmenter"]["pre_content_text"], encoding="utf-8")
     for key, filename in (
         ("segmenter", "segmenter.json"),
@@ -324,10 +350,19 @@ def _write_case(case_dir: Path, case: dict[str, Any]) -> None:
             _write_json(case_dir / "hybrid_output.json", output)
         elif strategy == "llm_only":
             _write_json(case_dir / "llm_only_output.json", output)
-    _write_case_review(case_dir / "review.html", case)
+    _write_case_review(
+        case_dir / "review.html",
+        case,
+        include_other_participants_output=include_other_participants_output,
+    )
 
 
-def _write_case_review(path: Path, case: dict[str, Any]) -> None:
+def _write_case_review(
+    path: Path,
+    case: dict[str, Any],
+    *,
+    include_other_participants_output: bool,
+) -> None:
     compare = case["compare"]
     compare_rows = "".join(
         f'<tr><td>{escape(item["field"])}</td><td>{escape(_display(item["left"]))}</td>'
@@ -347,7 +382,11 @@ def _write_case_review(path: Path, case: dict[str, Any]) -> None:
     body = (
         f'<h1>{escape(case["case_id"])}</h1>'
         + _final_excel_preview_html(_final_rows_for_case(case))
-        + _other_participants_preview_html(_other_rows_for_case(case))
+        + (
+            _other_participants_preview_html(_other_rows_for_case(case))
+            if include_other_participants_output
+            else ""
+        )
         + _charge_summary_html(case)
         + _defendant_charge_map_html(case)
         + _source_region_audit_html(case)
@@ -435,7 +474,13 @@ def _llm_runtime_html(case: dict[str, Any]) -> str:
     )
 
 
-def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, Any] | None) -> None:
+def _write_index(
+    path: Path,
+    cases: list[dict[str, Any]],
+    preflight: dict[str, Any] | None,
+    *,
+    include_other_participants_output: bool,
+) -> None:
     runtime = preflight or {"ok": "not_run", "model": "", "base_url": ""}
     rows = "".join(
         f'<tr><td><a href="cases/{escape(case["case_id"])}/review.html">{escape(case["case_id"])}</a></td>'
@@ -452,8 +497,12 @@ def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, A
         + _final_excel_preview_html(
             [row for case in cases for row in _final_rows_for_case(case)]
         )
-        + _other_participants_preview_html(
-            [row for case in cases for row in _other_rows_for_case(case)]
+        + (
+            _other_participants_preview_html(
+                [row for case in cases for row in _other_rows_for_case(case)]
+            )
+            if include_other_participants_output
+            else ""
         )
         + "".join(_charge_summary_html(case) for case in cases)
         + "".join(_defendant_charge_map_html(case) for case in cases)
@@ -467,7 +516,13 @@ def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, A
     write_html(path, "Rule anchor pre-content comparison", body)
 
 
-def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, Any]) -> None:
+def _write_workbook(
+    path: Path,
+    cases: list[dict[str, Any]],
+    summary: dict[str, Any],
+    *,
+    include_other_participants_output: bool,
+) -> None:
     workbook = Workbook()
     final_sheet = workbook.active
     final_sheet.title = FINAL_EXCEL_SHEET_NAME
@@ -477,12 +532,13 @@ def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, 
             final_sheet.append([row[column] for column in FINAL_EXCEL_COLUMNS])
     format_final_excel_sheet(final_sheet)
 
-    other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
-    other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
-    for case in cases:
-        for row in _other_rows_for_case(case):
-            other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
-    format_other_participants_sheet(other_sheet)
+    if include_other_participants_output:
+        other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
+        other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
+        for case in cases:
+            for row in _other_rows_for_case(case):
+                other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
+        format_other_participants_sheet(other_sheet)
 
     sheet_names = (
         "SUMMARY", "ANCHOR_BLOCKS", "ANCHOR_WARNINGS", "CASES", "DEFENDANTS",
@@ -664,12 +720,54 @@ def _charge_summary_html(case: dict[str, Any]) -> str:
     if not rows:
         rows = '<tr><td colspan="3">Chưa có tội danh explicit từ phần Quyết định.</td></tr>'
     warnings = charge_output.get("warnings", []) if isinstance(charge_output, dict) else []
+    candidates = (
+        charge_output.get("verdict_candidate_blocks", [])
+        if isinstance(charge_output, dict)
+        else []
+    )
+    candidate_rows = "".join(
+        "<tr>"
+        f"<td>{index}</td>"
+        f"<td>{escape(item.get('page_number'))}</td>"
+        f"<td>{escape(', '.join(item.get('line_ids', [])))}</td>"
+        f"<td><pre>{escape(item.get('raw_text'))}</pre></td>"
+        "</tr>"
+        for index, item in enumerate(candidates, start=1)
+        if isinstance(item, dict)
+    )
+    if not candidate_rows:
+        candidate_rows = '<tr><td colspan="4">Không có verdict candidate.</td></tr>'
+    evidence_rows = "".join(
+        "<tr>"
+        f"<td>{escape(item.get('charge'))}</td>"
+        f"<td>{escape(', '.join(item.get('defendant_names', [])))}</td>"
+        f"<td>{escape(', '.join(item.get('line_ids', [])))}</td>"
+        f"<td>{escape(item.get('raw_text'))}</td>"
+        "</tr>"
+        for item in charge_output.get("charge_evidence", [])
+        if isinstance(charge_output, dict) and isinstance(item, dict)
+    )
+    if not evidence_rows:
+        evidence_rows = '<tr><td colspan="4">Chưa có charge evidence.</td></tr>'
     return (
         '<section><h2>CHARGE SUMMARY</h2>'
         f'<p>Case: {escape(case.get("case_id"))}; decision-tail status: '
-        f'{escape(output.get("decision_tail_status") or "not_attached")}</p>'
+        f'{escape(output.get("decision_tail_status") or "not_attached")}; '
+        f'heading found: {escape(output.get("decision_heading_found"))}; '
+        f'heading page: {escape(output.get("decision_heading_page"))}; '
+        f'tail lines: {escape(output.get("decision_tail_line_count"))}; '
+        f'verdict candidates: {escape(output.get("verdict_candidate_count"))}; '
+        f'parsed charges: {escape(output.get("parsed_charge_count"))}; '
+        f'mapped defendants: {escape(output.get("mapped_defendant_count"))}; '
+        f'unmapped verdicts: {escape(output.get("unmapped_verdict_count"))}</p>'
         '<table><tr><th>STT</th><th>Tội danh</th><th>Source region</th></tr>'
         + rows
+        + '</table><h3>Verdict candidate blocks</h3>'
+        + '<table><tr><th>STT</th><th>Page</th><th>Line IDs</th><th>Raw block</th></tr>'
+        + candidate_rows
+        + '</table><h3>Charge evidence</h3>'
+        + '<table><tr><th>Tội danh</th><th>Bị cáo</th><th>Line IDs</th><th>Evidence</th></tr>'
+        + evidence_rows
         + '</table><p>Cảnh báo: '
         + escape("; ".join(str(value) for value in warnings) or "Không")
         + "</p></section>"
@@ -844,6 +942,13 @@ def _append_structured_rows(sheets, case) -> None:
             "pages_total": ocr["pages_total"],
             "strategy_used": strategy,
             "decision_tail_status": output.get("decision_tail_status"),
+            "decision_heading_found": output.get("decision_heading_found"),
+            "decision_heading_page": output.get("decision_heading_page"),
+            "decision_tail_line_count": output.get("decision_tail_line_count"),
+            "verdict_candidate_count": output.get("verdict_candidate_count"),
+            "parsed_charge_count": output.get("parsed_charge_count"),
+            "mapped_defendant_count": output.get("mapped_defendant_count"),
+            "unmapped_verdict_count": output.get("unmapped_verdict_count"),
             "case_charges": "; ".join(output.get("case_charges", [])),
             "charge_warnings": "; ".join(
                 output.get("charge_output", {}).get("warnings", [])
@@ -1094,10 +1199,18 @@ def _attach_decision_tail_charges(
     output.setdefault("warnings", [])
     if tail_record is None:
         output["decision_tail_status"] = "cache_missing"
+        output["decision_heading_found"] = False
+        output["decision_heading_page"] = None
+        output["decision_tail_line_count"] = 0
+        output["verdict_candidate_count"] = 0
+        output["parsed_charge_count"] = 0
+        output["mapped_defendant_count"] = 0
+        output["unmapped_verdict_count"] = 0
         output["charge_output"] = {
             "case_charges": [],
             "defendant_charge_map": {},
             "charge_evidence": [],
+            "verdict_candidate_blocks": [],
             "warnings": ["decision_tail_cache_missing"],
         }
         output["case_charges"] = []
@@ -1107,6 +1220,12 @@ def _attach_decision_tail_charges(
         return
     defendants = _ensure_front_defendant_entity_ids(output.get("defendants", []))
     output["defendants"] = defendants
+    decision_lines = [
+        line
+        for line in tail_record.lines
+        if str(line.get("source_region") or "").strip() in {"", DECISION_TAIL}
+    ]
+    verdict_blocks = iter_verdict_blocks(decision_lines)
     charge_output = parse_explicit_decision_charges(
         tail_record.lines,
         defendants=defendants,
@@ -1115,14 +1234,44 @@ def _attach_decision_tail_charges(
         name_match_ambiguity_gap=settings.decision_name_match_ambiguity_gap,
     )
     output["charge_output"] = charge_output
+    charge_output["verdict_candidate_blocks"] = verdict_blocks
     output["case_charges"] = list(charge_output["case_charges"])
     output["defendant_charge_map"] = dict(charge_output["defendant_charge_map"])
+    parsed_charge_count = len(charge_output["charge_evidence"])
+    mapped_defendant_count = sum(
+        bool(charges) for charges in charge_output["defendant_charge_map"].values()
+    )
+    unmapped_verdict_count = max(0, len(verdict_blocks) - parsed_charge_count) + sum(
+        not item.get("defendant_entity_ids")
+        for item in charge_output["charge_evidence"]
+    )
+    output["decision_heading_found"] = bool(tail_record.heading_found)
+    output["decision_heading_page"] = tail_record.heading_page
+    output["decision_tail_line_count"] = len(decision_lines)
+    output["verdict_candidate_count"] = len(verdict_blocks)
+    output["parsed_charge_count"] = parsed_charge_count
+    output["mapped_defendant_count"] = mapped_defendant_count
+    output["unmapped_verdict_count"] = unmapped_verdict_count
     output["decision_tail_status"] = (
         "heading_not_found"
         if not tail_record.heading_found
         else "parsed"
         if charge_output["case_charges"]
         else "charge_not_found"
+    )
+    diagnostic_warnings: list[str] = []
+    if tail_record.heading_found and not verdict_blocks:
+        diagnostic_warnings.append(
+            "decision_heading_found_but_no_verdict_candidate"
+        )
+    elif verdict_blocks and not charge_output["case_charges"]:
+        diagnostic_warnings.append(
+            "verdict_candidates_found_but_no_charge_parsed"
+        )
+    if charge_output["case_charges"] and not mapped_defendant_count:
+        diagnostic_warnings.append("charges_parsed_but_no_defendant_mapped")
+    charge_output["warnings"] = list(
+        dict.fromkeys([*charge_output.get("warnings", []), *diagnostic_warnings])
     )
     if charge_output["case_charges"]:
         for item in charge_output["charge_evidence"]:

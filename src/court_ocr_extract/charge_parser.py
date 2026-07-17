@@ -12,47 +12,23 @@ from court_ocr_extract.source_region_policy import DECISION_TAIL
 
 DEFAULT_NAME_MATCH_MIN_SCORE = 88.0
 DEFAULT_NAME_MATCH_AMBIGUITY_GAP = 5.0
+DEFAULT_VERDICT_BLOCK_MAX_LINES = 10
+DEFAULT_VERDICT_BLOCK_MAX_CHARS = 1600
 
 _QUOTE_OPEN = "“\"‘'"
 _QUOTE_CLOSE = "”\"’'"
-_QUOTED_CHARGE = (
-    rf"[{re.escape(_QUOTE_OPEN)}]\s*"
-    rf"(?P<charge>[^{re.escape(_QUOTE_CLOSE)}]{{2,200}}?)\s*"
-    rf"[{re.escape(_QUOTE_CLOSE)}]"
+_VERDICT_START_RE = re.compile(
+    r"\b(?:(?P<sentence>Xử\s+phạt)|(?P<declare>Tuyên))\s+"
+    r"(?:các\s+)?bị\s+cáo\s+|\b(?P<direct>Bị\s+cáo)\s+",
+    re.IGNORECASE,
 )
-_UNQUOTED_CHARGE = (
-    r"(?P<charge>[^\n.;]{2,200}?)"
-    r"(?=\s*(?:[.;\n]|$|,?\s*\b(?:theo|quy\s+định\s+tại|căn\s+cứ)\b))"
+_VERDICT_START_FOLDED_RE = re.compile(
+    r"(?:^|\s)(?:\d+(?:\.\d+)*[.)]?\s*)?"
+    r"(?:(?:xu phat|tuyen)\s+(?:cac\s+)?bi cao|bi cao\s+.+?\s+pham toi)\b",
+    re.IGNORECASE,
 )
-_VERDICT_BASES = (
-    (
-        "declare_guilty",
-        r"\bTuyên\s+(?:các\s+)?bị\s+cáo\s+(?P<names>.{1,300}?)"
-        r"\s+phạm\s+tội\s*",
-    ),
-    (
-        "sentence_for_charge",
-        r"\bXử\s+phạt\s+(?:các\s+)?bị\s+cáo\s+(?P<names>.{1,400}?)"
-        r"\s+về\s+tội\s*",
-    ),
-    (
-        "defendant_guilty",
-        r"\bBị\s+cáo\s+(?P<names>.{1,300}?)\s+phạm\s+tội\s*",
-    ),
-)
-_VERDICT_PATTERNS = tuple(
-    (
-        f"{base_name}_{suffix}",
-        re.compile(base + charge_pattern, re.IGNORECASE | re.DOTALL),
-        base_name,
-        quoted,
-    )
-    for base_name, base in _VERDICT_BASES
-    for suffix, charge_pattern, quoted in (
-        ("quoted", _QUOTED_CHARGE, True),
-        ("unquoted", _UNQUOTED_CHARGE, False),
-    )
-)
+_DECISION_ITEM_RE = re.compile(r"^\s*\d+(?:\.\d+)*[.)]\s*(?:\S.*)?$")
+_STANDALONE_PAGE_NUMBER_RE = re.compile(r"^\s*(?:trang\s+)?\d+\s*$", re.IGNORECASE)
 _HONORIFIC_PREFIX_RE = re.compile(
     r"^(?:ông\s+bị\s+cáo|bà\s+bị\s+cáo|bị\s+cáo|ông|bà|anh|chị)\s+",
     re.IGNORECASE,
@@ -96,6 +72,73 @@ class _NameMatch:
     warning: str
 
 
+def iter_verdict_blocks(
+    lines_or_text: str | Iterable[Mapping[str, Any]],
+    *,
+    max_lines: int = DEFAULT_VERDICT_BLOCK_MAX_LINES,
+    max_chars: int = DEFAULT_VERDICT_BLOCK_MAX_CHARS,
+) -> list[dict[str, Any]]:
+    if max_lines < 1 or max_chars < 1:
+        raise ValueError("verdict block guards must be positive")
+
+    lines = _ordered_lines(_coerce_lines(lines_or_text))
+    blocks: list[dict[str, Any]] = []
+    index = 0
+    while index < len(lines):
+        if not _is_verdict_start(_text(lines[index].get("text"))):
+            index += 1
+            continue
+
+        block_lines: list[dict[str, Any]] = []
+        char_count = 0
+        cursor = index
+        while cursor < len(lines) and len(block_lines) < max_lines:
+            line = lines[cursor]
+            text = _text(line.get("text"))
+            if cursor > index:
+                current_text = "\n".join(
+                    _text(item.get("text")) for item in block_lines
+                )
+                if _is_verdict_start(text):
+                    break
+                if _is_strong_item_boundary(text) and _block_has_charge(current_text):
+                    break
+            cursor += 1
+            if not text or _is_standalone_page_number(text):
+                continue
+            added = len(text) + (1 if block_lines else 0)
+            if block_lines and char_count + added > max_chars:
+                break
+            block_lines.append(line)
+            char_count += added
+
+        if block_lines:
+            raw_text = "\n".join(
+                _text(item.get("text")) for item in block_lines
+            )
+            blocks.append(
+                {
+                    "raw_text": raw_text,
+                    "line_ids": [
+                        _text(item.get("line_id"))
+                        for item in block_lines
+                        if _text(item.get("line_id"))
+                    ],
+                    "page_number": next(
+                        (
+                            _optional_int(item.get("page_number"))
+                            for item in block_lines
+                            if _optional_int(item.get("page_number")) is not None
+                        ),
+                        None,
+                    ),
+                    "line_count": len(block_lines),
+                }
+            )
+        index = max(cursor, index + 1)
+    return blocks
+
+
 def parse_explicit_decision_charges(
     lines_or_text: str | Iterable[Mapping[str, Any]],
     *,
@@ -114,11 +157,12 @@ def parse_explicit_decision_charges(
         for line in lines
         if _text(line.get("source_region")) not in {"", DECISION_TAIL}
     }
-    lines = [
+    decision_lines = [
         line
         for line in lines
         if _text(line.get("source_region")) in {"", DECISION_TAIL}
     ]
+    blocks = iter_verdict_blocks(decision_lines)
     refs = _defendant_refs(defendants, defendant_names)
     charges: list[str] = []
     charge_keys: set[str] = set()
@@ -130,73 +174,74 @@ def parse_explicit_decision_charges(
     ]
     seen_evidence: set[tuple[str, tuple[str, ...], tuple[str, ...]]] = set()
 
-    for start in range(len(lines)):
-        window = lines[start:start + 3]
-        text, line_spans = _window_text_and_spans(window)
-        if not text:
+    for block in blocks:
+        text = _text(block.get("raw_text"))
+        start = _VERDICT_START_RE.search(text)
+        if not start:
             continue
-        for pattern_name, pattern, base_name, quoted in _VERDICT_PATTERNS:
-            for match in pattern.finditer(text):
-                charge = _normalize_charge(match.group("charge"))
-                if not charge:
-                    continue
-                name_match = _match_defendant_entities(
-                    match.group("names"),
-                    refs,
-                    pattern_name=base_name,
-                    min_score=float(min_name_match_score),
-                    ambiguity_gap=float(name_match_ambiguity_gap),
-                )
-                if name_match.warning:
-                    warnings.append(name_match.warning)
-                matched_spans = [
-                    span
-                    for span in line_spans
-                    if span[0] < match.end() and span[1] > match.start()
-                ]
-                line_ids = tuple(span[2] for span in matched_spans if span[2])
-                evidence_key = (
-                    charge.casefold(),
-                    tuple(name_match.entity_ids),
-                    line_ids or (str(start),),
-                )
-                if evidence_key in seen_evidence:
-                    continue
-                seen_evidence.add(evidence_key)
+        base_name = _verdict_base_name(start)
+        anchor = _find_charge_anchor(text, start.end(), base_name)
+        if not anchor:
+            continue
+        charge, quoted = _charge_after_anchor(text[anchor.end():])
+        if not charge:
+            continue
 
-                charge_key = charge.casefold()
-                if charge_key not in charge_keys:
-                    charge_keys.add(charge_key)
-                    charges.append(charge)
-                for entity_id in name_match.entity_ids:
-                    mapped = defendant_charge_map.setdefault(entity_id, [])
-                    if charge not in mapped:
-                        mapped.append(charge)
+        names_scope = text[start.end():anchor.start()]
+        name_match = _match_defendant_entities(
+            names_scope,
+            refs,
+            pattern_name=base_name,
+            min_score=float(min_name_match_score),
+            ambiguity_gap=float(name_match_ambiguity_gap),
+        )
+        if name_match.warning:
+            warnings.append(name_match.warning)
 
-                page_number = next(
-                    (span[3] for span in matched_spans if span[3] is not None),
-                    None,
-                )
-                confidence = (
-                    "high"
-                    if quoted and name_match.entity_ids
-                    else "medium"
-                    if quoted or name_match.entity_ids
-                    else "low"
-                )
-                evidence.append(
-                    ChargeEvidence(
-                        charge=charge,
-                        defendant_entity_ids=list(name_match.entity_ids),
-                        defendant_names=list(name_match.names),
-                        source_region=DECISION_TAIL,
-                        page_number=page_number,
-                        line_ids=list(line_ids),
-                        raw_text=match.group(0).strip(),
-                        match_method=f"{pattern_name}:{name_match.method}",
-                        confidence=confidence,
-                    )
-                )
+        line_ids = tuple(
+            _text(value) for value in block.get("line_ids", []) if _text(value)
+        )
+        evidence_key = (
+            charge.casefold(),
+            tuple(name_match.entity_ids),
+            line_ids or (str(len(evidence)),),
+        )
+        if evidence_key in seen_evidence:
+            continue
+        seen_evidence.add(evidence_key)
+
+        charge_key = charge.casefold()
+        if charge_key not in charge_keys:
+            charge_keys.add(charge_key)
+            charges.append(charge)
+        for entity_id in name_match.entity_ids:
+            mapped = defendant_charge_map.setdefault(entity_id, [])
+            if charge not in mapped:
+                mapped.append(charge)
+
+        confidence = (
+            "high"
+            if quoted and name_match.entity_ids
+            else "medium"
+            if quoted or name_match.entity_ids
+            else "low"
+        )
+        evidence.append(
+            ChargeEvidence(
+                charge=charge,
+                defendant_entity_ids=list(name_match.entity_ids),
+                defendant_names=list(name_match.names),
+                source_region=DECISION_TAIL,
+                page_number=_optional_int(block.get("page_number")),
+                line_ids=list(line_ids),
+                raw_text=text,
+                match_method=(
+                    f"{base_name}_{'quoted' if quoted else 'unquoted'}:"
+                    f"{name_match.method}"
+                ),
+                confidence=confidence,
+            )
+        )
 
     return {
         "case_charges": charges,
@@ -214,10 +259,9 @@ def _match_defendant_entities(
     min_score: float,
     ambiguity_gap: float,
 ) -> _NameMatch:
-    candidate = _candidate_name_text(names_clause, pattern_name)
-    normalized_candidate = fold_text(candidate)
-    display_candidate = _clean(candidate)
-    if any(marker in normalized_candidate for marker in _COLLECTIVE_UNRESOLVED_MARKERS):
+    normalized_scope = fold_text(names_clause)
+    display_candidate = _clean(names_clause)
+    if any(marker in normalized_scope for marker in _COLLECTIVE_UNRESOLVED_MARKERS):
         return _NameMatch(
             [],
             [display_candidate] if display_candidate else [],
@@ -225,7 +269,7 @@ def _match_defendant_entities(
             "unresolved_collective_defendant_charge_mapping",
         )
 
-    exact_matches = _exact_name_matches(normalized_candidate, refs)
+    exact_matches = _exact_name_matches(normalized_scope, refs)
     if exact_matches:
         matched_refs = [item[0] for item in exact_matches]
         methods = list(dict.fromkeys(item[1] for item in exact_matches))
@@ -236,6 +280,9 @@ def _match_defendant_entities(
             "",
         )
 
+    candidate = _candidate_name_text(names_clause, pattern_name)
+    normalized_candidate = fold_text(candidate)
+    display_candidate = _clean(candidate)
     if not refs or not normalized_candidate:
         return _NameMatch(
             [],
@@ -316,7 +363,10 @@ def _exact_name_matches(
     ):
         if ref.entity_id in selected_ids:
             continue
-        if any(start < chosen_end and end > chosen_start for chosen_start, chosen_end, *_ in selected):
+        if any(
+            start < chosen_end and end > chosen_start
+            for chosen_start, chosen_end, *_ in selected
+        ):
             continue
         selected.append((start, end, ref, method))
         selected_ids.add(ref.entity_id)
@@ -350,13 +400,14 @@ def _defendant_refs(
             continue
         seen.add(entity_id)
         normalized = fold_text(full_name)
-        without_honorific = fold_text(_HONORIFIC_PREFIX_RE.sub("", full_name))
         refs.append(
             _DefendantRef(
                 entity_id=entity_id,
                 full_name=full_name,
                 normalized_name=normalized,
-                normalized_without_honorific=without_honorific,
+                normalized_without_honorific=fold_text(
+                    _HONORIFIC_PREFIX_RE.sub("", full_name)
+                ),
             )
         )
     return refs
@@ -366,12 +417,52 @@ def _candidate_name_text(value: str, pattern_name: str) -> str:
     candidate = re.sub(r"\s+", " ", value).strip(" ,;:-")
     if pattern_name == "sentence_for_charge":
         candidate = re.split(
-            r"\s+(?:(?:bị|phạt)\s+)?\d+\b|\s+mức\s+án\b|\s+hình\s+phạt\b",
+            r"\s+(?:(?:bị|phạt)\s+)?\d+\b"
+            r"|\s+(?:mức\s+án|hình\s+phạt|mỗi\s+bị\s+cáo)\b",
             candidate,
             maxsplit=1,
             flags=re.IGNORECASE,
         )[0]
     return candidate.strip(" ,;:-")
+
+
+def _verdict_base_name(match: re.Match[str]) -> str:
+    if match.group("sentence"):
+        return "sentence_for_charge"
+    if match.group("declare"):
+        return "declare_guilty"
+    return "defendant_guilty"
+
+
+def _find_charge_anchor(
+    text: str,
+    start: int,
+    base_name: str,
+) -> re.Match[str] | None:
+    anchor = r"về\s+tội" if base_name == "sentence_for_charge" else r"phạm\s+tội"
+    return re.compile(rf"\b{anchor}\b", re.IGNORECASE).search(text, pos=start)
+
+
+def _charge_after_anchor(value: str) -> tuple[str, bool]:
+    tail = value.lstrip()
+    if not tail:
+        return "", False
+    if tail[0] in _QUOTE_OPEN:
+        quoted = re.match(
+            rf"^[{re.escape(_QUOTE_OPEN)}]\s*"
+            rf"(?P<charge>[^{re.escape(_QUOTE_CLOSE)}]{{2,200}}?)\s*"
+            rf"[{re.escape(_QUOTE_CLOSE)}]",
+            tail,
+            re.DOTALL,
+        )
+        return (_normalize_charge(quoted.group("charge")), True) if quoted else ("", True)
+    unquoted = re.match(
+        r"^(?P<charge>[^\n.;]{2,200}?)"
+        r"(?=\s*(?:[.;\n]|$|,?\s*\b(?:theo|quy\s+định\s+tại|căn\s+cứ)\b))",
+        tail,
+        re.IGNORECASE,
+    )
+    return (_normalize_charge(unquoted.group("charge")), False) if unquoted else ("", False)
 
 
 def _normalize_charge(value: object) -> str:
@@ -388,6 +479,41 @@ def _normalize_charge(value: object) -> str:
     return charge
 
 
+def _block_has_charge(text: str) -> bool:
+    start = _VERDICT_START_RE.search(text)
+    if not start:
+        return False
+    base_name = _verdict_base_name(start)
+    anchor = _find_charge_anchor(text, start.end(), base_name)
+    return bool(anchor and _charge_after_anchor(text[anchor.end():])[0])
+
+
+def _is_verdict_start(text: str) -> bool:
+    return bool(_VERDICT_START_FOLDED_RE.search(fold_text(text)))
+
+
+def _is_strong_item_boundary(text: str) -> bool:
+    return bool(_DECISION_ITEM_RE.match(text))
+
+
+def _is_standalone_page_number(text: str) -> bool:
+    return bool(_STANDALONE_PAGE_NUMBER_RE.match(fold_text(text)))
+
+
+def _ordered_lines(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    indexed = list(enumerate(lines))
+    indexed.sort(
+        key=lambda item: (
+            _optional_int(item[1].get("page_number")) or 0,
+            _optional_int(item[1].get("reading_order"))
+            if _optional_int(item[1].get("reading_order")) is not None
+            else item[0],
+            item[0],
+        )
+    )
+    return [dict(line) for _, line in indexed]
+
+
 def _coerce_lines(
     lines_or_text: str | Iterable[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -396,6 +522,7 @@ def _coerce_lines(
             {
                 "line_id": f"decision_l{index:04d}",
                 "source_region": DECISION_TAIL,
+                "reading_order": index - 1,
                 "text": text,
             }
             for index, text in enumerate(lines_or_text.splitlines(), start=1)
@@ -404,31 +531,17 @@ def _coerce_lines(
     return [dict(line) for line in lines_or_text if isinstance(line, Mapping)]
 
 
-def _window_text_and_spans(
-    window: list[dict[str, Any]],
-) -> tuple[str, list[tuple[int, int, str, int | None]]]:
-    parts: list[str] = []
-    spans: list[tuple[int, int, str, int | None]] = []
-    cursor = 0
-    for line in window:
-        value = _text(line.get("text"))
-        if not value:
-            continue
-        if parts:
-            cursor += 1
-        start = cursor
-        parts.append(value)
-        cursor += len(value)
-        page_value = line.get("page_number")
-        page_number = int(page_value) if str(page_value or "").isdigit() else None
-        spans.append((start, cursor, _text(line.get("line_id")), page_number))
-    return "\n".join(parts), spans
-
-
 def _similarity(left: str, right: str) -> float:
     if not left or not right:
         return 0.0
     return SequenceMatcher(None, left, right).ratio() * 100.0
+
+
+def _optional_int(value: object) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _empty_result(warning: str = "") -> dict[str, Any]:

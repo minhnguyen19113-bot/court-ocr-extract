@@ -56,6 +56,8 @@ def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, A
         row = _complete_final_row(
             {
                 "LOẠI ÁN": case.get("case_type"),
+                "SỐ BẢN ÁN": case.get("judgment_number"),
+                "NGÀY TUYÊN ÁN (DD/MM/YYYY)": case.get("judgment_date"),
                 "SỐ THỤ LÝ": case.get("filing_number"),
                 "NGÀY THỤ LÝ (DD/MM/YYYY)": case.get("filing_date"),
                 "QUAN HỆ PHÁP LUẬT": case.get("legal_relationship"),
@@ -97,6 +99,12 @@ def rows_from_result(result: ExtractionResult) -> list[dict[str, str]]:
             _complete_final_row(
                 {
                     "LOẠI ÁN": result.case_info.loai_an,
+                    "SỐ BẢN ÁN": getattr(result.case_info, "so_ban_an", None),
+                    "NGÀY TUYÊN ÁN (DD/MM/YYYY)": getattr(
+                        result.case_info,
+                        "ngay_tuyen_an",
+                        None,
+                    ),
                     "SỐ THỤ LÝ": result.case_info.so_thu_ly,
                     "NGÀY THỤ LÝ (DD/MM/YYYY)": result.case_info.ngay_thu_ly,
                     "QUAN HỆ PHÁP LUẬT": result.case_info.quan_he_phap_luat,
@@ -192,6 +200,7 @@ def write_excel(
     output_path: str | Path,
     *,
     run_summary: dict[str, Any] | None = None,
+    include_other_participants_output: bool = False,
 ) -> Path:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -204,12 +213,13 @@ def write_excel(
             data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
     format_final_excel_sheet(data_sheet)
 
-    other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
-    other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
-    for draft in draft_records:
-        for row in other_rows_from_payload(draft["case_id"], draft["payload"]):
-            other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
-    format_other_participants_sheet(other_sheet)
+    if include_other_participants_output:
+        other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
+        other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
+        for draft in draft_records:
+            for row in other_rows_from_payload(draft["case_id"], draft["payload"]):
+                other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
+        format_other_participants_sheet(other_sheet)
 
     summary_sheet = workbook.create_sheet("RUN_SUMMARY")
     summary = run_summary or build_run_summary(draft_records)
@@ -225,6 +235,8 @@ def write_excel(
 def write_excel_from_results(
     results: list[ExtractionResult],
     output_path: str | Path,
+    *,
+    include_other_participants_output: bool = False,
 ) -> Path:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -236,12 +248,13 @@ def write_excel_from_results(
         for row in rows_from_result(result):
             data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
     format_final_excel_sheet(data_sheet)
-    other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
-    other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
-    for result in results:
-        for row in other_rows_from_result(result):
-            other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
-    format_other_participants_sheet(other_sheet)
+    if include_other_participants_output:
+        other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
+        other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
+        for result in results:
+            for row in other_rows_from_result(result):
+                other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
+        format_other_participants_sheet(other_sheet)
     workbook.save(output_path)
     return output_path
 
@@ -275,7 +288,7 @@ def format_final_excel_sheet(sheet) -> None:
     for row in sheet.iter_rows(min_row=2):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
-    widths = [16, 20, 22, 32, 28, 28, 12, 18, 48, 28, 44]
+    widths = [16, 20, 24, 20, 22, 32, 28, 28, 12, 18, 48, 28, 44]
     for index, width in enumerate(widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
     sheet.freeze_panes = "A2"
@@ -299,7 +312,14 @@ def format_other_participants_sheet(sheet) -> None:
 
 
 def _missing_important_count(rows: list[dict[str, Any]]) -> int:
-    important = ["SỐ THỤ LÝ", "NGÀY THỤ LÝ (DD/MM/YYYY)", "TƯ CÁCH TỐ TỤNG", "HỌ TÊN ĐƯƠNG SỰ"]
+    important = [
+        "SỐ BẢN ÁN",
+        "NGÀY TUYÊN ÁN (DD/MM/YYYY)",
+        "SỐ THỤ LÝ",
+        "NGÀY THỤ LÝ (DD/MM/YYYY)",
+        "TƯ CÁCH TỐ TỤNG",
+        "HỌ TÊN ĐƯƠNG SỰ",
+    ]
     return sum(1 for row in rows if any(not row.get(key) for key in important))
 
 
@@ -315,11 +335,15 @@ def _complete_final_row(
 ) -> dict[str, str]:
     values = dict(values)
     values["NĂM SINH"] = _year_only(values.get("NĂM SINH"))
-    raw_date = str(values.get("NGÀY THỤ LÝ (DD/MM/YYYY)") or "")
-    normalized_date = parse_vietnamese_date(raw_date)
-    values["NGÀY THỤ LÝ (DD/MM/YYYY)"] = normalized_date or ""
-    if raw_date and not normalized_date:
-        notes.append("Field bị validator loại")
+    for date_field in (
+        "NGÀY TUYÊN ÁN (DD/MM/YYYY)",
+        "NGÀY THỤ LÝ (DD/MM/YYYY)",
+    ):
+        raw_date = str(values.get(date_field) or "")
+        normalized_date = parse_vietnamese_date(raw_date)
+        values[date_field] = normalized_date or ""
+        if raw_date and not normalized_date:
+            notes.append("Field bị validator loại")
     identity = re.sub(r"\D", "", str(values.get("CCCD") or ""))
     if not 9 <= len(identity) <= 12:
         if identity:
@@ -335,6 +359,10 @@ def _complete_final_row(
 
     if not values.get("LOẠI ÁN"):
         notes.append("Không xác định chắc loại án")
+    if not values.get("SỐ BẢN ÁN"):
+        notes.append("Thiếu số bản án")
+    if not values.get("NGÀY TUYÊN ÁN (DD/MM/YYYY)"):
+        notes.append("Thiếu ngày tuyên án")
     if not values.get("SỐ THỤ LÝ"):
         notes.append("Thiếu số thụ lý")
     if not values.get("NGÀY THỤ LÝ (DD/MM/YYYY)"):

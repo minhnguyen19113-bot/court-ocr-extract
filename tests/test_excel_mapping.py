@@ -1,18 +1,8 @@
 from court_ocr_extract.excel_writer import EXCEL_HEADERS
+from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
 
 
 def test_excel_mapping_contains_requested_columns_only():
-    assert EXCEL_HEADERS == [
-        "LOẠI ÁN",
-        "SỐ THỤ LÝ",
-        "NGÀY THỤ LÝ (DD/MM/YYYY)",
-        "QUAN HỆ PHÁP LUẬT",
-        "TƯ CÁCH TỐ TỤNG",
-        "HỌ TÊN ĐƯƠNG SỰ",
-        "NĂM SINH",
-        "CCCD",
-        "ĐỊA CHỈ",
-        "HỌ TÊN CHỦ TỌA",
-        "GHI CHÚ",
-    ]
+    assert EXCEL_HEADERS == FINAL_EXCEL_COLUMNS
+    assert len(EXCEL_HEADERS) == 13
     assert "EMAIL NGƯỜI NHẬP" not in EXCEL_HEADERS

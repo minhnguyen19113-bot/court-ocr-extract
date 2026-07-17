@@ -9,17 +9,11 @@ PRIMARY_FINAL_ROLES = frozenset(
     {
         "Bị cáo",
         "Bị hại",
-        "Nguyên đơn dân sự",
-        "Bị đơn dân sự",
-        "Người có quyền lợi, nghĩa vụ liên quan",
-        "Pháp nhân thương mại bị cáo",
     }
 )
 
 PRIMARY_ROLE_ALIASES = {
-    "Người có quyền và nghĩa vụ liên quan": "Người có quyền lợi, nghĩa vụ liên quan",
-    "Người có quyền lợi và nghĩa vụ liên quan": "Người có quyền lợi, nghĩa vụ liên quan",
-    "Người liên quan": "Người có quyền lợi, nghĩa vụ liên quan",
+    "Người bị hại": "Bị hại",
 }
 
 OTHER_PARTICIPANT_ROLES = (

@@ -50,7 +50,7 @@ def test_excel_rows_repeat_case_info_per_person():
     result = validate_extraction(extract_rule_based(FAKE_JUDGMENT_TEXT, source_file="fake.pdf"))
     rows = rows_from_result(result)
 
-    assert len(rows) == 3
+    assert len(rows) == 2
     assert all(row["SỐ THỤ LÝ"] == "12/2025/TLST-HS" for row in rows)
-    assert rows[1]["TƯ CÁCH TỐ TỤNG"] == "Bị hại"
+    assert [row["TƯ CÁCH TỐ TỤNG"] for row in rows] == ["Bị cáo", "Bị hại"]
     assert "EMAIL NGƯỜI NHẬP" not in rows[0]

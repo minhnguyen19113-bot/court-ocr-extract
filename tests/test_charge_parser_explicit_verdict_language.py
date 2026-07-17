@@ -98,9 +98,12 @@ def test_tail_cache_charges_are_repeated_in_final_excel(tmp_path) -> None:
     )
 
     workbook = load_workbook(tmp_path / "compare_summary.xlsx", read_only=True)
+    final_sheet = workbook["FINAL_EXCEL"]
+    headers = next(final_sheet.iter_rows(max_row=1, values_only=True))
+    header_index = {value: index for index, value in enumerate(headers)}
     relationships = {
-        row[3]
-        for row in workbook["FINAL_EXCEL"].iter_rows(min_row=2, values_only=True)
+        row[header_index["QUAN HỆ PHÁP LUẬT"]]
+        for row in final_sheet.iter_rows(min_row=2, values_only=True)
     }
     assert relationships == {"Tội Synthetic Alpha"}
     assert workbook["CHARGES"].max_row == 2

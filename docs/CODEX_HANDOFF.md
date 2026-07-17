@@ -1,5 +1,15 @@
 # Codex Handoff
 
+## Bàn Giao Fast Patch 13 Cột, Verdict Charge và Địa Chỉ Qua Trang
+
+`FINAL_EXCEL` hiện theo schema 13 cột và chỉ chứa `Bị cáo`/`Bị hại`. Số/ngày bản án và số/ngày thụ lý map độc lập; thiếu field nào để trống và note đúng field. Participant khác vẫn ở structured JSON/`PARTICIPANTS`; sheet và HTML `NGUOI_THAM_GIA_KHAC` chỉ bật khi caller truyền `include_other_participants_output=true`.
+
+Charge parser đọc verdict block có guard 10 lines/1600 chars, hỗ trợ 1-8 dòng synthetic, punishment phrase, quoted/unquoted charge và page break. Decision diagnostics đã có status, heading page, tail lines, candidate/parsed/mapped/unmapped counts, candidate raw block, evidence và warning phân loại. Current address được nối qua page break đến identity/entity boundary, bỏ standalone page number và giữ evidence line IDs.
+
+Gate patch đã qua: targeted 10/10 và focused address regression 11/11. Full suite hiện 240/252 passed; 12 failure đều là assertion legacy còn đòi schema 11 cột, role liên quan trong final, sheet/HTML participant khác bật mặc định hoặc chỉ số cột cũ. Task chỉ cho cập nhật đúng 9 test modules mới, vì vậy chưa realign các test legacy ngoài danh sách. Không có PDF/cache/output thật, OCR, Surya, Docker, LLM, cloud, commit hoặc push.
+
+Project Owner chỉ rerun extraction từ cache bằng `compare-pre-content --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_1 --decision-tail-cache-dir outputs\decision_tail_cache_pilot_one --output-dir outputs\final_schema_charge_address_patch_check_1 --strategies rule_anchor_only --limit 1 --open`. Kiểm `compare_summary.xlsx`, `compare_summary.json`, `index.html`, `cases\<case_id>\review.html` và strategy JSON trong thư mục case; không OCR lại front hoặc decision tail.
+
 ## Bàn Giao Front + Decision Source và Legal Relationship Theo Dòng
 
 Nguồn production hiện bị khóa ở `front_pre_content` và `decision_tail`. `middle_excluded` gồm narrative/tranh luận/nhận định không được fill final field, không được làm fallback và không xuất hiện trong charge/source review. Front entities có stable `entity_id`; decision parser chỉ đối chiếu với dictionary này, không tạo defendant mới từ phần cuối.

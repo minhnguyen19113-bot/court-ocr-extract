@@ -61,7 +61,14 @@ PANEL_LABELS = (
 )
 
 DEFENDANT_LABELS = (
-    ("current_address", re.compile(r"Nơi\s+ở\s+(?:hiện\s+tại|hiện\s+nay)|Chỗ\s+ở", re.I)),
+    (
+        "current_address",
+        re.compile(
+            r"Chỗ\s+ở(?:\s+hiện\s+tại)?|Nơi\s+ở(?:\s+hiện\s+tại|\s+hiện\s+nay)?"
+            r"|Nơi\s+cư\s+trú|Địa\s+chỉ",
+            re.I,
+        ),
+    ),
     ("permanent_address", re.compile(r"Hộ\s+khẩu\s+thường\s+trú|Thường\s+trú|Nơi\s+đăng\s+ký\s+HKTT|Nơi\s+ĐKHKTT", re.I)),
     ("education", re.compile(r"Trình\s+độ\s+(?:văn\s+hóa|học\s+vấn)", re.I)),
     ("criminal_record", re.compile(r"Tiền\s+án\s*[,\-]\s*tiền\s+sự|Tiền\s+án|Tiền\s+sự", re.I)),
@@ -77,6 +84,23 @@ DEFENDANT_LABELS = (
     ("mother_name", re.compile(r"Họ\s+(?:và\s+)?tên\s+mẹ|Mẹ", re.I)),
     ("spouse", re.compile(r"Vợ\s*[,/]\s*con|Vợ|Chồng", re.I)),
     ("children", re.compile(r"Con(?!\s+ông\b)", re.I)),
+)
+
+CURRENT_ADDRESS_LINE_RE = re.compile(
+    r"^(?:Chỗ\s+ở(?:\s+hiện\s+tại)?|Nơi\s+ở(?:\s+hiện\s+tại|\s+hiện\s+nay)?"
+    r"|Nơi\s+cư\s+trú|Địa\s+chỉ)\s*[:：]?\s*(.*)$",
+    re.IGNORECASE,
+)
+ADDRESS_STOP_LABEL_RE = re.compile(
+    r"^(?:Nghề\s+nghiệp|Trình\s+độ|Dân\s+tộc|Giới\s+tính|Tôn\s+giáo"
+    r"|Quốc\s+tịch|Cha|Mẹ|con\s+ông|con\s+bà|Vợ|Chồng|Vợ\s+con"
+    r"|Con|Tiền\s+án|Tiền\s+sự|Nhân\s+thân|Bị\s+cáo\s+bị)\s*[:：]",
+    re.IGNORECASE,
+)
+STANDALONE_PAGE_NUMBER_RE = re.compile(r"^\s*(?:trang\s+)?\d+\s*$", re.IGNORECASE)
+NEXT_DEFENDANT_RE = re.compile(
+    r"^\s*(?:\d+[.)]\s+.*\b(?:sinh\s+ngày|sinh\s+năm)\b|Bị\s+cáo\s+\S)",
+    re.IGNORECASE,
 )
 
 
@@ -137,7 +161,7 @@ def parse_defendant_block(block: dict[str, Any]) -> dict[str, Any]:
     result["full_name"] = _defendant_name(raw)
     _extract_defendant_labeled_values(raw, result)
     _parse_spouse_children(raw, result)
-    _parse_current_address(raw, result)
+    _parse_current_address(block, raw, result)
     result["cccd"] = extract_identity_number(raw)
 
     parent_match = re.search(r"con\s+ông\s+(.+?)\s+và\s+bà\s+([^,;.\n]+)", raw, re.I)
@@ -352,21 +376,51 @@ def _parse_spouse_children(raw: str, result: dict[str, Any]) -> None:
     result["children"] = _clean_value(children.group(1)) if children else None
 
 
-def _parse_current_address(raw: str, result: dict[str, Any]) -> None:
+def _parse_current_address(
+    block: dict[str, Any],
+    raw: str,
+    result: dict[str, Any],
+) -> None:
     lines = raw.splitlines()
-    pattern = re.compile(
-        r"^(?:Nơi\s+ở(?:\s+hiện\s+tại|\s+hiện\s+nay)?|Chỗ\s+ở)\s*[:：]\s*(.*)$",
-        re.I,
-    )
+    line_ids = [str(value) for value in block.get("line_ids", [])]
     for index, line in enumerate(lines):
-        match = pattern.match(line.strip())
+        match = CURRENT_ADDRESS_LINE_RE.match(line.strip())
         if not match:
             continue
-        value = re.sub(r"^\s*hiện\s+tại\s*[:：]\s*", "", match.group(1), flags=re.I)
-        if index + 1 < len(lines) and re.match(r"^\s*số\s+\S", lines[index + 1], re.I):
-            value = f"{value.rstrip()} {lines[index + 1].strip()}"
-        result["current_address"] = _clean_value(value)
+        values = [match.group(1).strip()] if match.group(1).strip() else []
+        used_line_ids = [line_ids[index]] if index < len(line_ids) else []
+        for continuation_index in range(index + 1, len(lines)):
+            continuation = lines[continuation_index].strip()
+            if not continuation:
+                continue
+            if STANDALONE_PAGE_NUMBER_RE.match(continuation):
+                continue
+            if _is_address_stop_line(continuation):
+                break
+            values.append(continuation)
+            if continuation_index < len(line_ids):
+                used_line_ids.append(line_ids[continuation_index])
+        value = re.sub(r"\s+", " ", " ".join(values)).strip(" ,;:.-")
+        value = re.sub(
+            r"^(?:hiện\s+tại|hiện\s+nay)\s*[:：]\s*",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        ).strip(" ,;:.-")
+        if value:
+            result["current_address"] = value
+            result["evidence_line_ids"] = list(
+                dict.fromkeys([*result.get("evidence_line_ids", []), *used_line_ids])
+            )
         return
+
+
+def _is_address_stop_line(value: str) -> bool:
+    if CURRENT_ADDRESS_LINE_RE.match(value):
+        return True
+    if ADDRESS_STOP_LABEL_RE.match(value) or NEXT_DEFENDANT_RE.match(value):
+        return True
+    return any(pattern.match(value) for _, pattern in DEFENDANT_LABELS)
 
 
 def _defendant_name(raw: str) -> str | None:

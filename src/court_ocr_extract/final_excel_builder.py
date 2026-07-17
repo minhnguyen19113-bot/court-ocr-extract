@@ -26,6 +26,14 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
     if not case_type:
         common_notes.append("Không xác định chắc loại án")
 
+    judgment_number = _text(metadata.get("judgment_number"))
+    if not judgment_number:
+        common_notes.append("Thiếu số bản án")
+
+    judgment_date = parse_vietnamese_date(_text(metadata.get("judgment_date"))) or ""
+    if not judgment_date:
+        common_notes.append("Thiếu ngày tuyên án")
+
     acceptance_number = _text(metadata.get("case_acceptance_number"))
     if not acceptance_number:
         common_notes.append("Thiếu số thụ lý")
@@ -120,6 +128,8 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
             make_final_excel_row(
                 {
                     "LOẠI ÁN": case_type,
+                    "SỐ BẢN ÁN": judgment_number,
+                    "NGÀY TUYÊN ÁN (DD/MM/YYYY)": judgment_date,
                     "SỐ THỤ LÝ": acceptance_number,
                     "NGÀY THỤ LÝ (DD/MM/YYYY)": acceptance_date,
                     "QUAN HỆ PHÁP LUẬT": legal_relationship,

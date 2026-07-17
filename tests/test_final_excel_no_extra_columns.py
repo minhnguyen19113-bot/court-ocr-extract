@@ -37,7 +37,7 @@ def test_compare_workbook_puts_exact_final_sheet_before_debug_sheets(tmp_path) -
     assert workbook.sheetnames[0] == FINAL_EXCEL_SHEET_NAME
     final_sheet = workbook[FINAL_EXCEL_SHEET_NAME]
     assert [cell.value for cell in next(final_sheet.iter_rows())] == FINAL_EXCEL_COLUMNS
-    assert final_sheet.max_column == 11
+    assert final_sheet.max_column == len(FINAL_EXCEL_COLUMNS)
     assert {
         "CASES",
         "DEFENDANTS",
@@ -56,7 +56,7 @@ def test_compare_workbook_puts_exact_final_sheet_before_debug_sheets(tmp_path) -
     preview_end = html.index("</section>", preview_start)
     preview = html[preview_start:preview_end]
     assert preview_start < html.index("Anchor segmentation")
-    assert preview.count("<th>") == 11
+    assert preview.count("<th>") == len(FINAL_EXCEL_COLUMNS)
     assert "CONFIDENCE" not in preview
 
 
@@ -97,7 +97,12 @@ def test_rule_then_llm_strategy_also_writes_final_excel_without_real_llm(tmp_pat
     final_sheet = workbook[FINAL_EXCEL_SHEET_NAME]
     assert workbook.sheetnames[0] == FINAL_EXCEL_SHEET_NAME
     assert final_sheet.max_row == 3
-    assert [row[4] for row in final_sheet.iter_rows(min_row=2, values_only=True)] == [
+    headers = next(final_sheet.iter_rows(max_row=1, values_only=True))
+    header_index = {value: index for index, value in enumerate(headers)}
+    assert [
+        row[header_index["TƯ CÁCH TỐ TỤNG"]]
+        for row in final_sheet.iter_rows(min_row=2, values_only=True)
+    ] == [
         "Bị cáo",
         "Bị hại",
     ]

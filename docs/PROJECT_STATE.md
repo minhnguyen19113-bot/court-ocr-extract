@@ -1,5 +1,15 @@
 # Project State
 
+## Fast Patch 13 Cột, Verdict Block và Địa Chỉ Qua Trang
+
+- `FINAL_EXCEL` hiện có đúng 13 cột; `SỐ BẢN ÁN`, `NGÀY TUYÊN ÁN`, `SỐ THỤ LÝ`, `NGÀY THỤ LÝ` map độc lập từ metadata và không fallback chéo. Field thiếu để trống, kèm note đúng field.
+- Output final mặc định chỉ tạo dòng `Bị cáo` và `Bị hại`. Participant khác vẫn ở structured JSON và sheet debug `PARTICIPANTS`; `NGUOI_THAM_GIA_KHAC` cùng section HTML tương ứng mặc định tắt, có thể bật bằng `include_other_participants_output=true`.
+- `charge_parser.py` dùng verdict block tối đa 10 lines/1600 chars, sắp theo page/reading order, bỏ số trang độc lập và không kết thúc ở page break. Name matching dùng front defendant dictionary; punishment phrase không bị coi là tên.
+- Decision-tail output có đủ heading/tail/candidate/parsed/mapped/unmapped diagnostics, candidate raw blocks, charge evidence và ba warning phân biệt nguyên nhân blank.
+- Defendant current address nối continuation qua page break, bỏ standalone page number, dừng tại identity/entity boundary và giữ evidence line IDs. Tiền tố phụ `hiện tại:`/`hiện nay:` sau label được bỏ.
+- Targeted patch: 10/10 passed; focused rerun gồm regression địa chỉ cũ: 11/11 passed. Full suite hiện 240/252 passed; 12 test legacy còn khóa schema 11 cột, role phụ hoặc output participant khác bật mặc định. Task giới hạn test được sửa ở đúng 9 module mới nên các legacy assertion chưa được realign.
+- Không đọc/chạy PDF, cache hoặc output thật; không gọi OCR, Surya, Docker, LLM hay cloud; không commit/push.
+
 ## Front + Decision Only Source Policy và Row-specific Legal Relationship
 
 - Production extraction chỉ dùng `front_pre_content` và `decision_tail`; `middle_excluded` không được fill `FINAL_EXCEL` hay làm fallback. `source_region_policy.py` giữ canonical region, field-source allowlist và audit contract.

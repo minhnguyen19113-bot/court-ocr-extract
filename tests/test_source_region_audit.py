@@ -67,6 +67,7 @@ def test_workbook_and_html_expose_source_and_entity_charge_audit(tmp_path) -> No
         settings=PipelineSettings(),
         strategies=["rule_anchor_only"],
         decision_tail_records={record.case_id: tail},
+        include_other_participants_output=True,
     )
 
     workbook = load_workbook(tmp_path / "compare_summary.xlsx", read_only=True)
@@ -127,4 +128,3 @@ def _front_record() -> OCRCacheRecord:
             pages=[OCRPage(page_index=1, lines=lines)],
         ),
     )
-

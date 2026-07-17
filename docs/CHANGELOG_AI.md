@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-07-17 - Fast Patch Final Excel 13 Cột, Verdict Block và Địa Chỉ Qua Trang
+
+- Nâng canonical `FINAL_EXCEL` lên đúng 13 cột, thêm số/ngày tuyên án và khóa mapping độc lập với số/ngày thụ lý.
+- Thu hẹp final role về `Bị cáo`/`Bị hại`; giữ participant khác trong JSON/`PARTICIPANTS` và chuyển sheet/HTML phụ sang opt-in mặc định off.
+- Thay charge window ngắn bằng verdict block có line/char guard, hỗ trợ punishment phrase, quoted/unquoted charge, nhiều dòng và qua page break.
+- Thêm decision-tail diagnostics cùng candidate raw blocks/evidence/warnings vào workbook, JSON và HTML review.
+- Nối current address qua page break theo line sequence, bỏ số trang độc lập và dừng trước identity/entity tiếp theo.
+- Thêm đúng 9 test modules synthetic theo task: targeted 10/10 passed; focused address regression 11/11 passed. Full suite 240/252 passed, còn 12 assertion legacy mâu thuẫn trực tiếp với schema/role/output default mới và không được sửa vì task khóa danh sách test.
+- Không dùng dữ liệu thật, OCR, Surya, Docker, LLM hoặc cloud; không commit/push.
+
 ## 2026-07-17 - Front + Decision Source và Row-specific Legal Relationship
 
 - Thêm `source_region_policy.py`; production chỉ chấp nhận `front_pre_content` và `decision_tail`, loại `middle_excluded` khỏi final field/fallback.
