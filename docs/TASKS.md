@@ -1,5 +1,17 @@
 # Tasks
 
+## FINAL EXCEL SCHEMA FIRST REALIGNMENT
+
+- [x] Audit toàn repo và xác nhận không có bộ final columns cạnh tranh với 11 cột được duyệt.
+- [x] Tạo `final_excel_schema.py` và `final_excel_builder.py`.
+- [x] Bổ sung extraction cho ngày thụ lý, quan hệ pháp luật explicit và CCCD/CMND có label.
+- [x] Đổi mọi final workbook writer sang sheet đầu `FINAL_EXCEL` đúng 11 cột.
+- [x] Nối final builder vào `rule_anchor_only` và `rule_then_llm_per_block`; debug sheets vẫn nằm phía sau.
+- [x] Đặt `FINAL EXCEL PREVIEW` 11 cột trước mọi debug section trong HTML review.
+- [x] Thêm năm test modules bắt buộc và cập nhật writer contract cũ.
+- [x] Chạy full suite: 199/199 test passed; các static/architecture/repo checks đều passed.
+- [ ] Project Owner chạy rule-only trên `case_001`, review 10 dòng người và xác nhận mapping thật.
+
 ## FIX RULE ANCHOR METADATA + PARTICIPANT SPLITTER CASE001
 
 - [x] Bỏ metadata line cap gây mất anchor phía cuối header và chỉ capture token số thụ lý/quyết định.

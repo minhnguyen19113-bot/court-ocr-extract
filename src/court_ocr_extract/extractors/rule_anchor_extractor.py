@@ -17,6 +17,10 @@ from court_ocr_extract.extractors.pre_content_schema import (
     PARTICIPANT_FIELDS,
     empty_pre_content_output,
 )
+from court_ocr_extract.extractors.rule_parser import (
+    extract_identity_number,
+    parse_vietnamese_date,
+)
 
 
 DATE_RE = re.compile(r"\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b")
@@ -101,6 +105,7 @@ def parse_defendant_block(block: dict[str, Any]) -> dict[str, Any]:
     _extract_defendant_labeled_values(raw, result)
     _parse_spouse_children(raw, result)
     _parse_current_address(raw, result)
+    result["cccd"] = extract_identity_number(raw)
 
     parent_match = re.search(r"con\s+ông\s+(.+?)\s+và\s+bà\s+([^,;.\n]+)", raw, re.I)
     if parent_match:
@@ -140,6 +145,7 @@ def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
     )
     primary_line = _participant_primary_line(raw, role)
     result["full_name"] = _participant_name(primary_line)
+    result["cccd"] = extract_identity_number(raw)
     birth = re.search(r"\b(?:sinh\s+ngày\s+)?(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b|\bsinh\s+năm\s+(\d{4})\b", raw, re.I)
     if birth:
         result["birth_date_or_year"] = _normalize_date(birth.group(1)) if birth.group(1) else birth.group(2)
@@ -193,6 +199,23 @@ def _extract_metadata(lines: list[dict[str, Any]], output: dict[str, Any]) -> No
         elif "thu ly so" in folded:
             value = _number_after_anchor(text, r"thụ\s+lý\s+số")
             _set(output, "metadata.case_acceptance_number", value, line, 0.96)
+            acceptance_date = parse_vietnamese_date(
+                _text_after_anchor(text, r"thụ\s+lý\s+số") or ""
+            )
+            _set(output, "metadata.case_acceptance_date", acceptance_date, line, 0.96)
+        legal_relationship = re.search(
+            r"(?:Quan\s+hệ\s+pháp\s+luật|Tội\s+danh)\s*[:：]\s*([^;\n]+)",
+            text,
+            re.I,
+        )
+        if legal_relationship and not output["metadata"]["legal_relationship"]:
+            _set(
+                output,
+                "metadata.legal_relationship",
+                _clean_value(legal_relationship.group(1)),
+                line,
+                0.94,
+            )
         if (
             not output["metadata"]["trial_location_or_date_sentence"]
             and "xet xu so tham" in folded
@@ -440,13 +463,18 @@ def _split_panel_values(value: str) -> list[str]:
 
 
 def _number_after_anchor(text: str, anchor_pattern: str) -> str | None:
-    anchor = re.search(anchor_pattern + r"\s*[:.]?\s*", text, re.I)
-    if not anchor:
+    tail = _text_after_anchor(text, anchor_pattern)
+    if tail is None:
         return None
-    number = CASE_NUMBER_TOKEN_RE.match(text, anchor.end())
+    number = CASE_NUMBER_TOKEN_RE.match(tail)
     if not number:
         return None
     return re.sub(r"\s*/\s*", "/", number.group(1)).strip(" .;,:")
+
+
+def _text_after_anchor(text: str, anchor_pattern: str) -> str | None:
+    anchor = re.search(anchor_pattern + r"\s*[:.]?\s*", text, re.I)
+    return text[anchor.end():] if anchor else None
 
 
 def _date_after_day_anchor(text: str) -> str | None:

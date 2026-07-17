@@ -7,6 +7,7 @@ from typing import Any
 
 from openpyxl import Workbook
 
+from court_ocr_extract.excel_writer import format_final_excel_sheet
 from court_ocr_extract.extractors.hybrid_pre_content_extractor import HybridPreContentExtractor
 from court_ocr_extract.extractors.llm_only_pre_content_extractor import LLMCallable, LLMOnlyPreContentExtractor
 from court_ocr_extract.extractors.pre_content_anchor_segmenter import segment_pre_content_anchors
@@ -18,6 +19,11 @@ from court_ocr_extract.extractors.rule_anchor_strategies import (
     run_rule_anchor_strategy,
 )
 from court_ocr_extract.extractors.rule_based_pre_content_extractor import extract_pre_content_rules
+from court_ocr_extract.final_excel_builder import build_final_excel_rows
+from court_ocr_extract.final_excel_schema import (
+    FINAL_EXCEL_COLUMNS,
+    FINAL_EXCEL_SHEET_NAME,
+)
 from court_ocr_extract.ocr_cache import OCRCacheRecord
 from court_ocr_extract.settings import PipelineSettings
 from court_ocr_extract.visual_debug import escape, write_html
@@ -30,19 +36,20 @@ DEFAULT_STRATEGIES = ("rule_anchor_only", "rule_then_llm_per_block")
 CASES_HEADERS = (
     "case_id", "source_file", "document_type", "ocr_status", "marker_found", "marker_page",
     "early_stop_triggered", "pages_processed", "pages_total", "strategy_used", "court_name",
-    "judgment_number", "judgment_date", "case_acceptance_number", "trial_decision_number",
+    "judgment_number", "judgment_date", "case_type", "legal_relationship",
+    "case_acceptance_number", "case_acceptance_date", "trial_decision_number",
     "postponement_decision_number", "trial_date_or_location_sentence", "presiding_judge", "clerk",
     "prosecutor", "needs_review", "warnings",
 )
 DEFENDANTS_HEADERS = (
     "case_id", "strategy", "defendant_index", "full_name", "alias", "birth_date_or_year",
-    "birth_place", "permanent_address", "current_address", "detention_status", "presence_status",
+    "birth_place", "cccd", "permanent_address", "current_address", "detention_status", "presence_status",
     "occupation", "education", "nationality", "ethnicity", "religion", "gender", "father_name",
     "mother_name", "spouse", "children", "criminal_record", "evidence_line_ids", "evidence_text",
     "needs_review", "warnings",
 )
 PARTICIPANTS_HEADERS = (
-    "case_id", "strategy", "participant_index", "role", "full_name", "birth_date_or_year",
+    "case_id", "strategy", "participant_index", "role", "full_name", "birth_date_or_year", "cccd",
     "address", "presence_status", "relationship_or_note", "evidence_line_ids", "evidence_text",
     "needs_review", "warnings",
 )
@@ -307,6 +314,7 @@ def _write_case_review(path: Path, case: dict[str, Any]) -> None:
     )
     body = (
         f'<h1>{escape(case["case_id"])}</h1>'
+        + _final_excel_preview_html(_final_rows_for_case(case))
         + _llm_runtime_html(case)
         + '<section><h2>Văn bản pre-content</h2>' + source_lines + '</section>'
         + _anchor_html(case["anchor_segments"])
@@ -376,10 +384,13 @@ def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, A
     )
     body = (
         '<h1>So sánh extraction pre-content theo anchor</h1>'
-        f'<p>LLM preflight: <strong>{escape(runtime.get("ok"))}</strong>; model: {escape(runtime.get("model"))}; '
-        f'base URL: {escape(runtime.get("base_url"))}</p>'
-        '<table><tr><th>Case</th><th>Document type</th><th>Strategy chính</th>'
-        '<th>Trạng thái strategy thứ hai</th><th>Đã gọi LLM</th><th>Số block gọi</th><th>Block lỗi</th></tr>'
+        + _final_excel_preview_html(
+            [row for case in cases for row in _final_rows_for_case(case)]
+        )
+        + f'<p>LLM preflight: <strong>{escape(runtime.get("ok"))}</strong>; model: {escape(runtime.get("model"))}; '
+        + f'base URL: {escape(runtime.get("base_url"))}</p>'
+        + '<table><tr><th>Case</th><th>Document type</th><th>Strategy chính</th>'
+        + '<th>Trạng thái strategy thứ hai</th><th>Đã gọi LLM</th><th>Số block gọi</th><th>Block lỗi</th></tr>'
         + rows + '</table>'
     )
     write_html(path, "Rule anchor pre-content comparison", body)
@@ -387,7 +398,13 @@ def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, A
 
 def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, Any]) -> None:
     workbook = Workbook()
-    workbook.remove(workbook.active)
+    final_sheet = workbook.active
+    final_sheet.title = FINAL_EXCEL_SHEET_NAME
+    final_sheet.append(FINAL_EXCEL_COLUMNS)
+    for case in cases:
+        for row in _final_rows_for_case(case):
+            final_sheet.append([row[column] for column in FINAL_EXCEL_COLUMNS])
+    format_final_excel_sheet(final_sheet)
     sheet_names = (
         "SUMMARY", "ANCHOR_BLOCKS", "ANCHOR_WARNINGS", "CASES", "DEFENDANTS",
         "PARTICIPANTS", "TRIAL_PANEL", "LLM_STATUS", "FIELD_LONG", "EVIDENCE_LINES",
@@ -448,6 +465,35 @@ def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, 
                     _display(conflict),
                 ])
     workbook.save(path)
+
+
+def _final_rows_for_case(case: dict[str, Any]) -> list[dict[str, str]]:
+    if case.get("segmenter", {}).get("document_type") == "correction_notice":
+        return []
+    strategy = str(case.get("metrics", {}).get("primary_strategy") or "")
+    outputs = case.get("strategy_outputs", {})
+    output = outputs.get(strategy)
+    if not isinstance(output, dict):
+        output = next((value for value in outputs.values() if isinstance(value, dict)), {})
+    return build_final_excel_rows(output)
+
+
+def _final_excel_preview_html(rows: list[dict[str, str]]) -> str:
+    headers = "".join(f"<th>{escape(column)}</th>" for column in FINAL_EXCEL_COLUMNS)
+    body_rows = "".join(
+        "<tr>"
+        + "".join(f"<td>{escape(row.get(column))}</td>" for column in FINAL_EXCEL_COLUMNS)
+        + "</tr>"
+        for row in rows
+    )
+    if not body_rows:
+        body_rows = (
+            f'<tr><td colspan="{len(FINAL_EXCEL_COLUMNS)}">Không có dòng final cho tài liệu này.</td></tr>'
+        )
+    return (
+        '<section><h2>FINAL EXCEL PREVIEW</h2>'
+        f'<table><tr>{headers}</tr>{body_rows}</table></section>'
+    )
 
 
 def _append_anchor_rows(sheets, case) -> None:

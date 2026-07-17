@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-07-14 - Final Excel Schema First Realignment
+
+- Tạo canonical `FINAL_EXCEL_COLUMNS` đúng 11 cột và final row builder riêng cho rule-anchor output.
+- Đổi final sheet của canonical writers và compare workbook thành `FINAL_EXCEL`, luôn đứng đầu; giữ mọi sheet kỹ thuật làm debug phụ.
+- Bổ sung `case_acceptance_date`, `legal_relationship`, entity `cccd`, birth-year-only, address priority và missing-data notes.
+- Đưa `FINAL EXCEL PREVIEW` đúng 11 cột lên trước phần runtime/anchor/evidence trong HTML.
+- Mở rộng QA/validation cho approved participant roles và CCCD/CMND 9-12 chữ số liên tục.
+- Thêm năm test modules synthetic; không đọc PDF/cache/Excel/output thật hoặc gọi LLM, Surya, Docker, cloud.
+- Verification hoàn tất: 199/199 test passed; repo guardrails, architecture guardrails, static Surya backend và Local LLM config checks đều passed.
+
 ## 2026-07-14 - Fix Rule Anchor Metadata + Participant Splitter Case001
 
 - Bỏ metadata line cap và giới hạn các field số thụ lý/đưa ra xét xử/hoãn phiên tòa về đúng token sau anchor.

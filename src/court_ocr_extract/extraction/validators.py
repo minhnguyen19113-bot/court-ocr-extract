@@ -115,8 +115,8 @@ def _validate_participant(participant: Participant) -> None:
 
     if participant.cccd:
         digits = re.sub(r"\D", "", participant.cccd)
-        if len(digits) not in {9, 12}:
-            notes.append("CCCD/CMND không phải 9 hoặc 12 số.")
+        if not 9 <= len(digits) <= 12:
+            notes.append("CCCD/CMND không có từ 9 đến 12 số.")
         else:
             participant.cccd = digits
 

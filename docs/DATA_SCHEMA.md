@@ -57,39 +57,13 @@ Required fields:
 
 Every non-null value must have evidence unless a reviewer-approved rule says otherwise.
 
-## Participant Row
+## Final Excel Row
 
-Target Excel/export row metadata:
+`src/court_ocr_extract/final_excel_schema.py` là nguồn canonical cho đúng 11 cột final. Sheet đầu của mọi final workbook là `FINAL_EXCEL`; mỗi defendant/participant là một dòng và case metadata được lặp lại.
 
-- `SOURCE_CASE_ID`
-- `SOURCE_PAGE`
-- `SOURCE_LINE_IDS`
-- `OCR_CONFIDENCE`
-- `EXTRACTION_CONFIDENCE`
-- `EVIDENCE`
-- `WARNINGS`
-- `NEEDS_REVIEW`
+Không thêm `SOURCE_CASE_ID`, `SOURCE_PAGE`, `SOURCE_LINE_IDS`, OCR/extraction confidence, evidence, technical warnings hoặc `NEEDS_REVIEW` vào `FINAL_EXCEL`. Các field này thuộc debug sheets/QA report. `DATA` và `Trich xuat` là contract lịch sử trước final-schema realignment, không còn là tên sheet final.
 
-Domain fields should remain defined in `config/fields.yaml` or the canonical schema chosen in Phase 1B.
-
-Phase 1E giữ nguyên workbook contract hiện tại của canonical `src/court_ocr_extract/excel_writer.py`:
-
-- Draft-record API `write_excel()` tạo sheet `DATA` và `RUN_SUMMARY`.
-- Typed-result API `write_excel_from_results()` tạo sheet `Trich xuat` để giữ tương thích hành vi của caller đã migrate.
-- Cả hai API dùng cùng 11 domain headers trong `EXCEL_HEADERS`.
-
-Các cột audit/trace mục tiêu bên trên chưa có trong 11 headers hiện tại:
-
-- `SOURCE_CASE_ID`
-- `SOURCE_PAGE`
-- `SOURCE_LINE_IDS`
-- `OCR_CONFIDENCE`
-- `EXTRACTION_CONFIDENCE`
-- `EVIDENCE`
-- `WARNINGS`
-- `NEEDS_REVIEW`
-
-Phase 1E không ép thay đổi schema lớn. Việc bổ sung các cột này cần một phase schema riêng với migration/QA rõ ràng.
+Dữ liệu thiếu phải để trống và giải thích bằng chuỗi phẳng trong `GHI CHÚ`; không đặt JSON blob trong final row.
 
 ## Extraction Draft Contract
 

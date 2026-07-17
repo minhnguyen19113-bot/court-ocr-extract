@@ -1,5 +1,11 @@
 # Debug Output Spec
 
+## Final Excel preview trước debug
+
+Workbook compare phải đặt `FINAL_EXCEL` ở vị trí đầu tiên và sheet này chỉ có đúng 11 cột canonical. Tất cả sheet `SUMMARY`, `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `ANCHOR_*`, `LLM_STATUS`, `FIELD_LONG`, `EVIDENCE_LINES`, `RAW_JSON` và compare/validator sheets đều là debug phụ nằm sau.
+
+HTML index và per-case review phải có section đầu `FINAL EXCEL PREVIEW`, hiển thị đúng 11 cột và không chen confidence/evidence/debug columns. Các section Local LLM runtime, OCR lines, anchor blocks, evidence, warning và raw strategy output chỉ xuất hiện phía sau.
+
 ## Local LLM status trong compare report
 
 HTML phải hiển thị preflight/runtime, provider, model, base URL, context window, input token ước lượng, chunk count, `llm_actually_called` và chunk errors. `llm_only_failed`/`llm_only_not_run` phải hiện “không có output hợp lệ”, không render schema null như kết quả model.

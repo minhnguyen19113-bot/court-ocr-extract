@@ -11,7 +11,7 @@ flowchart TD
     C2 --> E2["VLM JSON/evidence extraction"]
     E1 --> F["Evidence validation + anti-hallucination checks"]
     E2 --> F
-    F --> G["Excel DATA + RUN_SUMMARY"]
+    F --> G["Excel FINAL_EXCEL (11 cột) + debug sheets"]
     G --> H["QA report"]
     H --> I{"Project Owner accepts real-data pilot?"}
     I -->|Yes| J["Full run"]

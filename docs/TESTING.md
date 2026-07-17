@@ -1,5 +1,11 @@
 # Testing
 
+## Final Excel schema tests
+
+Năm modules `test_final_excel_*.py` kiểm đúng 11 cột/thứ tự, final row builder, cấu trúc synthetic 6 defendant + 4 participant, sheet đầu `FINAL_EXCEL`, không có cột thừa, HTML preview đứng trước debug, rule-only/rule-then strategy và missing-data notes. Fixtures chỉ dùng identity/case/address synthetic; không đọc PDF/cache/Excel/output thật và không gọi LLM/Surya/Docker/cloud.
+
+Kết quả full suite sau realignment: 199/199 test passed; có một warning deprecation từ dependency `surya`/Pydantic, không có test failure.
+
 ## Rule anchor và per-block LLM tests
 
 Mười một test modules `test_rule_anchor_*.py` với 23 cases dùng OCR-line dictionaries/OCR cache synthetic và fake callable. Coverage gồm exact metadata number tokens sau header dài, judgment number/date adjacency, OCR typo, QĐXX exclusion, single/multi defendant, page-number warning severity, one-line/newline panel, hierarchical participant numbering/inline roles, defendant spouse/children/address continuation, validators, document routing, strategy defaults, LLM cap và Excel/HTML artifacts. Tests không đọc PDF/cache thật và không gọi Surya, Docker, Local LLM hoặc cloud.

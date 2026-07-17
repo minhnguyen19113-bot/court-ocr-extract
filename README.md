@@ -135,7 +135,7 @@ python -m court_ocr_extract.cli extract --ocr-cache outputs\ocr_cache --output o
 python -m scripts.qa_output --excel outputs\excel\pilot_10.xlsx
 ```
 
-Excel output should include or prepare for source/evidence columns such as `SOURCE_CASE_ID`, `SOURCE_PAGE`, `SOURCE_LINE_IDS`, `OCR_CONFIDENCE`, `EVIDENCE`, `WARNINGS`, and `NEEDS_REVIEW`.
+Excel output chính là sheet đầu `FINAL_EXCEL`, chỉ có đúng 11 cột nghiệp vụ trong `FINAL_EXCEL_COLUMNS`. `SOURCE_CASE_ID`, source page/line IDs, confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` chỉ nằm trong debug sheets/QA report phía sau, không được thêm vào final sheet.
 
 ## Real-Data Pilot And Full Run
 
@@ -165,7 +165,7 @@ python -m court_ocr_extract.cli zip-debug-visual --run-id latest --output output
 - Preprocess does not remove text or Vietnamese marks.
 - Surya OCR text matches page images and bbox overlays.
 - Marker detection is reasonable.
-- Extraction preview matches Excel columns and shows evidence.
+- `FINAL EXCEL PREVIEW` khớp đúng 11 cột của sheet đầu `FINAL_EXCEL`; evidence/debug hiển thị ở section riêng phía sau.
 - Excel does not mistake status phrases for names.
 - QA report does not expose sensitive data.
 

@@ -75,7 +75,7 @@ Likely main candidates:
 - Local LLM client/parser: `src/court_ocr_extract/local_llm/`.
 - Typed merge/schema/validation compatibility: `src/court_ocr_extract/extraction/`; package này không còn sở hữu extractor backend.
 - Validation/QA: `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/extraction/validators.py`, `src/court_ocr_extract/qa.py`.
-- Excel export: canonical `src/court_ocr_extract/excel_writer.py`; JSON helper vẫn ở `src/court_ocr_extract/export/json_writer.py`.
+- Final Excel schema/builder: `src/court_ocr_extract/final_excel_schema.py`, `src/court_ocr_extract/final_excel_builder.py`; canonical writer ở `excel_writer.py`, JSON helper ở `export/json_writer.py`.
 - Review UI/debug: `src/court_ocr_extract/visual_debug.py`, `src/court_ocr_extract/review_html.py`, `src/court_ocr_extract/extraction_preview.py`
 - Ezycloudx/remote worker: `src/court_ocr_extract/remote_worker/`, `scripts/ezycloudx_*`
 - Architecture audit/tooling: `scripts/repo_inventory.py`, `scripts/import_graph.py`, `scripts/check_architecture_guardrails.py`, `docs/REPO_INVENTORY.md`, `docs/IMPORT_GRAPH.md`, `docs/LEGACY_ARCHIVE_PLAN.md`
@@ -87,6 +87,7 @@ Phase 1B/1E canonical decisions:
 - Config: `src/court_ocr_extract/settings.py` is canonical for the rebuild.
 - Compatibility config: `src/court_ocr_extract/config.py` remains for older imports and should not be expanded unless necessary.
 - Excel writer: `src/court_ocr_extract/excel_writer.py` là canonical path duy nhất.
+- Final output: sheet đầu `FINAL_EXCEL`, đúng 11 cột canonical; technical sheets chỉ là debug phụ.
 - Phase 1E đã migrate caller và xóa `src/court_ocr_extract/excel.py` cùng `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
 
 Phase 1F canonical decisions:

@@ -13,6 +13,11 @@ VALID_ROLES = {
     "Nguyên đơn",
     "Bị đơn",
     "Người có quyền lợi, nghĩa vụ liên quan",
+    "Người có quyền và nghĩa vụ liên quan",
+    "Người giám hộ",
+    "Người giám hộ của bị cáo",
+    "Người bảo vệ quyền và lợi ích hợp pháp của bị hại",
+    "Người bào chữa cho bị cáo",
     "Người liên quan",
     "Người làm chứng",
     "Đương sự",
@@ -90,7 +95,7 @@ def _validate_participant(participant: dict[str, Any]) -> None:
     if id_number:
         digits = re.sub(r"\D", "", str(id_number))
         participant["id_number"] = digits
-        if len(digits) not in {9, 12}:
+        if not 9 <= len(digits) <= 12:
             warnings.append("Invalid CCCD/CMND length.")
 
     confidence = participant.setdefault("confidence", {})

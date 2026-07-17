@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -7,23 +8,17 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from court_ocr_extract.final_excel_builder import make_final_excel_row
+from court_ocr_extract.final_excel_schema import (
+    FINAL_EXCEL_COLUMNS,
+    FINAL_EXCEL_SHEET_NAME,
+)
+from court_ocr_extract.extractors.rule_parser import parse_vietnamese_date
 from court_ocr_extract.models import ExtractionResult, Participant
 from court_ocr_extract.validation import row_needs_review
 
 
-EXCEL_HEADERS = [
-    "LOẠI ÁN",
-    "SỐ THỤ LÝ",
-    "NGÀY THỤ LÝ (DD/MM/YYYY)",
-    "QUAN HỆ PHÁP LUẬT",
-    "TƯ CÁCH TỐ TỤNG",
-    "HỌ TÊN ĐƯƠNG SỰ",
-    "NĂM SINH",
-    "CCCD",
-    "ĐỊA CHỈ",
-    "HỌ TÊN CHỦ TỌA",
-    "GHI CHÚ",
-]
+EXCEL_HEADERS = FINAL_EXCEL_COLUMNS
 
 
 def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -36,7 +31,7 @@ def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, A
     for participant in participants:
         participant_note = "; ".join(participant.get("warnings", []))
         note = "; ".join(item for item in [document_note, participant_note] if item)
-        rows.append(
+        row = _complete_final_row(
             {
                 "LOẠI ÁN": case.get("case_type"),
                 "SỐ THỤ LÝ": case.get("filing_number"),
@@ -48,15 +43,16 @@ def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, A
                 "CCCD": participant.get("id_number"),
                 "ĐỊA CHỈ": participant.get("address"),
                 "HỌ TÊN CHỦ TỌA": case.get("presiding_judge"),
-                "GHI CHÚ": note or None,
-                "_case_id": case_id,
-                "_needs_review": row_needs_review(payload, participant),
-            }
+            },
+            notes=[note],
         )
+        row["_case_id"] = case_id
+        row["_needs_review"] = row_needs_review(payload, participant)
+        rows.append(row)
     return rows
 
 
-def rows_from_result(result: ExtractionResult) -> list[dict[str, str | None]]:
+def rows_from_result(result: ExtractionResult) -> list[dict[str, str]]:
     participants = result.participants or [
         Participant(ghi_chu="Không nhận diện được người tham gia tố tụng")
     ]
@@ -65,19 +61,21 @@ def rows_from_result(result: ExtractionResult) -> list[dict[str, str | None]]:
     for participant in participants:
         note = "; ".join(item for item in [participant.ghi_chu, common_note] if item)
         rows.append(
-            {
-                "LOẠI ÁN": result.case_info.loai_an,
-                "SỐ THỤ LÝ": result.case_info.so_thu_ly,
-                "NGÀY THỤ LÝ (DD/MM/YYYY)": result.case_info.ngay_thu_ly,
-                "QUAN HỆ PHÁP LUẬT": result.case_info.quan_he_phap_luat,
-                "TƯ CÁCH TỐ TỤNG": participant.tu_cach_to_tung,
-                "HỌ TÊN ĐƯƠNG SỰ": participant.ho_ten,
-                "NĂM SINH": participant.nam_sinh,
-                "CCCD": participant.cccd,
-                "ĐỊA CHỈ": participant.dia_chi,
-                "HỌ TÊN CHỦ TỌA": result.case_info.chu_toa,
-                "GHI CHÚ": note or None,
-            }
+            _complete_final_row(
+                {
+                    "LOẠI ÁN": result.case_info.loai_an,
+                    "SỐ THỤ LÝ": result.case_info.so_thu_ly,
+                    "NGÀY THỤ LÝ (DD/MM/YYYY)": result.case_info.ngay_thu_ly,
+                    "QUAN HỆ PHÁP LUẬT": result.case_info.quan_he_phap_luat,
+                    "TƯ CÁCH TỐ TỤNG": participant.tu_cach_to_tung,
+                    "HỌ TÊN ĐƯƠNG SỰ": participant.ho_ten,
+                    "NĂM SINH": participant.nam_sinh,
+                    "CCCD": participant.cccd,
+                    "ĐỊA CHỈ": participant.dia_chi,
+                    "HỌ TÊN CHỦ TỌA": result.case_info.chu_toa,
+                },
+                notes=[note],
+            )
         )
     return rows
 
@@ -92,12 +90,12 @@ def write_excel(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook = Workbook()
     data_sheet = workbook.active
-    data_sheet.title = "DATA"
+    data_sheet.title = FINAL_EXCEL_SHEET_NAME
     data_sheet.append(EXCEL_HEADERS)
     for draft in draft_records:
         for row in rows_from_payload(draft["case_id"], draft["payload"]):
             data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
-    _format_data_sheet(data_sheet)
+    format_final_excel_sheet(data_sheet)
 
     summary_sheet = workbook.create_sheet("RUN_SUMMARY")
     summary = run_summary or build_run_summary(draft_records)
@@ -118,12 +116,12 @@ def write_excel_from_results(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook = Workbook()
     data_sheet = workbook.active
-    data_sheet.title = "Trich xuat"
+    data_sheet.title = FINAL_EXCEL_SHEET_NAME
     data_sheet.append(EXCEL_HEADERS)
     for result in results:
         for row in rows_from_result(result):
             data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
-    _format_data_sheet(data_sheet)
+    format_final_excel_sheet(data_sheet)
     workbook.save(output_path)
     return output_path
 
@@ -147,7 +145,7 @@ def build_run_summary(draft_records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _format_data_sheet(sheet) -> None:
+def format_final_excel_sheet(sheet) -> None:
     header_fill = PatternFill("solid", fgColor="D9EAF7")
     header_font = Font(bold=True, color="000000")
     for cell in sheet[1]:
@@ -172,3 +170,62 @@ def _missing_important_count(rows: list[dict[str, Any]]) -> int:
 def _joined_unique(values) -> str:
     clean = [str(value) for value in values if value]
     return ", ".join(sorted(set(clean)))
+
+
+def _complete_final_row(
+    values: dict[str, Any],
+    *,
+    notes: list[str],
+) -> dict[str, str]:
+    values = dict(values)
+    values["NĂM SINH"] = _year_only(values.get("NĂM SINH"))
+    raw_date = str(values.get("NGÀY THỤ LÝ (DD/MM/YYYY)") or "")
+    normalized_date = parse_vietnamese_date(raw_date)
+    values["NGÀY THỤ LÝ (DD/MM/YYYY)"] = normalized_date or ""
+    if raw_date and not normalized_date:
+        notes.append("Field bị validator loại")
+    identity = re.sub(r"\D", "", str(values.get("CCCD") or ""))
+    if not 9 <= len(identity) <= 12:
+        if identity:
+            notes.append("Field bị validator loại")
+        identity = ""
+    values["CCCD"] = identity
+    values["ĐỊA CHỈ"] = re.sub(
+        r"^\s*hiện\s+tại\s*[:：]\s*",
+        "",
+        str(values.get("ĐỊA CHỈ") or ""),
+        flags=re.IGNORECASE,
+    ).strip(" ;,.")
+
+    if not values.get("LOẠI ÁN"):
+        notes.append("Không xác định chắc loại án")
+    if not values.get("SỐ THỤ LÝ"):
+        notes.append("Thiếu số thụ lý")
+    if not values.get("NGÀY THỤ LÝ (DD/MM/YYYY)"):
+        notes.append("Thiếu ngày thụ lý")
+    if not values.get("QUAN HỆ PHÁP LUẬT"):
+        if "hình sự" in str(values.get("LOẠI ÁN") or "").casefold():
+            values["QUAN HỆ PHÁP LUẬT"] = "Hình sự"
+            notes.append(
+                "Chưa xác định tội danh/quan hệ pháp luật chi tiết từ pre-content"
+            )
+        else:
+            notes.append("Không xác định chắc quan hệ pháp luật")
+    if not values.get("TƯ CÁCH TỐ TỤNG"):
+        notes.append("Thiếu tư cách tố tụng")
+    if not values.get("HỌ TÊN ĐƯƠNG SỰ"):
+        notes.append("Thiếu họ tên")
+    if not values.get("NĂM SINH"):
+        notes.append("Thiếu năm sinh")
+    if not identity:
+        notes.append("Thiếu CCCD/CMND")
+    if not values.get("ĐỊA CHỈ"):
+        notes.append("Thiếu địa chỉ")
+    if not values.get("HỌ TÊN CHỦ TỌA"):
+        notes.append("Thiếu chủ tọa")
+    return make_final_excel_row(values, notes=notes)
+
+
+def _year_only(value: Any) -> str:
+    years = re.findall(r"(?<!\d)((?:18|19|20)\d{2})(?!\d)", str(value or ""))
+    return years[-1] if years else ""

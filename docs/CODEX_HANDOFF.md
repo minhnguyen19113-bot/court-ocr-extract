@@ -1,5 +1,13 @@
 # Codex Handoff
 
+## Bàn Giao Final Excel Schema First
+
+Output chính hiện là sheet đầu `FINAL_EXCEL`, đúng 11 cột từ `FINAL_EXCEL_COLUMNS`. `final_excel_builder.py` map metadata/panel/defendants/participants thành một dòng mỗi người; không đưa JSON, evidence blob hoặc field kỹ thuật vào final sheet. `DATA` và `Trich xuat` không còn là tên sheet final.
+
+Verification synthetic/static hiện tại: 199/199 test passed; repo guardrails, architecture guardrails, static Surya backend check và Local LLM config check đều passed. Architecture check chỉ còn các warning inventory đã biết, không có failure.
+
+Project Owner chạy `rule_anchor_only --limit 1` trước và chỉ review `FINAL_EXCEL`: số/ngày thụ lý, 6 bị cáo + 4 participant, role dài không bị collapse, năm sinh chỉ còn năm, judge lặp đúng, CCCD thiếu để trống kèm note. Sau đó mới dùng debug sheets để truy nguyên. Codex chưa chạy/đọc `case_001` hoặc runtime thật.
+
 ## Bàn Giao Bản Vá Rule Anchor Case001
 
 Code đã có regression contract cho ba metadata case-number tokens, juror newline, bốn participant blocks theo cấu trúc `7.x.`, các field defendant nhỏ và informational warning severity. Không rebuild architecture và không thay Local LLM/Surya/Excel writer.
@@ -229,7 +237,7 @@ Template report chuẩn:
 
 ## Suggested Next Step
 
-Project Owner chạy rule-anchor compare trên 1 OCR-cache case với `--require-llm`, review anchor blocks/validator/LLM status, rồi mới tăng `--limit` lên 3.
+Project Owner chạy rule-only trên 1 OCR-cache case, review `FINAL_EXCEL` 11 cột và 10 dòng người trước; chỉ sau khi final mapping đạt mới review anchor/validator hoặc bật Local LLM.
 ## Ban giao moi nhat
 
 Task hien tai da hoan thien contract cho Windows Surya runtime va stamp suppression V3. Dung `--stamp-suppression balanced` va `--ocr-stamp-filter balanced` khi co `--use-preprocessed`; dung aggressive chi sau visual review.

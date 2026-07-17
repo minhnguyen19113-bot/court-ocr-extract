@@ -223,14 +223,11 @@ def extract_birth_year(text: str) -> str | None:
 def extract_identity_number(text: str) -> str | None:
     match = re.search(
         r"(?:CCCD|CMND|Căn\s*cước\s*công\s*dân|Chứng\s*minh\s*nhân\s*dân|"
-        r"số\s*định\s*danh\s*cá\s*nhân)\D{0,25}(\d(?:\D?\d){8}(?:\D?\d{3})?)",
+        r"số\s*định\s*danh\s*cá\s*nhân)\s*(?:số\s*)?[:：]?\s*(\d{9,12})(?!\d)",
         text,
         flags=re.IGNORECASE,
     )
-    if not match:
-        return None
-    digits = re.sub(r"\D", "", match.group(1))
-    return digits if len(digits) in {9, 12} else digits
+    return match.group(1) if match else None
 
 
 def extract_address(text: str) -> str | None:
@@ -247,7 +244,7 @@ def extract_address(text: str) -> str | None:
 
 def parse_vietnamese_date(value: str) -> str | None:
     vn_match = re.search(
-        r"ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})",
+        r"(?:ngày|ngay)\s+(\d{1,2})\s+(?:tháng|thang)\s+(\d{1,2})\s+(?:năm|nam)\s+(\d{4})",
         value,
         flags=re.IGNORECASE,
     )

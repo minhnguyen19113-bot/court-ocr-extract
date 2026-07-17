@@ -7,12 +7,18 @@ from typing import Any
 from openpyxl import load_workbook
 
 from court_ocr_extract.excel_writer import EXCEL_HEADERS
+from court_ocr_extract.final_excel_schema import FINAL_EXCEL_SHEET_NAME
 from court_ocr_extract.validation import STATUS_PHRASES, VALID_ROLES
 
 
 def qa_excel(excel_path: str | Path) -> dict[str, Any]:
     workbook = load_workbook(excel_path, read_only=True, data_only=True)
-    sheet = workbook["DATA"] if "DATA" in workbook.sheetnames else workbook.active
+    if FINAL_EXCEL_SHEET_NAME in workbook.sheetnames:
+        sheet = workbook[FINAL_EXCEL_SHEET_NAME]
+    elif "DATA" in workbook.sheetnames:
+        sheet = workbook["DATA"]
+    else:
+        sheet = workbook.active
     rows = list(sheet.iter_rows(values_only=True))
     if not rows:
         return {"total rows": 0}
@@ -23,7 +29,12 @@ def qa_excel(excel_path: str | Path) -> dict[str, Any]:
         "participant rows": sum(1 for row in data if row.get("HỌ TÊN ĐƯƠNG SỰ")),
         "rows need review": sum(1 for row in data if row.get("GHI CHÚ")),
         "invalid date count": sum(1 for row in data if row.get("NGÀY THỤ LÝ (DD/MM/YYYY)") and not _valid_date(str(row.get("NGÀY THỤ LÝ (DD/MM/YYYY)")))),
-        "invalid id count": sum(1 for row in data if row.get("CCCD") and len(re.sub(r"\D", "", str(row.get("CCCD")))) not in {9, 12}),
+        "invalid id count": sum(
+            1
+            for row in data
+            if row.get("CCCD")
+            and not 9 <= len(re.sub(r"\D", "", str(row.get("CCCD")))) <= 12
+        ),
         "suspicious name phrase count": sum(1 for row in data if _suspicious_name(row.get("HỌ TÊN ĐƯƠNG SỰ"))),
         "unknown role count": sum(1 for row in data if row.get("TƯ CÁCH TỐ TỤNG") and row.get("TƯ CÁCH TỐ TỤNG") not in VALID_ROLES),
     }

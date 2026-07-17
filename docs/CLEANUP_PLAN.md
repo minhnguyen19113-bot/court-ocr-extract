@@ -12,6 +12,8 @@ Phase 1E consolidates Excel/export behavior into `src/court_ocr_extract/excel_wr
 
 Phase 1F consolidates extractor backends into `src/court_ocr_extract/extractors/`, moves rule parsing under that package, and removes five duplicate/unimported extraction paths after caller migration.
 
+FINAL EXCEL SCHEMA FIRST adds canonical `final_excel_schema.py` and `final_excel_builder.py`; `excel_writer.py` remains the sole workbook writer. These modules are `main_candidate`, not cleanup candidates.
+
 TOOLKIT-1 adds `src/court_ocr_extract/evaluation/`, two CLI scripts và synthetic JSONL fixtures. Đây là `main_candidate` toolkit code; real manifests remain protected outside Git.
 
 ## Categories
@@ -34,7 +36,7 @@ TOOLKIT-1 adds `src/court_ocr_extract/evaluation/`, two CLI scripts và syntheti
 
 | Category | Count |
 | --- | ---: |
-| main_candidate | 21 |
+| main_candidate | 22 |
 | legacy_optional | 12 |
 | experimental | 6 |
 | duplicate_conflict | 5 |
@@ -90,6 +92,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `src/court_ocr_extract/extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, `extractor.py`, `llm.py` | removed_in_phase1f | Duplicate/unimported paths đã migrate vào canonical `extractors/`. | Đã xóa; restore bằng Git history trước Phase 1F nếu cần. |
 | `src/court_ocr_extract/validation.py`, `validator.py`, `extraction/validators.py` | duplicate_conflict | Validation split across modules. | Choose canonical validation package. |
 | `src/court_ocr_extract/excel_writer.py` | main_candidate | Canonical Excel writer duy nhất sau Phase 1E; hỗ trợ draft records và typed `ExtractionResult`. | Keep; chỉ mở rộng schema qua phase được duyệt. |
+| `src/court_ocr_extract/final_excel_schema.py`, `final_excel_builder.py` | main_candidate | Canonical 11-column final schema và rule-anchor row mapping; không chứa debug columns. | Keep; mọi final exporter dùng chung contract này. |
 | `src/court_ocr_extract/excel.py`, `src/court_ocr_extract/export/excel_writer.py` | removed_in_phase1e | Caller đã migrate sang canonical path; không cần compatibility wrapper. | Đã xóa; restore bằng Git history trước Phase 1E nếu cần. |
 | `src/court_ocr_extract/qa.py`, `scripts/qa_output.py`, `scripts/qa_batch_output.py` | main_candidate | QA output pieces exist. | Keep and align report schema. |
 | `src/court_ocr_extract/visual_debug.py`, `review_html.py`, `evidence_viewer.py`, `extraction_preview.py` | main_candidate | Debug/review UI pieces. | Keep and connect bbox/evidence views. |

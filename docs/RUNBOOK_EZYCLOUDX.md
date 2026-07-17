@@ -352,13 +352,13 @@ OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, 
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
   --input-dir data\test_pdfs\pre_content_9 `
   --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
-  --output-dir outputs\pre_content_rule_anchor_only_check_1_fix `
+  --output-dir outputs\pre_content_final_excel_rule_only_check_1 `
   --strategies rule_anchor_only `
   --limit 1 `
   --open
 ```
 
-Review exact metadata tokens, hai dòng juror, bốn participant blocks/roles/names, defendant spouse/children/detention/address và warning severity trong `CASES`/`ANCHOR_WARNINGS`. Chỉ khi rule-only đạt mới chạy rule + LLM:
+Review sheet đầu `FINAL_EXCEL`: đúng 11 cột, 6 dòng `Bị cáo` + 4 participant, số/ngày thụ lý, chủ tọa, role dài, năm sinh và missing-data notes. Chỉ sau đó mới dùng `CASES`/`ANCHOR_*`/entity sheets để debug hoặc chạy rule + LLM:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `

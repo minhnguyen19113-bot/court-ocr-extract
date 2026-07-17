@@ -9,8 +9,10 @@ METADATA_FIELDS = (
     "judgment_number",
     "judgment_date",
     "case_type",
+    "legal_relationship",
     "trial_location_or_date_sentence",
     "case_acceptance_number",
+    "case_acceptance_date",
     "trial_decision_number",
     "postponement_decision_number",
 )
@@ -19,10 +21,10 @@ DEFENDANT_FIELDS = (
     "full_name", "alias", "birth_date_or_year", "birth_place", "gender",
     "nationality", "ethnicity", "religion", "education", "occupation",
     "permanent_address", "current_address", "father_name", "mother_name",
-    "spouse", "children", "criminal_record", "detention_status", "presence_status",
+    "spouse", "children", "criminal_record", "detention_status", "presence_status", "cccd",
 )
 PARTICIPANT_FIELDS = (
-    "role", "full_name", "birth_date_or_year", "address", "presence_status", "relationship",
+    "role", "full_name", "birth_date_or_year", "cccd", "address", "presence_status", "relationship",
 )
 
 

@@ -62,6 +62,12 @@ Sau khi migrate extraction callers và xóa năm duplicate/unimported paths:
 - Không còn import `extraction.local_llm_extractor`, `extraction.rule_support`, `extraction.base`, root `extractor`, hoặc root `llm` trong safe code/docs roots.
 - Main CLI và scripts dùng `extraction_pipeline.py` + `extractors/`; typed pipeline/remote worker dùng adapter trong canonical Local LLM module.
 
+## Final Excel schema first
+
+- `excel_writer.py`, `pre_content_ab.py` và `extraction_preview.py` import canonical `final_excel_schema.py`/`final_excel_builder.py` thay vì hard-code final columns.
+- `final_excel_builder.py` chỉ phụ thuộc extraction text helpers; nó không tạo workbook và không thay thế canonical writer.
+- Không tạo thêm Excel writer path hoặc compatibility wrapper.
+
 Các module low-fan-in/unimported hiện là tín hiệu audit, chưa phải bằng chứng để xóa:
 
 - `court_ocr_extract.export.json_writer`

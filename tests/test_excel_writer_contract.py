@@ -33,9 +33,9 @@ def test_canonical_writer_creates_draft_workbook_contract(tmp_path):
     result_path = write_excel(drafts, output_path)
     workbook = load_workbook(result_path, read_only=True)
 
-    assert workbook.sheetnames == ["DATA", "RUN_SUMMARY"]
-    assert [cell.value for cell in workbook["DATA"][1]] == EXCEL_HEADERS
-    assert workbook["DATA"].max_row == 2
+    assert workbook.sheetnames == ["FINAL_EXCEL", "RUN_SUMMARY"]
+    assert [cell.value for cell in workbook["FINAL_EXCEL"][1]] == EXCEL_HEADERS
+    assert workbook["FINAL_EXCEL"].max_row == 2
 
 
 def test_canonical_writer_creates_typed_result_workbook_contract(tmp_path):
@@ -56,6 +56,6 @@ def test_canonical_writer_creates_typed_result_workbook_contract(tmp_path):
     result_path = write_excel_from_results([result], output_path)
     workbook = load_workbook(result_path, read_only=True)
 
-    assert workbook.sheetnames == ["Trich xuat"]
-    assert [cell.value for cell in workbook["Trich xuat"][1]] == EXCEL_HEADERS
-    assert workbook["Trich xuat"].max_row == 2
+    assert workbook.sheetnames == ["FINAL_EXCEL"]
+    assert [cell.value for cell in workbook["FINAL_EXCEL"][1]] == EXCEL_HEADERS
+    assert workbook["FINAL_EXCEL"].max_row == 2

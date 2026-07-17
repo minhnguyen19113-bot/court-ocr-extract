@@ -1,5 +1,16 @@
 # Project State
 
+## Final Excel Schema First Realignment
+
+- `FINAL_EXCEL` là output workbook chính và luôn là sheet đầu tiên; schema canonical nằm tại `final_excel_schema.py` với đúng 11 cột của Project Owner.
+- `final_excel_builder.py` tạo một dòng cho mỗi defendant/participant, lặp case metadata/judge và chỉ ghi đúng 11 cột. Dữ liệu thiếu để trống, lý do nằm trong `GHI CHÚ`; không có JSON/debug field trong final sheet.
+- Rule-anchor metadata bổ sung `case_acceptance_date` và `legal_relationship`; entity bổ sung `cccd`. Ngày thụ lý chỉ lấy từ line `thụ lý số ... ngày ...`; CCCD/CMND chỉ lấy 9-12 chữ số liên tục sau label định danh.
+- `rule_anchor_only` và `rule_then_llm_per_block` đều tạo `FINAL_EXCEL`; khi compare nhiều strategy, final sheet dùng primary strategy, còn mọi strategy vẫn được giữ trong debug sheets.
+- `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `ANCHOR_*`, `LLM_STATUS`, `RAW_JSON` và các sheet khác chỉ là debug phụ. HTML đặt `FINAL EXCEL PREVIEW` 11 cột trước debug sections.
+- Audit không phát hiện schema final cạnh tranh: `EXCEL_HEADERS`, template và field docs cũ đã dùng đúng cùng 11 tên cột. Contract sheet `DATA`/`Trich xuat` cũ được thay bằng `FINAL_EXCEL`.
+- Codex chỉ chạy tests synthetic; không đọc PDF/OCR cache/Excel/output thật và không gọi LLM, Surya, Docker hay cloud.
+- Verification: 199/199 test passed; compile, snapshot, repo/architecture guardrails, static Surya backend và Local LLM config checks đều passed.
+
 ## Bản Vá Rule Anchor Metadata + Participant Case001
 
 - Metadata parser không còn giới hạn cứng 100 dòng trước entity đầu tiên và chỉ lấy token số ngay sau anchor, nên `case_acceptance_number`, `trial_decision_number`, `postponement_decision_number` không nuốt phần `ngày`/`theo` phía sau.
@@ -90,9 +101,9 @@ Last updated: 2026-07-14
 
 ## Current Phase
 
-FIX RULE ANCHOR METADATA + PARTICIPANT SPLITTER CASE001.
+FINAL EXCEL SCHEMA FIRST REALIGNMENT.
 
-Task này chỉ vá parser/splitter còn sai sau review `case_001`; không thay architecture rule-anchor, Surya OCR runtime hoặc Local LLM runtime. Không chạy dữ liệu thật và không gọi model thật.
+Task này realign extraction/export theo 11 cột final và giữ các sheet kỹ thuật làm debug phụ. Không thay Surya OCR runtime, không chạy dữ liệu thật và không gọi model thật.
 
 ## Active Direction
 
@@ -203,7 +214,7 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 - Hợp nhất `rows_from_result()` và `write_excel_from_results()` vào canonical `src/court_ocr_extract/excel_writer.py`.
 - Chuyển pipeline, evaluation script, và tests khỏi `court_ocr_extract.excel`/`court_ocr_extract.export.excel_writer` sang canonical module.
 - Xóa `src/court_ocr_extract/excel.py` và `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
-- Giữ nguyên 11 domain headers và hai workbook contract hiện hữu: draft records dùng `DATA` + `RUN_SUMMARY`, typed `ExtractionResult` dùng `Trich xuat`.
+- Tại thời điểm Phase 1E, giữ nguyên 11 domain headers và hai workbook contract khi đó: draft records dùng `DATA` + `RUN_SUMMARY`, typed `ExtractionResult` dùng `Trich xuat`. Quyết định lịch sử này đã được D-043 thay thế bằng sheet đầu `FINAL_EXCEL`.
 - Thêm synthetic workbook contract tests và architecture guardrail cho canonical path/legacy imports.
 - Các cột audit/trace mục tiêu chưa được thêm trong phase này; cần một phase schema riêng nếu Project Owner duyệt.
 - Không chạy PDF thật, không đọc Excel thật, không gọi cloud API, và không push.
@@ -268,4 +279,4 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 
 ## Next Gate
 
-Project Owner chạy `compare-pre-content` với 1 case bằng `rule_anchor_only,rule_then_llm_per_block`, review `ANCHOR_BLOCKS`, `ANCHOR_WARNINGS`, structured sheets và HTML; chỉ tăng lên 3 case sau khi case đầu đạt.
+Project Owner chạy `compare-pre-content` với 1 case bằng `rule_anchor_only`, review sheet đầu `FINAL_EXCEL` và `FINAL EXCEL PREVIEW` trước; chỉ mở debug sheets hoặc chạy rule + LLM sau khi 11 cột/10 dòng người đạt.

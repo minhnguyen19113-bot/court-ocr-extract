@@ -1,5 +1,13 @@
 # Pipeline Spec
 
+## Final Excel schema contract
+
+`FINAL_EXCEL` là output nghiệp vụ chính và phải là sheet đầu tiên của mọi final workbook. Schema duy nhất là `FINAL_EXCEL_COLUMNS` trong `src/court_ocr_extract/final_excel_schema.py`, đúng 11 cột và đúng thứ tự Project Owner duyệt. Không được thêm source/evidence/confidence/strategy/JSON columns vào sheet này.
+
+`final_excel_builder.py` nhận rule-anchor output và tạo một dòng cho mỗi defendant/participant. Case type, số/ngày thụ lý, quan hệ pháp luật và chủ tọa được lặp trên từng dòng. Năm sinh chỉ giữ năm; CCCD/CMND chỉ nhận 9-12 chữ số liên tục sau label; defendant address ưu tiên current rồi permanent. Field thiếu để trống và thêm lý do vào `GHI CHÚ`; không suy đoán từ tên, địa chỉ hoặc số quyết định.
+
+Khi compare nhiều strategy, `FINAL_EXCEL` dùng primary strategy để tránh nhân đôi các dòng không có strategy column. `rule_anchor_only` hoặc `rule_then_llm_per_block` khi chạy riêng đều phải tạo final sheet. `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `ANCHOR_*`, `LLM_STATUS`, `RAW_JSON` và các sheet trace khác nằm sau và chỉ phục vụ debug.
+
 ## Local LLM context budget và chunked extraction
 
 Local LLM mặc định dùng `Qwen/Qwen2.5-3B-Instruct`, context 8192, output 1024, input tối đa 6000 token/22000 ký tự và safety margin 512. OpenAI-compatible payload luôn có `temperature=0` và `max_tokens>0`. Adapter ước lượng tiếng Việt bằng `ceil(chars/3.2)`, trim `preserve_head` trước HTTP và fail `llm_context_budget_exceeded` nếu vẫn không an toàn.
@@ -192,16 +200,7 @@ Terminal summary must include:
 - output Excel path
 - output QA report path
 
-Excel should include or prepare for:
-
-- `SOURCE_CASE_ID`
-- `SOURCE_PAGE`
-- `SOURCE_LINE_IDS`
-- `OCR_CONFIDENCE`
-- `EXTRACTION_CONFIDENCE`
-- `EVIDENCE`
-- `WARNINGS`
-- `NEEDS_REVIEW`
+Sheet `FINAL_EXCEL` chỉ có 11 cột canonical. `SOURCE_CASE_ID`, source page/line IDs, OCR/extraction confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` phải nằm trong debug sheets/QA report, không được thêm vào final columns.
 
 ## Fallback Rules
 
