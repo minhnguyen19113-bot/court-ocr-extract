@@ -57,7 +57,7 @@ CASES_HEADERS = (
     "early_stop_triggered", "pages_processed", "pages_total", "strategy_used",
     "decision_tail_status", "decision_heading_found", "decision_heading_page",
     "decision_tail_line_count", "verdict_candidate_count", "parsed_charge_count",
-    "mapped_defendant_count", "unmapped_verdict_count",
+    "mapped_defendant_count", "unmapped_verdict_count", "invalid_charge_count",
     "case_charges", "charge_warnings", "court_name",
     "judgment_number", "judgment_date", "case_type", "legal_relationship",
     "case_acceptance_number", "case_acceptance_date", "trial_decision_number",
@@ -739,7 +739,8 @@ def _charge_summary_html(case: dict[str, Any]) -> str:
         candidate_rows = '<tr><td colspan="4">Không có verdict candidate.</td></tr>'
     evidence_rows = "".join(
         "<tr>"
-        f"<td>{escape(item.get('charge'))}</td>"
+        f"<td>{escape(item.get('raw_charge'))}</td>"
+        f"<td>{escape(item.get('normalized_charge') or item.get('charge'))}</td>"
         f"<td>{escape(', '.join(item.get('defendant_names', [])))}</td>"
         f"<td>{escape(', '.join(item.get('line_ids', [])))}</td>"
         f"<td>{escape(item.get('raw_text'))}</td>"
@@ -748,7 +749,7 @@ def _charge_summary_html(case: dict[str, Any]) -> str:
         if isinstance(charge_output, dict) and isinstance(item, dict)
     )
     if not evidence_rows:
-        evidence_rows = '<tr><td colspan="4">Chưa có charge evidence.</td></tr>'
+        evidence_rows = '<tr><td colspan="5">Chưa có charge evidence.</td></tr>'
     return (
         '<section><h2>CHARGE SUMMARY</h2>'
         f'<p>Case: {escape(case.get("case_id"))}; decision-tail status: '
@@ -759,14 +760,16 @@ def _charge_summary_html(case: dict[str, Any]) -> str:
         f'verdict candidates: {escape(output.get("verdict_candidate_count"))}; '
         f'parsed charges: {escape(output.get("parsed_charge_count"))}; '
         f'mapped defendants: {escape(output.get("mapped_defendant_count"))}; '
-        f'unmapped verdicts: {escape(output.get("unmapped_verdict_count"))}</p>'
+        f'unmapped verdicts: {escape(output.get("unmapped_verdict_count"))}; '
+        f'invalid charges: {escape(output.get("invalid_charge_count"))}</p>'
         '<table><tr><th>STT</th><th>Tội danh</th><th>Source region</th></tr>'
         + rows
         + '</table><h3>Verdict candidate blocks</h3>'
         + '<table><tr><th>STT</th><th>Page</th><th>Line IDs</th><th>Raw block</th></tr>'
         + candidate_rows
         + '</table><h3>Charge evidence</h3>'
-        + '<table><tr><th>Tội danh</th><th>Bị cáo</th><th>Line IDs</th><th>Evidence</th></tr>'
+        + '<table><tr><th>Raw charge</th><th>Normalized charge</th>'
+        '<th>Bị cáo</th><th>Line IDs</th><th>Evidence</th></tr>'
         + evidence_rows
         + '</table><p>Cảnh báo: '
         + escape("; ".join(str(value) for value in warnings) or "Không")
@@ -886,7 +889,8 @@ def _charge_evidence_html(case: dict[str, Any]) -> str:
             rows.append(
                 "<tr>"
                 f"<td>{escape(strategy)}</td>"
-                f"<td>{escape(item.get('charge'))}</td>"
+                f"<td>{escape(item.get('raw_charge'))}</td>"
+                f"<td>{escape(item.get('normalized_charge') or item.get('charge'))}</td>"
                 f"<td>{escape(', '.join(item.get('defendant_names', [])))}</td>"
                 f"<td>{escape(', '.join(item.get('line_ids', [])))}</td>"
                 f"<td>{escape(item.get('source_region'))}</td>"
@@ -896,7 +900,8 @@ def _charge_evidence_html(case: dict[str, Any]) -> str:
             )
     return (
         '<section><h2>Charge evidence</h2>'
-        '<table><tr><th>Strategy</th><th>Tội danh</th><th>Bị cáo</th>'
+        '<table><tr><th>Strategy</th><th>Raw charge</th>'
+        '<th>Normalized charge</th><th>Bị cáo</th>'
         '<th>Line IDs</th><th>Source region</th><th>Match method</th><th>Evidence</th></tr>'
         + "".join(rows)
         + "</table></section>"
@@ -949,6 +954,7 @@ def _append_structured_rows(sheets, case) -> None:
             "parsed_charge_count": output.get("parsed_charge_count"),
             "mapped_defendant_count": output.get("mapped_defendant_count"),
             "unmapped_verdict_count": output.get("unmapped_verdict_count"),
+            "invalid_charge_count": output.get("invalid_charge_count"),
             "case_charges": "; ".join(output.get("case_charges", [])),
             "charge_warnings": "; ".join(
                 output.get("charge_output", {}).get("warnings", [])
@@ -1206,6 +1212,7 @@ def _attach_decision_tail_charges(
         output["parsed_charge_count"] = 0
         output["mapped_defendant_count"] = 0
         output["unmapped_verdict_count"] = 0
+        output["invalid_charge_count"] = 0
         output["charge_output"] = {
             "case_charges": [],
             "defendant_charge_map": {},
@@ -1252,6 +1259,9 @@ def _attach_decision_tail_charges(
     output["parsed_charge_count"] = parsed_charge_count
     output["mapped_defendant_count"] = mapped_defendant_count
     output["unmapped_verdict_count"] = unmapped_verdict_count
+    output["invalid_charge_count"] = int(
+        charge_output.get("invalid_charge_count") or 0
+    )
     output["decision_tail_status"] = (
         "heading_not_found"
         if not tail_record.heading_found
@@ -1267,6 +1277,11 @@ def _attach_decision_tail_charges(
     elif verdict_blocks and not charge_output["case_charges"]:
         diagnostic_warnings.append(
             "verdict_candidates_found_but_no_charge_parsed"
+        )
+    if parsed_charge_count < len(verdict_blocks):
+        diagnostic_warnings.append(
+            f"verdict_charge_coverage_incomplete:"
+            f"{parsed_charge_count}/{len(verdict_blocks)}"
         )
     if charge_output["case_charges"] and not mapped_defendant_count:
         diagnostic_warnings.append("charges_parsed_but_no_defendant_mapped")

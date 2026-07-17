@@ -86,16 +86,37 @@ DEFENDANT_LABELS = (
     ("children", re.compile(r"Con(?!\s+ông\b)", re.I)),
 )
 
+CURRENT_ADDRESS_LABEL_PATTERN = (
+    r"(?:Chỗ\s+ở(?:\s+hiện\s+tại)?|Nơi\s+ở(?:\s+hiện\s+tại|\s+hiện\s+nay)?"
+    r"|Nơi\s+cư\s+trú|Địa\s+chỉ)"
+)
+ADDRESS_STOP_LABEL_PATTERN = (
+    r"(?:Nghề\s+nghiệp|Trình\s+độ(?:\s+văn\s+hóa)?|Dân\s+tộc|Giới\s+tính"
+    r"|Tôn\s+giáo|Quốc\s+tịch|Cha|Mẹ|con\s+ông|con\s+bà|Vợ|Chồng"
+    r"|Vợ\s+con|Con|Tiền\s+án|Tiền\s+sự|Nhân\s+thân|Bị\s+cáo\s+bị)"
+)
 CURRENT_ADDRESS_LINE_RE = re.compile(
-    r"^(?:Chỗ\s+ở(?:\s+hiện\s+tại)?|Nơi\s+ở(?:\s+hiện\s+tại|\s+hiện\s+nay)?"
-    r"|Nơi\s+cư\s+trú|Địa\s+chỉ)\s*[:：]?\s*(.*)$",
+    rf"^{CURRENT_ADDRESS_LABEL_PATTERN}\s*[:：]?\s*(.*)$",
+    re.IGNORECASE,
+)
+CURRENT_ADDRESS_SEARCH_RE = re.compile(
+    rf"{CURRENT_ADDRESS_LABEL_PATTERN}\s*[:：]?\s*(.*)$",
     re.IGNORECASE,
 )
 ADDRESS_STOP_LABEL_RE = re.compile(
-    r"^(?:Nghề\s+nghiệp|Trình\s+độ|Dân\s+tộc|Giới\s+tính|Tôn\s+giáo"
-    r"|Quốc\s+tịch|Cha|Mẹ|con\s+ông|con\s+bà|Vợ|Chồng|Vợ\s+con"
-    r"|Con|Tiền\s+án|Tiền\s+sự|Nhân\s+thân|Bị\s+cáo\s+bị)\s*[:：]",
+    rf"^{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]",
     re.IGNORECASE,
+)
+ADDRESS_STOP_INLINE_RE = re.compile(
+    rf"(?:^|;)\s*{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]",
+    re.IGNORECASE,
+)
+CURRENT_ADDRESS_FLAT_RE = re.compile(
+    rf"{CURRENT_ADDRESS_LABEL_PATTERN}\s*[:：]?\s*(?P<value>.*?)"
+    rf"(?=(?:\n|;)\s*{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]"
+    rf"|\n\s*(?:\d+[.)]\s+.*\b(?:sinh\s+ngày|sinh\s+năm)\b|Bị\s+cáo\s+\S)"
+    rf"|\Z)",
+    re.IGNORECASE | re.DOTALL,
 )
 STANDALONE_PAGE_NUMBER_RE = re.compile(r"^\s*(?:trang\s+)?\d+\s*$", re.IGNORECASE)
 NEXT_DEFENDANT_RE = re.compile(
@@ -381,38 +402,88 @@ def _parse_current_address(
     raw: str,
     result: dict[str, Any],
 ) -> None:
+    value, used_line_ids = _collect_current_address_lines(block, raw)
+    if not value:
+        value, used_line_ids = _collect_current_address_flat(block, raw)
+    if not value:
+        return
+    result["current_address"] = value
+    result["current_address_evidence_line_ids"] = list(used_line_ids)
+    result["evidence_line_ids"] = list(
+        dict.fromkeys([*result.get("evidence_line_ids", []), *used_line_ids])
+    )
+
+
+def _collect_current_address_lines(
+    block: dict[str, Any],
+    raw: str,
+) -> tuple[str, list[str]]:
     lines = raw.splitlines()
     line_ids = [str(value) for value in block.get("line_ids", [])]
     for index, line in enumerate(lines):
-        match = CURRENT_ADDRESS_LINE_RE.match(line.strip())
+        match = CURRENT_ADDRESS_SEARCH_RE.search(line.strip())
         if not match:
             continue
-        values = [match.group(1).strip()] if match.group(1).strip() else []
+        first_value, stopped = _address_fragment(match.group(1))
+        values = [first_value] if first_value else []
         used_line_ids = [line_ids[index]] if index < len(line_ids) else []
-        for continuation_index in range(index + 1, len(lines)):
-            continuation = lines[continuation_index].strip()
-            if not continuation:
-                continue
-            if STANDALONE_PAGE_NUMBER_RE.match(continuation):
-                continue
-            if _is_address_stop_line(continuation):
-                break
-            values.append(continuation)
-            if continuation_index < len(line_ids):
-                used_line_ids.append(line_ids[continuation_index])
-        value = re.sub(r"\s+", " ", " ".join(values)).strip(" ,;:.-")
-        value = re.sub(
-            r"^(?:hiện\s+tại|hiện\s+nay)\s*[:：]\s*",
-            "",
-            value,
-            flags=re.IGNORECASE,
-        ).strip(" ,;:.-")
-        if value:
-            result["current_address"] = value
-            result["evidence_line_ids"] = list(
-                dict.fromkeys([*result.get("evidence_line_ids", []), *used_line_ids])
-            )
-        return
+        if not stopped:
+            for continuation_index in range(index + 1, len(lines)):
+                continuation = lines[continuation_index].strip()
+                if not continuation:
+                    continue
+                if STANDALONE_PAGE_NUMBER_RE.match(continuation):
+                    continue
+                if _is_address_stop_line(continuation):
+                    break
+                fragment, stopped = _address_fragment(continuation)
+                if fragment:
+                    values.append(fragment)
+                    if continuation_index < len(line_ids):
+                        used_line_ids.append(line_ids[continuation_index])
+                if stopped:
+                    break
+        return _normalize_current_address(" ".join(values)), used_line_ids
+    return "", []
+
+
+def _collect_current_address_flat(
+    block: dict[str, Any],
+    raw: str,
+) -> tuple[str, list[str]]:
+    match = CURRENT_ADDRESS_FLAT_RE.search(raw)
+    if match is None:
+        return "", []
+    start_line = raw[:match.start("value")].count("\n")
+    line_ids = [str(value) for value in block.get("line_ids", [])]
+    values: list[str] = []
+    used_line_ids: list[str] = []
+    for offset, line in enumerate(match.group("value").splitlines()):
+        value = line.strip()
+        if not value or STANDALONE_PAGE_NUMBER_RE.match(value):
+            continue
+        values.append(value)
+        line_index = start_line + offset
+        if line_index < len(line_ids):
+            used_line_ids.append(line_ids[line_index])
+    return _normalize_current_address(" ".join(values)), used_line_ids
+
+
+def _address_fragment(value: str) -> tuple[str, bool]:
+    stop = ADDRESS_STOP_INLINE_RE.search(value)
+    if stop is None:
+        return value.strip(), False
+    return value[:stop.start()].strip(), True
+
+
+def _normalize_current_address(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value).strip(" ,;:.-")
+    return re.sub(
+        r"^(?:hiện\s+tại|hiện\s+nay)\s*[:：]\s*",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    ).strip(" ,;:.-")
 
 
 def _is_address_stop_line(value: str) -> bool:

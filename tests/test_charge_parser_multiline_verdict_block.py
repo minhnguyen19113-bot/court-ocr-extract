@@ -38,5 +38,6 @@ def test_verdict_spanning_eight_lines_is_parsed() -> None:
         "defendant_alpha": ["Charge Synthetic Alpha"]
     }
     assert output["charge_evidence"][0]["line_ids"] == [
-        f"p009_l{index:04d}" for index in range(1, 9)
+        f"p009_l{index:04d}" for index in range(1, 8)
     ]
+    assert "theo quy định synthetic" not in output["charge_evidence"][0]["raw_text"]
