@@ -1,5 +1,26 @@
 # AI Changelog
 
+## 2026-07-17 - Front + Decision Source và Row-specific Legal Relationship
+
+- Thêm `source_region_policy.py`; production chỉ chấp nhận `front_pre_content` và `decision_tail`, loại `middle_excluded` khỏi final field/fallback.
+- Chuẩn hóa charge result thành `case_charges`, entity-ID keyed `defendant_charge_map`, `charge_evidence`, `warnings`; hỗ trợ explicit quoted/unquoted verdict và ambiguity-safe matching.
+- Đổi final legal relationship sang row-specific: defendant chỉ nhận specific charges, primary role khác nhận case charges; thiếu/ambiguous để trống có ghi chú, không fallback `Hình sự`.
+- Siết reverse decision scan bắt buộc giới hạn dương/hữu hạn và status `heading_not_found`; không tự OCR toàn văn bản.
+- Thêm workbook sheets `CHARGES`, `DEFENDANT_CHARGES`, `SOURCE_REGION_AUDIT`, `CHARGE_WARNINGS` cùng HTML charge/source review đúng thứ tự.
+- Thêm 11 test modules bắt buộc và cập nhật regression cũ. Full suite 242/242 passed với synthetic fixtures; không đọc/chạy dữ liệu thật, không gọi OCR/LLM/Docker/cloud, không commit/push.
+
+## 2026-07-17 - Final Excel Role, Boundary và Decision Charge
+
+- Sửa pre-content marker boundary để giữ mọi line trước heading, kể cả phần trước marker trên trang vượt fallback limit.
+- Cô lập defendant region bằng intro/strong identity evidence, chặn trial-panel leakage và xuất rejected candidates/reasons.
+- Sửa multi-anchor metadata cùng dòng, acceptance number/date binding và warning khi thiếu number token.
+- Thêm `final_excel_role_policy.py` cùng sheet `NGUOI_THAM_GIA_KHAC`; final row dedupe theo case + normalized name + normalized role.
+- Split support-role block nhiều person có kiểm soát; giữ represented person, shared note và evidence line IDs.
+- Xóa fallback `QUAN HỆ PHÁP LUẬT = Hình sự`; thêm explicit decision charge parser, reverse-scan tail cache và command Surya-only `ocr-decision-tail`.
+- Mở rộng workbook/HTML debug với role policy, charge evidence, defendant region và metadata anchor evidence.
+- Thêm/cập nhật synthetic regression tests; không đọc dữ liệu thật, không gọi OCR/LLM/Docker/cloud và không commit/push.
+- Verification hoàn tất: 226/226 test passed; compile, snapshot, repo/architecture guardrails, static Surya backend và extractor checks đều passed.
+
 ## 2026-07-14 - Final Excel Schema First Realignment
 
 - Tạo canonical `FINAL_EXCEL_COLUMNS` đúng 11 cột và final row builder riêng cho rule-anchor output.

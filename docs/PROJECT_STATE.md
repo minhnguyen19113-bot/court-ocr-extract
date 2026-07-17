@@ -1,9 +1,32 @@
 # Project State
 
+## Front + Decision Only Source Policy và Row-specific Legal Relationship
+
+- Production extraction chỉ dùng `front_pre_content` và `decision_tail`; `middle_excluded` không được fill `FINAL_EXCEL` hay làm fallback. `source_region_policy.py` giữ canonical region, field-source allowlist và audit contract.
+- Front sở hữu loại án, thụ lý, role, identity, địa chỉ và chủ tọa. Decision tail sở hữu tội danh; các field tuyên án khác mới chỉ được bảo lưu trong contract để mở rộng sau, chưa thêm cột final.
+- `charge_parser.py` hỗ trợ explicit quoted/unquoted verdict, giữ `ChargeEvidence`, `case_charges` theo thứ tự và `defendant_charge_map` keyed by front defendant `entity_id`. Exact/honorific/unique-fuzzy matching đều fail-safe; ambiguous/collective không chắc chỉ warning, không gán charge.
+- Dòng bị cáo chỉ dùng specific charge của entity đó. Primary role không phải bị cáo dùng toàn bộ case charges. Cùng người khác role giữ hai dòng với relationship tương ứng. Thiếu hoặc ambiguous để trống kèm note; không fallback `Hình sự`.
+- Reverse scan bắt buộc guard `decision_tail_max_scan_pages` dương, hữu hạn. Không thấy heading thì `decision_tail_status=heading_not_found`; không có silent full-document fallback.
+- Workbook có `CHARGES`, `DEFENDANT_CHARGES`, `SOURCE_REGION_AUDIT`, `CHARGE_WARNINGS`; HTML đặt charge summary/map/source audit ngay sau hai preview user-facing và không hiển thị middle content.
+- Task không dùng LLM, OCR, Docker, cloud hay dữ liệu thật; không commit/push. Verification synthetic hiện tại: 242/242 test passed; còn một warning deprecation từ Surya/Pydantic.
+
+## Final Excel Role, Pre-content Boundary và Decision Tail
+
+- `segment_pre_content()` giữ toàn bộ line trước stop heading ở bất kỳ trang nào; `max_fallback_pages` chỉ áp dụng khi không tìm thấy marker.
+- Defendant region chỉ bắt đầu sau intro `Đối/Đồi với (các) bị cáo:` hoặc inline identity đủ mạnh. Numbered trial-panel line không còn là fallback defendant; block overlap metadata/trial panel/participant bị loại và có lý do debug.
+- Metadata parser kiểm tra độc lập các anchor cùng dòng. Số thụ lý lấy token ngay sau anchor; ngày thụ lý chỉ được parse sau token đó và để trống với warning nếu thiếu số.
+- `FINAL_EXCEL` vẫn đúng 11 cột nhưng chỉ nhận sáu primary roles canonical. Guardian, representative, defense/protection, witness và support roles nằm trong sheet thứ hai `NGUOI_THAM_GIA_KHAC`; court procedural roles không đi vào hai sheet user-facing.
+- Dedupe final row dùng `case_id + normalized_full_name + normalized_procedural_role`; cùng tên khác role vẫn giữ hai dòng.
+- Criminal row không còn fallback `QUAN HỆ PHÁP LUẬT = Hình sự`. Khi chưa có explicit charge, field để trống và `GHI CHÚ` có `Chưa trích xuất tội danh`.
+- Command `ocr-decision-tail` dùng Surya, scan ngược theo batch cấu hình, dừng khi gặp heading quyết định, ghi cache schema riêng và không thay đổi OCR cache cũ. `compare-pre-content --decision-tail-cache-dir` parse explicit verdict phrases rồi lặp `case_charges` trên các final rows.
+- HTML/workbook review đặt `FINAL EXCEL PREVIEW` rồi `NGƯỜI THAM GIA KHÁC` trước debug; debug có defendant region/rejection, metadata evidence, role policy và charge evidence.
+- Toàn bộ fixture/test do Codex dùng là synthetic. Codex không mở PDF/cache/output thật, không gọi Surya/LLM/Docker/cloud và không commit/push.
+- Verification: 226/226 test passed; compile, snapshot, repo/architecture guardrails, static Surya backend và extractor configuration checks đều passed. Chỉ có một warning deprecation từ dependency Surya/Pydantic.
+
 ## Final Excel Schema First Realignment
 
 - `FINAL_EXCEL` là output workbook chính và luôn là sheet đầu tiên; schema canonical nằm tại `final_excel_schema.py` với đúng 11 cột của Project Owner.
-- `final_excel_builder.py` tạo một dòng cho mỗi defendant/participant, lặp case metadata/judge và chỉ ghi đúng 11 cột. Dữ liệu thiếu để trống, lý do nằm trong `GHI CHÚ`; không có JSON/debug field trong final sheet.
+- `final_excel_builder.py` tạo một dòng cho mỗi entity có primary role, lặp case metadata/judge và chỉ ghi đúng 11 cột. Support participants nằm ở sheet riêng; dữ liệu thiếu để trống, lý do nằm trong `GHI CHÚ` và không có JSON/debug field trong final sheet.
 - Rule-anchor metadata bổ sung `case_acceptance_date` và `legal_relationship`; entity bổ sung `cccd`. Ngày thụ lý chỉ lấy từ line `thụ lý số ... ngày ...`; CCCD/CMND chỉ lấy 9-12 chữ số liên tục sau label định danh.
 - `rule_anchor_only` và `rule_then_llm_per_block` đều tạo `FINAL_EXCEL`; khi compare nhiều strategy, final sheet dùng primary strategy, còn mọi strategy vẫn được giữ trong debug sheets.
 - `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `ANCHOR_*`, `LLM_STATUS`, `RAW_JSON` và các sheet khác chỉ là debug phụ. HTML đặt `FINAL EXCEL PREVIEW` 11 cột trước debug sections.
@@ -279,4 +302,4 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 
 ## Next Gate
 
-Project Owner chạy `compare-pre-content` với 1 case bằng `rule_anchor_only`, review sheet đầu `FINAL_EXCEL` và `FINAL EXCEL PREVIEW` trước; chỉ mở debug sheets hoặc chạy rule + LLM sau khi 11 cột/10 dòng người đạt.
+Project Owner rerun extraction từ OCR cache cũ cho đúng 1 case bằng `rule_anchor_only`, không OCR và không bật LLM. Review cả `FINAL_EXCEL` lẫn `NGUOI_THAM_GIA_KHAC`; chỉ khi boundary/role/metadata đạt mới chạy `ocr-decision-tail` cho case đó, rồi rerun extraction với tail cache. Không tăng lên 3/9 PDF trước khi case đầu được chấp nhận.

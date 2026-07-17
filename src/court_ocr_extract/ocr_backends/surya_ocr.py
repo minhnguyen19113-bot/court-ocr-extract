@@ -219,6 +219,109 @@ class SuryaOCRBackend:
             if temp_context is not None:
                 temp_context.cleanup()
 
+    def create_reusable_page_runner(
+        self,
+        *,
+        work_dir: Path,
+        docker_binary: str | None = None,
+        startup_timeout_seconds: int = 600,
+        container_spawn_check_seconds: int = 60,
+    ) -> tuple[Any, _RuntimeDiagnostics]:
+        status = self.check_available()
+        if not status.available:
+            raise RuntimeError(status.reason)
+        work_dir.mkdir(parents=True, exist_ok=True)
+        diagnostics = _RuntimeDiagnostics(
+            work_dir / "surya_runtime_diagnostics.json"
+        )
+        diagnostics.annotate(
+            docker_binary=resolve_docker_binary(docker_binary),
+            startup_timeout_seconds=int(startup_timeout_seconds),
+            reusable_page_runner=True,
+        )
+        runner = self._create_surya_page_runner(
+            diagnostics=diagnostics,
+            docker_binary=docker_binary,
+            startup_timeout_seconds=int(startup_timeout_seconds),
+            container_spawn_check_seconds=int(container_spawn_check_seconds),
+        )
+        diagnostics.annotate(status="ready")
+        return runner, diagnostics
+
+    def ocr_pdf_pages(
+        self,
+        pdf_path: Path,
+        page_numbers: list[int],
+        *,
+        work_dir: Path,
+        preprocess_options: dict[str, Any] | None = None,
+        prediction_runner=None,
+        runtime_diagnostics: _RuntimeDiagnostics | None = None,
+        debug_visual: bool = False,
+        docker_binary: str | None = None,
+        startup_timeout_seconds: int = 600,
+        container_spawn_check_seconds: int = 60,
+    ) -> OCRResult:
+        selected_pages = sorted({int(page) for page in page_numbers if int(page) > 0})
+        if not selected_pages:
+            raise ValueError("page_numbers must contain at least one positive page")
+        work_dir.mkdir(parents=True, exist_ok=True)
+        diagnostics = runtime_diagnostics
+        runner = prediction_runner
+        if runner is None:
+            runner, diagnostics = self.create_reusable_page_runner(
+                work_dir=work_dir,
+                docker_binary=docker_binary,
+                startup_timeout_seconds=startup_timeout_seconds,
+                container_spawn_check_seconds=container_spawn_check_seconds,
+            )
+        if diagnostics is not None:
+            diagnostics.stage("stage_01_render_pdf", page_numbers=selected_pages)
+        rendered_pages = render_pdf_pages(
+            pdf_path,
+            work_dir / "01_rendered",
+            dpi=self.settings.ocr_dpi,
+            page_numbers=selected_pages,
+        )
+        image_paths = [page.image_path for page in rendered_pages]
+        input_metadata_by_page: dict[int, dict[str, Any]] = {}
+        result_metadata: dict[str, Any] = {
+            "ocr_input_source": "rendered_original",
+            "page_selection_mode": "explicit_page_numbers",
+            "requested_page_numbers": selected_pages,
+        }
+        if diagnostics is not None:
+            diagnostics.stage(
+                "stage_02_preprocess",
+                enabled=preprocess_options is not None,
+                page_numbers=selected_pages,
+            )
+        if preprocess_options is not None:
+            image_paths, input_metadata_by_page, preprocess_metadata = _preprocess_ocr_pages(
+                rendered_pages,
+                work_dir=work_dir,
+                options=preprocess_options,
+            )
+            result_metadata.update(preprocess_metadata)
+            result_metadata["page_selection_mode"] = "explicit_page_numbers"
+            result_metadata["requested_page_numbers"] = selected_pages
+        result = self.ocr_images(
+            image_paths,
+            stop_marker="",
+            debug_visual=debug_visual,
+            work_dir=work_dir,
+            page_numbers=[page.page_number for page in rendered_pages],
+            warn_if_marker_missing=False,
+            metadata=result_metadata,
+            input_metadata_by_page=input_metadata_by_page,
+            runtime_diagnostics=diagnostics,
+            prediction_runner=runner,
+            pages_total=get_pdf_page_count(pdf_path),
+        )
+        if diagnostics is not None:
+            diagnostics.annotate(status="page_batch_succeeded")
+        return result
+
     def _ocr_pdf_with_early_stop(
         self,
         pdf_path: Path,

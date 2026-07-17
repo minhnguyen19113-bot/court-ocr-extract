@@ -31,7 +31,7 @@ def test_builder_maps_common_fields_and_one_row_per_person() -> None:
         ],
         "participants": [
             {
-                "role": "Người bảo vệ quyền và lợi ích hợp pháp của bị hại",
+                "role": "Bị hại",
                 "full_name": "Người Synthetic B",
                 "birth_date_or_year": "ngày 20 tháng 12 năm 1997",
                 "raw_block": "CCCD số 0000000000",
@@ -50,9 +50,7 @@ def test_builder_maps_common_fields_and_one_row_per_person() -> None:
     assert all(row["NGÀY THỤ LÝ (DD/MM/YYYY)"] == "09/04/2099" for row in rows)
     assert all(row["HỌ TÊN CHỦ TỌA"] == "Chủ Tọa Synthetic" for row in rows)
     assert rows[0]["TƯ CÁCH TỐ TỤNG"] == "Bị cáo"
-    assert rows[1]["TƯ CÁCH TỐ TỤNG"] == (
-        "Người bảo vệ quyền và lợi ích hợp pháp của bị hại"
-    )
+    assert rows[1]["TƯ CÁCH TỐ TỤNG"] == "Bị hại"
     assert [row["NĂM SINH"] for row in rows] == ["2010", "1997"]
     assert [row["CCCD"] for row in rows] == ["000000000000", "0000000000"]
     assert rows[0]["ĐỊA CHỈ"] == "Vùng Synthetic A"

@@ -5,13 +5,19 @@ import inspect
 import json
 import os
 import shutil
+import tempfile
 import webbrowser
 from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook
 
-from court_ocr_extract.case_ids import case_files_for_paths, discover_pdfs
+from court_ocr_extract.case_ids import case_file_for_path, case_files_for_paths, discover_pdfs
+from court_ocr_extract.decision_tail import (
+    read_decision_tail_cache_dir,
+    scan_decision_tail,
+    write_decision_tail_record,
+)
 from court_ocr_extract.excel_writer import build_run_summary, write_excel
 from court_ocr_extract.extractors import get_extractor_backend
 from court_ocr_extract.extraction_pipeline import extract_from_ocr_cache_records, review_candidates_from_drafts
@@ -28,7 +34,7 @@ from court_ocr_extract.ocr_cache import (
     safe_cache_metadata,
     write_ocr_cache_record,
 )
-from court_ocr_extract.pdf_render import parse_page_range, render_pdf_pages
+from court_ocr_extract.pdf_render import get_pdf_page_count, parse_page_range, render_pdf_pages
 from court_ocr_extract.pre_content_ab import run_pre_content_ab_test
 from court_ocr_extract.progress import track
 from court_ocr_extract.qa import print_safe_qa, qa_excel
@@ -58,6 +64,7 @@ def main(argv: list[str] | None = None) -> None:
     _add_debug_ocr_review(subparsers)
     _add_debug_marker(subparsers)
     _add_ocr(subparsers)
+    _add_ocr_decision_tail(subparsers)
     _add_preview_extraction(subparsers)
     _add_extract(subparsers)
     _add_qa(subparsers)
@@ -159,6 +166,20 @@ def _add_ocr(subparsers) -> None:
     _add_full_document_args(parser)
     _add_ocr_preprocess_args(parser)
     parser.set_defaults(func=cmd_ocr, surya_startup_timeout_seconds=600)
+
+
+def _add_ocr_decision_tail(subparsers) -> None:
+    parser = subparsers.add_parser("ocr-decision-tail")
+    parser.add_argument("--input-dir", required=True)
+    parser.add_argument("--ocr-cache-dir", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--ocr-backend", default="surya")
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--decision-tail-batch-size", type=int, default=None)
+    parser.add_argument("--decision-tail-max-scan-pages", type=int, default=None)
+    parser.add_argument("--debug-visual", action="store_true")
+    _add_ocr_preprocess_args(parser)
+    parser.set_defaults(func=cmd_ocr_decision_tail, surya_startup_timeout_seconds=900)
 
 
 def _add_full_document_args(parser: argparse.ArgumentParser) -> None:
@@ -285,6 +306,7 @@ def _add_compare_pre_content(subparsers) -> None:
     parser.add_argument("--ocr-cache-dir", required=True)
     parser.add_argument("--input-dir", default=None, help="Optional source directory for operator traceability; PDFs are not read by this command.")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--decision-tail-cache-dir", default=None)
     parser.add_argument("--strategies", default="rule_anchor_only,rule_then_llm_per_block")
     parser.add_argument("--limit", type=int, default=None)
     llm_policy = parser.add_mutually_exclusive_group()
@@ -513,6 +535,104 @@ def cmd_ocr(args) -> None:
     print(f"OCR cache: {cache_dir}")
 
 
+def cmd_ocr_decision_tail(args) -> None:
+    settings = get_settings()
+    backend = get_ocr_backend(args.ocr_backend, settings)
+    if getattr(backend, "name", "") != "surya":
+        raise RuntimeError("ocr-decision-tail only supports the Surya OCR backend.")
+    if not hasattr(backend, "create_reusable_page_runner") or not hasattr(
+        backend, "ocr_pdf_pages"
+    ):
+        raise RuntimeError(
+            "Installed Surya adapter does not support explicit page batches for decision-tail OCR."
+        )
+    status = backend.check_available()
+    if not status.available:
+        raise RuntimeError(status.reason)
+
+    records = read_ocr_cache_dir(args.ocr_cache_dir)
+    if args.limit is not None:
+        records = records[: args.limit]
+    if not records:
+        raise RuntimeError(f"No OCR cache records found in: {args.ocr_cache_dir}")
+    source_paths = discover_pdfs(args.input_dir)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    runtime_dir = output_dir / "_runtime"
+    _run_surya_runtime_preflight(args, backend, output_dir=runtime_dir)
+    runtime_options = _surya_runtime_options(args)
+    prediction_runner, runtime_diagnostics = backend.create_reusable_page_runner(
+        work_dir=runtime_dir,
+        docker_binary=runtime_options["docker_binary"],
+        startup_timeout_seconds=runtime_options["startup_timeout_seconds"],
+        container_spawn_check_seconds=runtime_options["container_spawn_check_seconds"],
+    )
+    preprocess_options = _ocr_preprocess_options(args)
+    batch_size = int(
+        args.decision_tail_batch_size or settings.decision_tail_batch_size
+    )
+    max_scan_pages = int(
+        args.decision_tail_max_scan_pages or settings.decision_tail_max_scan_pages
+    )
+    written = []
+
+    for record in records:
+        source_position = int(record.source_index) - 1
+        if source_position < 0 or source_position >= len(source_paths):
+            raise RuntimeError(
+                f"Cannot map OCR cache case {record.case_id} to --input-dir by source_index."
+            )
+        source_case = case_file_for_path(source_paths[source_position], record.source_index)
+        if record.pdf_hash and source_case.pdf_hash != record.pdf_hash:
+            raise RuntimeError(
+                f"PDF hash mismatch for OCR cache case {record.case_id}; refusing decision-tail OCR."
+            )
+
+        def scan_in(work_dir: Path):
+            def ocr_batch(page_numbers: list[int]) -> OCRResult:
+                return backend.ocr_pdf_pages(
+                    source_case.path,
+                    page_numbers,
+                    work_dir=work_dir,
+                    preprocess_options=preprocess_options,
+                    prediction_runner=prediction_runner,
+                    runtime_diagnostics=runtime_diagnostics,
+                    debug_visual=bool(args.debug_visual),
+                    docker_binary=runtime_options["docker_binary"],
+                    startup_timeout_seconds=runtime_options["startup_timeout_seconds"],
+                    container_spawn_check_seconds=runtime_options[
+                        "container_spawn_check_seconds"
+                    ],
+                )
+
+            return scan_decision_tail(
+                case_id=record.case_id,
+                source_index=record.source_index,
+                pdf_hash=record.pdf_hash,
+                backend=backend.name,
+                pages_total=get_pdf_page_count(source_case.path),
+                ocr_batch=ocr_batch,
+                batch_size=batch_size,
+                max_scan_pages=max_scan_pages,
+                heading_variants=settings.decision_heading_variants,
+            )
+
+        if args.debug_visual:
+            tail_record = scan_in(output_dir / "_debug" / record.case_id)
+        else:
+            with tempfile.TemporaryDirectory(prefix="court_ocr_decision_tail_") as temp_dir:
+                tail_record = scan_in(Path(temp_dir))
+        written.append(write_decision_tail_record(tail_record, output_dir))
+        print(f"Case: {record.case_id}")
+        print(f"Decision heading found: {'yes' if tail_record.heading_found else 'no'}")
+        print(f"Pages scanned: {len(tail_record.scanned_page_numbers)}")
+        print(f"Warnings: {len(tail_record.warnings)}")
+
+    print("Decision-tail OCR cache finished")
+    print(f"Cases processed: {len(written)}")
+    print(f"Tail cache: {output_dir}")
+
+
 def _print_ocr_case_summary(case_id: str, result: OCRResult, cache_dir: Path, work_dir: Path | None) -> None:
     total_lines = sum(len(page.lines) for page in result.pages)
     low_confidence = 0
@@ -727,6 +847,14 @@ def cmd_compare_pre_content(args) -> None:
                 "Local LLM preflight failed before case processing: "
                 f"{llm_preflight.get('error_type')}: {llm_preflight.get('error')}"
             )
+    decision_tail_records = (
+        {
+            record.case_id: record
+            for record in read_decision_tail_cache_dir(args.decision_tail_cache_dir)
+        }
+        if args.decision_tail_cache_dir
+        else None
+    )
     summary = run_pre_content_ab_test(
         records,
         output_dir=args.output_dir,
@@ -735,6 +863,7 @@ def cmd_compare_pre_content(args) -> None:
         limit=args.limit,
         llm_preflight=llm_preflight,
         llm_available=llm_available,
+        decision_tail_records=decision_tail_records,
     )
     index = Path(args.output_dir) / "index.html"
     _maybe_open(index, args.open)

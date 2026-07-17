@@ -7,7 +7,12 @@ from typing import Any
 
 from openpyxl import Workbook
 
-from court_ocr_extract.excel_writer import format_final_excel_sheet
+from court_ocr_extract.charge_parser import parse_explicit_decision_charges
+from court_ocr_extract.decision_tail import DecisionTailRecord
+from court_ocr_extract.excel_writer import (
+    format_final_excel_sheet,
+    format_other_participants_sheet,
+)
 from court_ocr_extract.extractors.hybrid_pre_content_extractor import HybridPreContentExtractor
 from court_ocr_extract.extractors.llm_only_pre_content_extractor import LLMCallable, LLMOnlyPreContentExtractor
 from court_ocr_extract.extractors.pre_content_anchor_segmenter import segment_pre_content_anchors
@@ -20,12 +25,23 @@ from court_ocr_extract.extractors.rule_anchor_strategies import (
 )
 from court_ocr_extract.extractors.rule_based_pre_content_extractor import extract_pre_content_rules
 from court_ocr_extract.final_excel_builder import build_final_excel_rows
+from court_ocr_extract.final_excel_role_policy import classify_final_role
 from court_ocr_extract.final_excel_schema import (
     FINAL_EXCEL_COLUMNS,
     FINAL_EXCEL_SHEET_NAME,
 )
 from court_ocr_extract.ocr_cache import OCRCacheRecord
+from court_ocr_extract.other_participants_builder import (
+    OTHER_PARTICIPANT_COLUMNS,
+    OTHER_PARTICIPANTS_SHEET_NAME,
+    build_other_participant_rows,
+)
 from court_ocr_extract.settings import PipelineSettings
+from court_ocr_extract.source_region_policy import (
+    DECISION_TAIL,
+    FRONT_PRE_CONTENT,
+    build_extraction_source_region_audit,
+)
 from court_ocr_extract.visual_debug import escape, write_html
 
 
@@ -35,21 +51,24 @@ DEFAULT_STRATEGIES = ("rule_anchor_only", "rule_then_llm_per_block")
 
 CASES_HEADERS = (
     "case_id", "source_file", "document_type", "ocr_status", "marker_found", "marker_page",
-    "early_stop_triggered", "pages_processed", "pages_total", "strategy_used", "court_name",
+    "early_stop_triggered", "pages_processed", "pages_total", "strategy_used",
+    "decision_tail_status", "case_charges", "charge_warnings", "court_name",
     "judgment_number", "judgment_date", "case_type", "legal_relationship",
     "case_acceptance_number", "case_acceptance_date", "trial_decision_number",
     "postponement_decision_number", "trial_date_or_location_sentence", "presiding_judge", "clerk",
     "prosecutor", "needs_review", "warnings",
 )
 DEFENDANTS_HEADERS = (
-    "case_id", "strategy", "defendant_index", "full_name", "alias", "birth_date_or_year",
+    "case_id", "strategy", "defendant_index", "entity_id", "source_region",
+    "full_name", "alias", "birth_date_or_year",
     "birth_place", "cccd", "permanent_address", "current_address", "detention_status", "presence_status",
     "occupation", "education", "nationality", "ethnicity", "religion", "gender", "father_name",
     "mother_name", "spouse", "children", "criminal_record", "evidence_line_ids", "evidence_text",
     "needs_review", "warnings",
 )
 PARTICIPANTS_HEADERS = (
-    "case_id", "strategy", "participant_index", "role", "full_name", "birth_date_or_year", "cccd",
+    "case_id", "strategy", "participant_index", "entity_id", "source_region",
+    "role", "full_name", "birth_date_or_year", "cccd",
     "address", "presence_status", "relationship_or_note", "evidence_line_ids", "evidence_text",
     "needs_review", "warnings",
 )
@@ -75,6 +94,7 @@ def run_pre_content_ab_test(
     llm_callable: LLMCallable | None = None,
     llm_preflight: dict[str, Any] | None = None,
     llm_available: bool | None = None,
+    decision_tail_records: dict[str, DecisionTailRecord] | None = None,
 ) -> dict[str, Any]:
     selected = records[:limit] if limit is not None else records
     requested = list(strategies or DEFAULT_STRATEGIES)
@@ -144,6 +164,13 @@ def run_pre_content_ab_test(
                 )
                 outputs[strategy]["strategy"] = strategy
 
+        if decision_tail_records is not None:
+            tail_record = decision_tail_records.get(record.case_id)
+            for output in outputs.values():
+                _attach_decision_tail_charges(output, tail_record, settings=settings)
+        for output in outputs.values():
+            output["source_region_audit"] = build_extraction_source_region_audit(output)
+
         left_name = requested[0]
         right_name = requested[1] if len(requested) > 1 else requested[0]
         compare = compare_strategy_outputs(
@@ -163,6 +190,11 @@ def run_pre_content_ab_test(
             "compare": compare,
             "metrics": metrics,
             "benchmark_included": not correction and segment["document_type"] == "judgment_criminal_first_instance",
+            "decision_tail": _decision_tail_summary(
+                decision_tail_records.get(record.case_id)
+                if decision_tail_records is not None
+                else None
+            ),
         }
         _write_case(case_dir, case)
         cases.append(case)
@@ -315,9 +347,16 @@ def _write_case_review(path: Path, case: dict[str, Any]) -> None:
     body = (
         f'<h1>{escape(case["case_id"])}</h1>'
         + _final_excel_preview_html(_final_rows_for_case(case))
+        + _other_participants_preview_html(_other_rows_for_case(case))
+        + _charge_summary_html(case)
+        + _defendant_charge_map_html(case)
+        + _source_region_audit_html(case)
         + _llm_runtime_html(case)
         + '<section><h2>Văn bản pre-content</h2>' + source_lines + '</section>'
         + _anchor_html(case["anchor_segments"])
+        + _metadata_anchor_evidence_html(case)
+        + _role_policy_html(case)
+        + _charge_evidence_html(case)
         + output_panels
         + '<h2>So sánh field</h2><table><tr><th>Field</th>'
         + f'<th>{escape(compare["left_strategy"])}</th><th>{escape(compare["right_strategy"])}</th><th>Status</th></tr>'
@@ -344,8 +383,34 @@ def _anchor_html(anchor: dict[str, Any]) -> str:
         '<section><h2>Anchor segmentation</h2>'
         f'<h3>Metadata lines</h3><pre>{escape(_display(anchor.get("metadata_lines", [])))}</pre>'
         f'<h3>Trial panel lines</h3><pre>{escape(_display(anchor.get("trial_panel_lines", [])))}</pre>'
+        f'<h3>Defendant region start/end</h3><pre>{escape(_display(anchor.get("defendant_region", {})))}</pre>'
+        f'<h3>Rejected defendant candidates</h3><pre>{escape(_display(anchor.get("rejected_defendant_candidates", [])))}</pre>'
         + "".join(blocks)
         + f'<h3>Validator/cảnh báo</h3><pre>{escape(_display(anchor.get("warnings", [])))}</pre></section>'
+    )
+
+
+def _metadata_anchor_evidence_html(case: dict[str, Any]) -> str:
+    rows = []
+    for strategy, output in case.get("strategy_outputs", {}).items():
+        for item in output.get("evidence", []):
+            if not str(item.get("field") or "").startswith("metadata."):
+                continue
+            rows.append(
+                "<tr>"
+                f"<td>{escape(strategy)}</td>"
+                f"<td>{escape(item.get('field'))}</td>"
+                f"<td>{escape(item.get('value'))}</td>"
+                f"<td>{escape(item.get('line_id'))}</td>"
+                f"<td>{escape(item.get('text'))}</td>"
+                "</tr>"
+            )
+    return (
+        '<section><h2>Metadata anchor evidence</h2>'
+        '<table><tr><th>Strategy</th><th>Field</th><th>Value</th>'
+        '<th>Line ID</th><th>Evidence</th></tr>'
+        + "".join(rows)
+        + "</table></section>"
     )
 
 
@@ -387,6 +452,12 @@ def _write_index(path: Path, cases: list[dict[str, Any]], preflight: dict[str, A
         + _final_excel_preview_html(
             [row for case in cases for row in _final_rows_for_case(case)]
         )
+        + _other_participants_preview_html(
+            [row for case in cases for row in _other_rows_for_case(case)]
+        )
+        + "".join(_charge_summary_html(case) for case in cases)
+        + "".join(_defendant_charge_map_html(case) for case in cases)
+        + "".join(_source_region_audit_html(case) for case in cases)
         + f'<p>LLM preflight: <strong>{escape(runtime.get("ok"))}</strong>; model: {escape(runtime.get("model"))}; '
         + f'base URL: {escape(runtime.get("base_url"))}</p>'
         + '<table><tr><th>Case</th><th>Document type</th><th>Strategy chính</th>'
@@ -405,17 +476,38 @@ def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, 
         for row in _final_rows_for_case(case):
             final_sheet.append([row[column] for column in FINAL_EXCEL_COLUMNS])
     format_final_excel_sheet(final_sheet)
+
+    other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
+    other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
+    for case in cases:
+        for row in _other_rows_for_case(case):
+            other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
+    format_other_participants_sheet(other_sheet)
+
     sheet_names = (
         "SUMMARY", "ANCHOR_BLOCKS", "ANCHOR_WARNINGS", "CASES", "DEFENDANTS",
         "PARTICIPANTS", "TRIAL_PANEL", "LLM_STATUS", "FIELD_LONG", "EVIDENCE_LINES",
         "RAW_JSON", "CASE_COMPARE", "CONFLICTS", "MISSING_FIELDS", "NEEDS_REVIEW",
-        "DOC_ROUTER",
+        "DOC_ROUTER", "ROLE_POLICY", "CHARGES", "DEFENDANT_CHARGES",
+        "SOURCE_REGION_AUDIT", "CHARGE_WARNINGS", "CHARGE_EVIDENCE",
     )
     sheets = {name: workbook.create_sheet(name) for name in sheet_names}
     sheets["SUMMARY"].append(["METRIC", "VALUE"])
     for key, value in summary.items():
         if key != "cases":
             sheets["SUMMARY"].append([key, _display(value)])
+    for case in cases:
+        output = _primary_output_for_case(case)
+        charge_output = output.get("charge_output", {})
+        charge_warnings = (
+            charge_output.get("warnings", [])
+            if isinstance(charge_output, dict)
+            else []
+        )
+        sheets["SUMMARY"].append([
+            f"charge_warnings:{case['case_id']}",
+            "; ".join(str(value) for value in charge_warnings),
+        ])
     for name, headers in (
         ("CASES", CASES_HEADERS),
         ("DEFENDANTS", DEFENDANTS_HEADERS),
@@ -437,6 +529,30 @@ def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, 
     sheets["MISSING_FIELDS"].append(["case_id", "field", "left", "right"])
     sheets["NEEDS_REVIEW"].append(["case_id", "strategy", "warnings"])
     sheets["DOC_ROUTER"].append(["case_id", "document_type", "benchmark_included", "warnings"])
+    sheets["ROLE_POLICY"].append([
+        "case_id", "strategy", "source_group", "original_role", "normalized_role",
+        "category", "include_in_final", "include_in_other", "reason",
+    ])
+    sheets["CHARGE_EVIDENCE"].append([
+        "case_id", "strategy", "charge", "defendant_entity_ids",
+        "defendant_names", "source_region", "page_number", "line_ids",
+        "match_method", "confidence", "raw_text",
+    ])
+    sheets["CHARGES"].append([
+        "case_id", "charge", "source_region", "page_number", "line_ids",
+        "match_method", "confidence", "raw_text",
+    ])
+    sheets["DEFENDANT_CHARGES"].append([
+        "case_id", "defendant_entity_id", "defendant_name", "charge",
+        "mapping_status", "mapping_method", "evidence_line_ids",
+    ])
+    sheets["SOURCE_REGION_AUDIT"].append([
+        "case_id", "field_name", "source_region", "source_page",
+        "evidence_line_ids", "allowed", "warning",
+    ])
+    sheets["CHARGE_WARNINGS"].append([
+        "case_id", "strategy", "warning",
+    ])
 
     for case in cases:
         _append_anchor_rows(sheets, case)
@@ -470,12 +586,29 @@ def _write_workbook(path: Path, cases: list[dict[str, Any]], summary: dict[str, 
 def _final_rows_for_case(case: dict[str, Any]) -> list[dict[str, str]]:
     if case.get("segmenter", {}).get("document_type") == "correction_notice":
         return []
+    return build_final_excel_rows(_primary_output_for_case(case))
+
+
+def _other_rows_for_case(case: dict[str, Any]) -> list[dict[str, str]]:
+    if case.get("segmenter", {}).get("document_type") == "correction_notice":
+        return []
+    return build_other_participant_rows(_primary_output_for_case(case))
+
+
+def _primary_output_for_case(case: dict[str, Any]) -> dict[str, Any]:
     strategy = str(case.get("metrics", {}).get("primary_strategy") or "")
     outputs = case.get("strategy_outputs", {})
-    output = outputs.get(strategy)
+    output = outputs.get(strategy) if isinstance(outputs, dict) else None
     if not isinstance(output, dict):
-        output = next((value for value in outputs.values() if isinstance(value, dict)), {})
-    return build_final_excel_rows(output)
+        output = next(
+            (
+                value
+                for value in outputs.values()
+                if isinstance(value, dict)
+            ),
+            {},
+        ) if isinstance(outputs, dict) else {}
+    return output
 
 
 def _final_excel_preview_html(rows: list[dict[str, str]]) -> str:
@@ -493,6 +626,182 @@ def _final_excel_preview_html(rows: list[dict[str, str]]) -> str:
     return (
         '<section><h2>FINAL EXCEL PREVIEW</h2>'
         f'<table><tr>{headers}</tr>{body_rows}</table></section>'
+    )
+
+
+def _other_participants_preview_html(rows: list[dict[str, str]]) -> str:
+    headers = "".join(
+        f"<th>{escape(column)}</th>" for column in OTHER_PARTICIPANT_COLUMNS
+    )
+    body_rows = "".join(
+        "<tr>"
+        + "".join(
+            f"<td>{escape(row.get(column))}</td>"
+            for column in OTHER_PARTICIPANT_COLUMNS
+        )
+        + "</tr>"
+        for row in rows
+    )
+    if not body_rows:
+        body_rows = (
+            f'<tr><td colspan="{len(OTHER_PARTICIPANT_COLUMNS)}">'
+            "Không có người tham gia khác.</td></tr>"
+        )
+    return (
+        '<section><h2>NGƯỜI THAM GIA KHÁC</h2>'
+        f'<table><tr>{headers}</tr>{body_rows}</table></section>'
+    )
+
+
+def _charge_summary_html(case: dict[str, Any]) -> str:
+    output = _primary_output_for_case(case)
+    charge_output = output.get("charge_output", {})
+    charges = charge_output.get("case_charges", []) if isinstance(charge_output, dict) else []
+    rows = "".join(
+        f"<tr><td>{index}</td><td>{escape(charge)}</td><td>decision_tail</td></tr>"
+        for index, charge in enumerate(charges, start=1)
+    )
+    if not rows:
+        rows = '<tr><td colspan="3">Chưa có tội danh explicit từ phần Quyết định.</td></tr>'
+    warnings = charge_output.get("warnings", []) if isinstance(charge_output, dict) else []
+    return (
+        '<section><h2>CHARGE SUMMARY</h2>'
+        f'<p>Case: {escape(case.get("case_id"))}; decision-tail status: '
+        f'{escape(output.get("decision_tail_status") or "not_attached")}</p>'
+        '<table><tr><th>STT</th><th>Tội danh</th><th>Source region</th></tr>'
+        + rows
+        + '</table><p>Cảnh báo: '
+        + escape("; ".join(str(value) for value in warnings) or "Không")
+        + "</p></section>"
+    )
+
+
+def _defendant_charge_map_html(case: dict[str, Any]) -> str:
+    output = _primary_output_for_case(case)
+    charge_output = output.get("charge_output", {})
+    mapping = charge_output.get("defendant_charge_map", {}) if isinstance(charge_output, dict) else {}
+    evidence = charge_output.get("charge_evidence", []) if isinstance(charge_output, dict) else []
+    rows = []
+    for index, defendant in enumerate(output.get("defendants", []), start=1):
+        entity_id = str(
+            defendant.get("entity_id")
+            or defendant.get("source_block_id")
+            or f"defendant_{index:03d}"
+        )
+        charges = mapping.get(entity_id, []) if isinstance(mapping, dict) else []
+        methods = list(
+            dict.fromkeys(
+                str(item.get("match_method") or "")
+                for item in evidence
+                if isinstance(item, dict)
+                and entity_id in item.get("defendant_entity_ids", [])
+                and item.get("match_method")
+            )
+        )
+        rows.append(
+            "<tr>"
+            f"<td>{escape(entity_id)}</td>"
+            f"<td>{escape(defendant.get('full_name'))}</td>"
+            f"<td>{escape('; '.join(charges))}</td>"
+            f"<td>{'mapped' if charges else 'unmapped'}</td>"
+            f"<td>{escape('; '.join(methods))}</td>"
+            "</tr>"
+        )
+    if not rows:
+        rows.append('<tr><td colspan="5">Không có defendant front entity.</td></tr>')
+    return (
+        '<section><h2>DEFENDANT → CHARGE MAP</h2>'
+        '<table><tr><th>Entity ID</th><th>Họ tên</th><th>Tội danh</th>'
+        '<th>Trạng thái</th><th>Phương pháp</th></tr>'
+        + "".join(rows)
+        + "</table></section>"
+    )
+
+
+def _source_region_audit_html(case: dict[str, Any]) -> str:
+    output = _primary_output_for_case(case)
+    rows = "".join(
+        "<tr>"
+        f"<td>{escape(item.get('field_name'))}</td>"
+        f"<td>{escape(item.get('source_region'))}</td>"
+        f"<td>{escape(item.get('source_page'))}</td>"
+        f"<td>{escape(', '.join(item.get('evidence_line_ids', [])))}</td>"
+        f"<td>{escape(item.get('allowed'))}</td>"
+        f"<td>{escape(item.get('warning'))}</td>"
+        "</tr>"
+        for item in output.get("source_region_audit", [])
+        if isinstance(item, dict)
+    )
+    if not rows:
+        rows = '<tr><td colspan="6">Chưa có source-region audit row.</td></tr>'
+    return (
+        '<section><h2>SOURCE REGION AUDIT</h2>'
+        '<table><tr><th>Field</th><th>Source region</th><th>Page</th>'
+        '<th>Line IDs</th><th>Allowed</th><th>Warning</th></tr>'
+        + rows
+        + "</table></section>"
+    )
+
+
+def _role_policy_html(case: dict[str, Any]) -> str:
+    rows = []
+    for strategy, output in case.get("strategy_outputs", {}).items():
+        for _defendant in output.get("defendants", []):
+            decision = classify_final_role("Bị cáo")
+            rows.append(
+                "<tr>"
+                f"<td>{escape(strategy)}</td>"
+                "<td>Bị cáo</td>"
+                f"<td>{escape(decision.normalized_role)}</td>"
+                f"<td>{escape(decision.category)}</td>"
+                f"<td>{escape(decision.include_in_final)}</td>"
+                f"<td>{escape(decision.include_in_other)}</td>"
+                f"<td>{escape(decision.reason)}</td>"
+                "</tr>"
+            )
+        for participant in output.get("participants", []):
+            decision = classify_final_role(participant.get("role"))
+            rows.append(
+                "<tr>"
+                f"<td>{escape(strategy)}</td>"
+                f"<td>{escape(participant.get('role'))}</td>"
+                f"<td>{escape(decision.normalized_role)}</td>"
+                f"<td>{escape(decision.category)}</td>"
+                f"<td>{escape(decision.include_in_final)}</td>"
+                f"<td>{escape(decision.include_in_other)}</td>"
+                f"<td>{escape(decision.reason)}</td>"
+                "</tr>"
+            )
+    return (
+        '<section><h2>Quyết định role inclusion/exclusion</h2>'
+        '<table><tr><th>Strategy</th><th>Role gốc</th><th>Role chuẩn hóa</th>'
+        '<th>Nhóm</th><th>FINAL_EXCEL</th><th>NGUOI_THAM_GIA_KHAC</th>'
+        '<th>Lý do</th></tr>' + "".join(rows) + "</table></section>"
+    )
+
+
+def _charge_evidence_html(case: dict[str, Any]) -> str:
+    rows = []
+    for strategy, output in case.get("strategy_outputs", {}).items():
+        charge_output = output.get("charge_output", {})
+        for item in charge_output.get("charge_evidence", []):
+            rows.append(
+                "<tr>"
+                f"<td>{escape(strategy)}</td>"
+                f"<td>{escape(item.get('charge'))}</td>"
+                f"<td>{escape(', '.join(item.get('defendant_names', [])))}</td>"
+                f"<td>{escape(', '.join(item.get('line_ids', [])))}</td>"
+                f"<td>{escape(item.get('source_region'))}</td>"
+                f"<td>{escape(item.get('match_method'))}</td>"
+                f"<td>{escape(item.get('raw_text'))}</td>"
+                "</tr>"
+            )
+    return (
+        '<section><h2>Charge evidence</h2>'
+        '<table><tr><th>Strategy</th><th>Tội danh</th><th>Bị cáo</th>'
+        '<th>Line IDs</th><th>Source region</th><th>Match method</th><th>Evidence</th></tr>'
+        + "".join(rows)
+        + "</table></section>"
     )
 
 
@@ -534,6 +843,11 @@ def _append_structured_rows(sheets, case) -> None:
             "pages_processed": ocr["pages_processed"],
             "pages_total": ocr["pages_total"],
             "strategy_used": strategy,
+            "decision_tail_status": output.get("decision_tail_status"),
+            "case_charges": "; ".join(output.get("case_charges", [])),
+            "charge_warnings": "; ".join(
+                output.get("charge_output", {}).get("warnings", [])
+            ),
             **metadata,
             "trial_date_or_location_sentence": metadata.get("trial_location_or_date_sentence"),
             "presiding_judge": panel.get("presiding_judge"),
@@ -549,6 +863,12 @@ def _append_structured_rows(sheets, case) -> None:
             row["evidence_text"] = _evidence_text(item, line_text)
             row["warnings"] = "; ".join(item.get("warnings", []))
             sheets["DEFENDANTS"].append([row.get(header) for header in DEFENDANTS_HEADERS])
+            decision = classify_final_role("Bị cáo")
+            sheets["ROLE_POLICY"].append([
+                case_id, strategy, "defendant", "Bị cáo",
+                decision.normalized_role, decision.category,
+                decision.include_in_final, decision.include_in_other, decision.reason,
+            ])
         for index, item in enumerate(output.get("participants", []), start=1):
             row = {"case_id": case_id, "strategy": strategy, "participant_index": index, **item}
             row["relationship_or_note"] = item.get("relationship_or_note") or item.get("relationship")
@@ -556,7 +876,20 @@ def _append_structured_rows(sheets, case) -> None:
             row["evidence_text"] = _evidence_text(item, line_text)
             row["warnings"] = "; ".join(item.get("warnings", []))
             sheets["PARTICIPANTS"].append([row.get(header) for header in PARTICIPANTS_HEADERS])
+            decision = classify_final_role(item.get("role"))
+            sheets["ROLE_POLICY"].append([
+                case_id, strategy, "participant", item.get("role"),
+                decision.normalized_role, decision.category,
+                decision.include_in_final, decision.include_in_other, decision.reason,
+            ])
         _append_trial_panel(sheets["TRIAL_PANEL"], case_id, strategy, panel)
+        for court_role in ("Thẩm phán", "Hội thẩm", "Thư ký", "Kiểm sát viên"):
+            decision = classify_final_role(court_role)
+            sheets["ROLE_POLICY"].append([
+                case_id, strategy, "trial_panel", court_role,
+                decision.normalized_role, decision.category,
+                decision.include_in_final, decision.include_in_other, decision.reason,
+            ])
         for status in output.get("llm_status", []):
             row = {"case_id": case_id, **status}
             row["input_tokens_estimated"] = status.get("estimated_input_tokens")
@@ -567,6 +900,75 @@ def _append_structured_rows(sheets, case) -> None:
             sheets["EVIDENCE_LINES"].append([
                 case_id, strategy, evidence.get("field"), evidence.get("value"),
                 evidence.get("line_id"), evidence.get("text"),
+            ])
+        charge_output = output.get("charge_output", {})
+        charge_evidence = charge_output.get("charge_evidence", [])
+        for evidence in charge_evidence:
+            sheets["CHARGE_EVIDENCE"].append([
+                case_id,
+                strategy,
+                evidence.get("charge"),
+                "; ".join(evidence.get("defendant_entity_ids", [])),
+                "; ".join(evidence.get("defendant_names", [])),
+                evidence.get("source_region"),
+                evidence.get("page_number"),
+                "; ".join(evidence.get("line_ids", [])),
+                evidence.get("match_method"),
+                evidence.get("confidence"),
+                evidence.get("raw_text"),
+            ])
+            sheets["CHARGES"].append([
+                case_id,
+                evidence.get("charge"),
+                evidence.get("source_region"),
+                evidence.get("page_number"),
+                "; ".join(evidence.get("line_ids", [])),
+                evidence.get("match_method"),
+                evidence.get("confidence"),
+                evidence.get("raw_text"),
+            ])
+            entity_ids = evidence.get("defendant_entity_ids", [])
+            names = evidence.get("defendant_names", [])
+            if entity_ids:
+                for entity_index, entity_id in enumerate(entity_ids):
+                    sheets["DEFENDANT_CHARGES"].append([
+                        case_id,
+                        entity_id,
+                        names[entity_index] if entity_index < len(names) else "",
+                        evidence.get("charge"),
+                        "mapped",
+                        evidence.get("match_method"),
+                        "; ".join(evidence.get("line_ids", [])),
+                    ])
+            else:
+                sheets["DEFENDANT_CHARGES"].append([
+                    case_id,
+                    "",
+                    "; ".join(names),
+                    evidence.get("charge"),
+                    "unmapped",
+                    evidence.get("match_method"),
+                    "; ".join(evidence.get("line_ids", [])),
+                ])
+        warning_values = list(charge_output.get("warnings", []))
+        warning_values.extend(
+            warning
+            for warning in output.get("warnings", [])
+            if str(warning).startswith((
+                "decision_", "charge_", "ambiguous_", "unmatched_", "unresolved_"
+            ))
+        )
+        for warning in dict.fromkeys(str(value) for value in warning_values if value):
+            sheets["CHARGE_WARNINGS"].append([case_id, strategy, warning])
+        for audit in output.get("source_region_audit", []):
+            sheets["SOURCE_REGION_AUDIT"].append([
+                case_id,
+                audit.get("field_name"),
+                audit.get("source_region"),
+                audit.get("source_page"),
+                "; ".join(audit.get("evidence_line_ids", [])),
+                audit.get("allowed"),
+                audit.get("warning"),
             ])
         sheets["RAW_JSON"].append([case_id, strategy, _display(output)])
         if output.get("needs_review"):
@@ -680,6 +1082,109 @@ def _preflight_status(strategy, preflight, *, required):
         "error_type": value.get("error_type") or "llm_preflight_failed",
         "error_message": value.get("error") or "Local LLM preflight failed.",
         "duration_ms": 0,
+    }
+
+
+def _attach_decision_tail_charges(
+    output: dict[str, Any],
+    tail_record: DecisionTailRecord | None,
+    *,
+    settings: PipelineSettings,
+) -> None:
+    output.setdefault("warnings", [])
+    if tail_record is None:
+        output["decision_tail_status"] = "cache_missing"
+        output["charge_output"] = {
+            "case_charges": [],
+            "defendant_charge_map": {},
+            "charge_evidence": [],
+            "warnings": ["decision_tail_cache_missing"],
+        }
+        output["case_charges"] = []
+        output["defendant_charge_map"] = {}
+        output["warnings"].append("decision_tail_cache_missing")
+        output["needs_review"] = True
+        return
+    defendants = _ensure_front_defendant_entity_ids(output.get("defendants", []))
+    output["defendants"] = defendants
+    charge_output = parse_explicit_decision_charges(
+        tail_record.lines,
+        defendants=defendants,
+        source_region=DECISION_TAIL,
+        min_name_match_score=settings.decision_name_match_min_score,
+        name_match_ambiguity_gap=settings.decision_name_match_ambiguity_gap,
+    )
+    output["charge_output"] = charge_output
+    output["case_charges"] = list(charge_output["case_charges"])
+    output["defendant_charge_map"] = dict(charge_output["defendant_charge_map"])
+    output["decision_tail_status"] = (
+        "heading_not_found"
+        if not tail_record.heading_found
+        else "parsed"
+        if charge_output["case_charges"]
+        else "charge_not_found"
+    )
+    if charge_output["case_charges"]:
+        for item in charge_output["charge_evidence"]:
+            line_ids = list(item.get("line_ids", []))
+            output.setdefault("evidence", []).append(
+                {
+                    "field": "metadata.legal_relationship",
+                    "value": item.get("charge"),
+                    "line_id": line_ids[0] if line_ids else None,
+                    "text": item.get("raw_text"),
+                    "confidence": 0.99,
+                    "source": "decision_tail_charge",
+                    "source_region": DECISION_TAIL,
+                }
+            )
+        output.setdefault("field_meta", {})["metadata.legal_relationship"] = {
+            "source": "decision_tail_charge",
+            "source_region": DECISION_TAIL,
+            "confidence": 0.99,
+            "evidence_line_ids": list(
+                dict.fromkeys(
+                    line_id
+                    for item in charge_output["charge_evidence"]
+                    for line_id in item.get("line_ids", [])
+                )
+            ),
+        }
+    else:
+        output["warnings"].append("charge_not_found_in_decision_tail")
+        output["needs_review"] = True
+    output["warnings"].extend(charge_output.get("warnings", []))
+    output["warnings"].extend(tail_record.warnings)
+    output["warnings"] = list(dict.fromkeys(output["warnings"]))
+
+
+def _ensure_front_defendant_entity_ids(values: Any) -> list[dict[str, Any]]:
+    defendants = []
+    for index, raw in enumerate(values if isinstance(values, list) else [], start=1):
+        if not isinstance(raw, dict):
+            continue
+        item = dict(raw)
+        item["entity_id"] = str(
+            item.get("entity_id")
+            or item.get("source_block_id")
+            or f"defendant_{index:03d}"
+        )
+        item["source_region"] = FRONT_PRE_CONTENT
+        defendants.append(item)
+    return defendants
+
+
+def _decision_tail_summary(
+    tail_record: DecisionTailRecord | None,
+) -> dict[str, Any] | None:
+    if tail_record is None:
+        return None
+    return {
+        "status": tail_record.status,
+        "heading_found": tail_record.heading_found,
+        "heading_page": tail_record.heading_page,
+        "pages_scanned": len(tail_record.scanned_page_numbers),
+        "warnings": list(tail_record.warnings),
     }
 
 

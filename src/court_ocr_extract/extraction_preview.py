@@ -4,9 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from court_ocr_extract.evidence_viewer import evidence_status
-from court_ocr_extract.excel_writer import rows_from_payload
+from court_ocr_extract.excel_writer import other_rows_from_payload, rows_from_payload
 from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
 from court_ocr_extract.ocr_cache import OCRCacheRecord
+from court_ocr_extract.other_participants_builder import OTHER_PARTICIPANT_COLUMNS
 from court_ocr_extract.visual_debug import escape, write_html
 
 
@@ -37,11 +38,14 @@ def write_extraction_preview(
 def _case_preview(draft: dict[str, Any], record: OCRCacheRecord | None) -> str:
     payload = draft.get("payload", {})
     rows = rows_from_payload(draft["case_id"], payload)
+    other_rows = other_rows_from_payload(draft["case_id"], payload)
     final_preview = _fields_table(rows)
+    other_preview = _other_fields_table(other_rows)
     debug = _evidence_panel(payload, record)
     return (
         f"<section><h2>{escape(draft['case_id'])}</h2>"
         f"<h3>FINAL EXCEL PREVIEW</h3>{final_preview}"
+        f"<h3>NGƯỜI THAM GIA KHÁC</h3>{other_preview}"
         f"<h3>Debug evidence</h3>{debug}</section>"
     )
 
@@ -54,6 +58,25 @@ def _fields_table(rows: list[dict[str, Any]]) -> str:
             f"<td>{escape(row.get(name))}</td>" for name in FINAL_EXCEL_COLUMNS
         )
         body_rows.append(f"<tr>{cells}</tr>")
+    return f"<table><tr>{header}</tr>{''.join(body_rows)}</table>"
+
+
+def _other_fields_table(rows: list[dict[str, Any]]) -> str:
+    header = "".join(
+        f"<th>{escape(name)}</th>" for name in OTHER_PARTICIPANT_COLUMNS
+    )
+    body_rows = []
+    for row in rows:
+        cells = "".join(
+            f"<td>{escape(row.get(name))}</td>"
+            for name in OTHER_PARTICIPANT_COLUMNS
+        )
+        body_rows.append(f"<tr>{cells}</tr>")
+    if not body_rows:
+        body_rows.append(
+            f'<tr><td colspan="{len(OTHER_PARTICIPANT_COLUMNS)}">'
+            "Không có người tham gia khác.</td></tr>"
+        )
     return f"<table><tr>{header}</tr>{''.join(body_rows)}</table>"
 
 

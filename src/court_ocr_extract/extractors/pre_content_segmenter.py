@@ -44,14 +44,23 @@ def route_document(text: str) -> dict[str, Any]:
 def segment_pre_content(result: OCRResult, *, max_fallback_pages: int = 3) -> dict[str, Any]:
     lines = _filtered_lines(result)
     router = route_document("\n".join(str(line.get("text") or "") for line in lines))
-    selected = []
-    stop_line = None
-    for line in lines:
-        if _is_stop_heading(str(line.get("text") or "")):
-            stop_line = line
-            break
-        if int(line.get("page_number") or 1) <= max_fallback_pages:
-            selected.append(line)
+    stop_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if _is_stop_heading(str(line.get("text") or ""))
+        ),
+        None,
+    )
+    stop_line = lines[stop_index] if stop_index is not None else None
+    if stop_index is not None:
+        selected = lines[:stop_index]
+    else:
+        selected = [
+            line
+            for line in lines
+            if int(line.get("page_number") or 1) <= max_fallback_pages
+        ]
     warnings = list(router["warnings"])
     if stop_line is None:
         warnings.append("pre_content_stop_heading_not_found_using_page_limit")

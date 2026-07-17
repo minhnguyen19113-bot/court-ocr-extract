@@ -1,6 +1,6 @@
 # Data Schema
 
-Last updated: 2026-07-10
+Last updated: 2026-07-17
 
 This document records target schema expectations for rebuild planning. It does not change runtime behavior.
 
@@ -59,11 +59,45 @@ Every non-null value must have evidence unless a reviewer-approved rule says oth
 
 ## Final Excel Row
 
-`src/court_ocr_extract/final_excel_schema.py` là nguồn canonical cho đúng 11 cột final. Sheet đầu của mọi final workbook là `FINAL_EXCEL`; mỗi defendant/participant là một dòng và case metadata được lặp lại.
+`src/court_ocr_extract/final_excel_schema.py` là nguồn canonical cho đúng 11 cột final. Sheet đầu của mọi final workbook là `FINAL_EXCEL`; mỗi entity có primary role là một dòng và case metadata được lặp lại.
 
 Không thêm `SOURCE_CASE_ID`, `SOURCE_PAGE`, `SOURCE_LINE_IDS`, OCR/extraction confidence, evidence, technical warnings hoặc `NEEDS_REVIEW` vào `FINAL_EXCEL`. Các field này thuộc debug sheets/QA report. `DATA` và `Trich xuat` là contract lịch sử trước final-schema realignment, không còn là tên sheet final.
 
-Dữ liệu thiếu phải để trống và giải thích bằng chuỗi phẳng trong `GHI CHÚ`; không đặt JSON blob trong final row.
+Dữ liệu thiếu phải để trống và giải thích bằng chuỗi phẳng trong `GHI CHÚ`; không đặt JSON blob trong final row. Row chỉ được tạo cho primary role trong `final_excel_role_policy.py`; identity dedupe là `case_id + normalized_full_name + normalized_procedural_role`.
+
+## Other Participants Row
+
+Sheet user-facing thứ hai là `NGUOI_THAM_GIA_KHAC`, gồm đúng tám cột:
+
+- `LOẠI ÁN`
+- `SỐ THỤ LÝ`
+- `TƯ CÁCH TỐ TỤNG`
+- `HỌ TÊN`
+- `NGƯỜI ĐƯỢC ĐẠI DIỆN/BẢO VỆ`
+- `ĐỊA CHỈ`
+- `TÌNH TRẠNG THAM GIA`
+- `GHI CHÚ`
+
+Sheet này giữ support roles nhưng loại court procedural roles. `PARTICIPANTS` vẫn là debug sheet đầy đủ và không bị thay thế.
+
+## Decision Tail Cache Record
+
+`DecisionTailRecord` là cache schema riêng, version 1, không thay đổi `OCRCacheRecord`. Các field chính:
+
+- `case_id`, `source_index`, `pdf_hash`, `backend`
+- `pages_total`, `scanned_page_numbers`, `scan_batches`
+- `heading_found`, `heading_page`, `heading_line_id`, `heading_text`
+- `text`, `lines`, `warnings`, `status`, `schema_version`
+
+Extraction charge output có đúng các key `case_charges`, `defendant_charge_map`, `charge_evidence` và `warnings`. `defendant_charge_map` dùng defendant `entity_id`, không dùng tên làm key khi entity đã tồn tại. Mỗi `ChargeEvidence` giữ `charge`, `defendant_entity_ids`, `defendant_names`, `source_region`, `page_number`, `line_ids`, `raw_text`, `match_method` và `confidence`. Charge evidence hợp lệ luôn có `source_region=decision_tail`; không có explicit verdict phrase thì danh sách/map để trống.
+
+Mỗi defendant/participant front giữ `entity_id` và `source_region=front_pre_content`. Extraction output có `decision_tail_status` và `source_region_audit`. Audit row gồm `field_name`, `source_region`, `source_page`, `evidence_line_ids`, `allowed`, `warning`; workbook thêm `case_id` khi ghi sheet `SOURCE_REGION_AUDIT`.
+
+Các sheet charge debug dùng schema:
+
+- `CHARGES`: `case_id`, charge, source region/page, line IDs, match method, confidence, raw text.
+- `DEFENDANT_CHARGES`: `case_id`, defendant entity ID/name, charge, mapping status/method, evidence line IDs.
+- `CHARGE_WARNINGS`: warning cấp case/strategy, không thêm cột vào `FINAL_EXCEL`.
 
 ## Extraction Draft Contract
 
@@ -116,4 +150,4 @@ Prediction JSONL record:
 Evaluation report schema là whitelist numeric metrics trong `evaluation.metrics.METRIC_KEYS`; không chứa raw manifest values.
 ## Pre-content A/B schema
 
-Schema thử nghiệm gồm `document_type`, `metadata`, `trial_panel`, `defendants`, `participants`, `evidence`, `warnings`, `needs_review` và `field_meta`. Entity giữ `raw_block`, `evidence_line_ids` và warning riêng. `correction_notice` dùng nhánh nhẹ `notice_number`, `notice_date`, `referenced_judgment_number`, `correction_from`, `correction_to`; không ép vào schema bản án.
+Schema thử nghiệm gồm `document_type`, `metadata`, `trial_panel`, `defendants`, `participants`, `evidence`, `warnings`, `needs_review` và `field_meta`. Entity giữ `raw_block`, `source_block_id`, `evidence_line_ids` và warning riêng; participant có thể có `represented_person`. Anchor output có `defendant_region` và `rejected_defendant_candidates`; extraction có thể bổ sung `rejected_defendant_entities`, `case_charges`, `defendant_charge_map` và `charge_output`. `correction_notice` dùng nhánh nhẹ `notice_number`, `notice_date`, `referenced_judgment_number`, `correction_from`, `correction_to`; không ép vào schema bản án.

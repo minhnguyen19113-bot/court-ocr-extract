@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from typing import Any
 
 from court_ocr_extract.extractors.pre_content_anchor_segmenter import (
@@ -21,6 +22,7 @@ from court_ocr_extract.extractors.rule_parser import (
     extract_identity_number,
     parse_vietnamese_date,
 )
+from court_ocr_extract.source_region_policy import FRONT_PRE_CONTENT
 
 
 DATE_RE = re.compile(r"\b(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b")
@@ -34,6 +36,22 @@ PRESENCE_SUFFIX_RE = re.compile(
     re.I,
 )
 SHORT_FIELDS = ("gender", "nationality", "ethnicity", "religion", "occupation")
+DEFENDANT_IDENTITY_FIELDS = (
+    "birth_date_or_year",
+    "birth_place",
+    "permanent_address",
+    "current_address",
+    "occupation",
+    "education",
+    "cccd",
+)
+MULTI_PERSON_ROLE_PREFIXES = (
+    "nguoi giam ho",
+    "nguoi dai dien",
+    "nguoi bao chua",
+    "nguoi bao ve quyen va loi ich hop phap",
+)
+HONORIFIC_RE = re.compile(r"\b(?:Ông|Bà|Anh|Chị)\s+", re.IGNORECASE)
 
 PANEL_LABELS = (
     (re.compile(r"(?:Thẩm\s+phán(?:\s*-\s*Chủ\s+tọa\s+phiên\s+tòa)?|Chủ\s+tọa\s+phiên\s+tòa)(?=\s*(?::|$))", re.I), "presiding_judge"),
@@ -66,8 +84,19 @@ def extract_rule_anchor_output(anchor: dict[str, Any]) -> dict[str, Any]:
     output = empty_pre_content_output(str(anchor.get("document_type") or "unknown"))
     _extract_metadata(anchor.get("metadata_lines", []), output)
     _extract_trial_panel(anchor.get("trial_panel_lines", []), output)
-    output["defendants"] = [parse_defendant_block(block) for block in anchor.get("defendant_blocks", [])]
-    output["participants"] = [parse_participant_block(block) for block in anchor.get("participant_blocks", [])]
+    rejected_defendants = []
+    for block in anchor.get("defendant_blocks", []):
+        defendant = parse_defendant_block(block)
+        if defendant.get("entity_valid"):
+            output["defendants"].append(defendant)
+        else:
+            rejected_defendants.append(defendant)
+            output["warnings"].append(
+                f"defendant_entity_rejected:{block.get('block_id') or 'unknown'}"
+            )
+    output["rejected_defendant_entities"] = rejected_defendants
+    for block in anchor.get("participant_blocks", []):
+        output["participants"].extend(parse_participant_block_entities(block))
     output["warnings"].extend(anchor.get("warnings", []))
     if not output["metadata"]["judgment_number"]:
         output["warnings"].append("missing:metadata.judgment_number")
@@ -98,6 +127,10 @@ def parse_defendant_block(block: dict[str, Any]) -> dict[str, Any]:
     result.update(
         raw_block=raw_source,
         evidence_line_ids=line_ids,
+        source_block_id=str(block.get("block_id") or ""),
+        entity_id=str(block.get("block_id") or ""),
+        source_region=FRONT_PRE_CONTENT,
+        split_reason=str(block.get("split_reason") or ""),
         needs_review=False,
         warnings=[],
     )
@@ -140,12 +173,16 @@ def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
         role=role,
         raw_block=raw_source,
         evidence_line_ids=line_ids,
+        source_block_id=str(block.get("block_id") or ""),
+        entity_id=str(block.get("block_id") or ""),
+        source_region=FRONT_PRE_CONTENT,
         needs_review=False,
         warnings=[],
     )
     primary_line = _participant_primary_line(raw, role)
     result["full_name"] = _participant_name(primary_line)
     result["cccd"] = extract_identity_number(raw)
+    result["represented_person"] = _participant_represented_person(raw, role)
     birth = re.search(r"\b(?:sinh\s+ngày\s+)?(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b|\bsinh\s+năm\s+(\d{4})\b", raw, re.I)
     if birth:
         result["birth_date_or_year"] = _normalize_date(birth.group(1)) if birth.group(1) else birth.group(2)
@@ -176,6 +213,31 @@ def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def parse_participant_block_entities(block: dict[str, Any]) -> list[dict[str, Any]]:
+    base = parse_participant_block(block)
+    role = str(base.get("role") or "")
+    if not any(fold_text(role).startswith(prefix) for prefix in MULTI_PERSON_ROLE_PREFIXES):
+        return [base]
+    primary_line = _participant_primary_line(
+        normalize_ocr_text(str(block.get("text") or "")),
+        role,
+    )
+    names, shared_note = _multi_person_names(primary_line)
+    if len(names) < 2:
+        return [base]
+    entities = []
+    for name in names:
+        entity = deepcopy(base)
+        entity["full_name"] = name
+        entity["relationship"] = shared_note
+        entity["relationship_or_note"] = shared_note
+        entity["warnings"] = []
+        entity["needs_review"] = False
+        validate_participant_entity(entity)
+        entities.append(entity)
+    return entities
+
+
 def _extract_metadata(lines: list[dict[str, Any]], output: dict[str, Any]) -> None:
     judgment_index = None
     for index, line in enumerate(lines):
@@ -193,29 +255,22 @@ def _extract_metadata(lines: list[dict[str, Any]], output: dict[str, Any]) -> No
         if "quyet dinh dua vu an ra xet xu so" in folded:
             value = _number_after_anchor(text, r"Quyết\s+định\s+đưa\s+vụ\s+án\s+ra\s+xét\s+xử\s+số")
             _set(output, "metadata.trial_decision_number", value, line, 0.97)
-        elif "quyet dinh hoan phien toa so" in folded:
+        if "quyet dinh hoan phien toa so" in folded:
             value = _number_after_anchor(text, r"Quyết\s+định\s+hoãn\s+phiên\s+tòa\s+số")
             _set(output, "metadata.postponement_decision_number", value, line, 0.97)
-        elif "thu ly so" in folded:
-            value = _number_after_anchor(text, r"thụ\s+lý\s+số")
+        if "thu ly so" in folded:
+            value, acceptance_tail = _number_and_tail_after_anchor(
+                text,
+                r"thụ\s+lý\s+số",
+            )
             _set(output, "metadata.case_acceptance_number", value, line, 0.96)
-            acceptance_date = parse_vietnamese_date(
-                _text_after_anchor(text, r"thụ\s+lý\s+số") or ""
-            )
-            _set(output, "metadata.case_acceptance_date", acceptance_date, line, 0.96)
-        legal_relationship = re.search(
-            r"(?:Quan\s+hệ\s+pháp\s+luật|Tội\s+danh)\s*[:：]\s*([^;\n]+)",
-            text,
-            re.I,
-        )
-        if legal_relationship and not output["metadata"]["legal_relationship"]:
-            _set(
-                output,
-                "metadata.legal_relationship",
-                _clean_value(legal_relationship.group(1)),
-                line,
-                0.94,
-            )
+            if value:
+                acceptance_date = parse_vietnamese_date(acceptance_tail or "")
+                _set(output, "metadata.case_acceptance_date", acceptance_date, line, 0.96)
+            elif not output["metadata"].get("case_acceptance_number"):
+                output["warnings"].append(
+                    "acceptance_date_blocked_missing_acceptance_number"
+                )
         if (
             not output["metadata"]["trial_location_or_date_sentence"]
             and "xet xu so tham" in folded
@@ -381,6 +436,14 @@ def validate_defendant_entity(result: dict[str, Any]) -> dict[str, Any]:
             result["warnings"].append(f"field_too_long:{field}")
     if not result.get("full_name"):
         result["warnings"].append("defendant_name_missing")
+    split_reason = str(result.get("split_reason") or "")
+    explicit_label = "defendant_label" in split_reason or "full_name_label" in split_reason
+    has_identity_profile = explicit_label or any(
+        result.get(field) not in (None, "") for field in DEFENDANT_IDENTITY_FIELDS
+    )
+    if result.get("full_name") and not has_identity_profile:
+        result["warnings"].append("defendant_identity_profile_missing")
+    result["entity_valid"] = bool(result.get("full_name") and has_identity_profile)
     result["warnings"] = list(dict.fromkeys(result["warnings"]))
     result["needs_review"] = bool(result["warnings"])
     return result
@@ -412,10 +475,12 @@ def _set(output: dict[str, Any], path: str, value: Any, line: dict[str, Any], co
         "text": _text(line),
         "confidence": confidence,
         "source": "rule_anchor",
+        "source_region": FRONT_PRE_CONTENT,
     }
     output["evidence"].append(evidence)
     output["field_meta"][path] = {
         "source": "rule_anchor",
+        "source_region": FRONT_PRE_CONTENT,
         "confidence": confidence,
         "evidence_line_ids": [_line_id(line)],
     }
@@ -437,6 +502,7 @@ def _set_panel(output: dict[str, Any], field: str, value: str, line: dict[str, A
             {
                 "field": f"trial_panel.{field}", "value": clean, "line_id": _line_id(line),
                 "text": _text(line), "confidence": 0.94, "source": "rule_anchor",
+                "source_region": FRONT_PRE_CONTENT,
             }
         )
 
@@ -463,18 +529,67 @@ def _split_panel_values(value: str) -> list[str]:
 
 
 def _number_after_anchor(text: str, anchor_pattern: str) -> str | None:
-    tail = _text_after_anchor(text, anchor_pattern)
-    if tail is None:
-        return None
-    number = CASE_NUMBER_TOKEN_RE.match(tail)
+    number, _ = _number_and_tail_after_anchor(text, anchor_pattern)
+    return number
+
+
+def _number_and_tail_after_anchor(
+    text: str,
+    anchor_pattern: str,
+) -> tuple[str | None, str | None]:
+    anchor = re.search(anchor_pattern + r"\s*[:.]?\s*", text, re.I)
+    if not anchor:
+        return None, None
+    number = CASE_NUMBER_TOKEN_RE.match(text, anchor.end())
     if not number:
-        return None
-    return re.sub(r"\s*/\s*", "/", number.group(1)).strip(" .;,:")
+        return None, text[anchor.end():]
+    value = re.sub(r"\s*/\s*", "/", number.group(1)).strip(" .;,:")
+    return value, text[number.end():]
 
 
 def _text_after_anchor(text: str, anchor_pattern: str) -> str | None:
     anchor = re.search(anchor_pattern + r"\s*[:.]?\s*", text, re.I)
     return text[anchor.end():] if anchor else None
+
+
+def _participant_represented_person(raw: str, role: str | None) -> str | None:
+    if not role:
+        return None
+    first_line = raw.splitlines()[0] if raw.splitlines() else raw
+    match = re.search(
+        r"(?:của|cho)\s+(?:bị\s+cáo|bị\s+hại)\s+([^:：;]+)\s*[:：]",
+        first_line,
+        re.IGNORECASE,
+    )
+    return _clean_value(match.group(1)) if match else None
+
+
+def _multi_person_names(primary_line: str | None) -> tuple[list[str], str | None]:
+    if not primary_line:
+        return [], None
+    folded = fold_text(primary_line)
+    if any(
+        marker in folded
+        for marker in ("dia chi", "noi cu tru", "cong ty", "van phong", "to chuc")
+    ):
+        return [], None
+    starts = []
+    for match in HONORIFIC_RE.finditer(primary_line):
+        prefix = primary_line[:match.start()].rstrip().casefold()
+        if not prefix or prefix.endswith((",", ";", " và")):
+            starts.append(match.start())
+    if len(starts) < 2:
+        return [], None
+    names: list[str] = []
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else len(primary_line)
+        segment = primary_line[start:end].strip(" ,;:-")
+        name = _participant_name(segment)
+        if name:
+            names.append(name)
+    notes = [_clean_value(value) for value in re.findall(r"\(([^)]+)\)", primary_line)]
+    shared_note = "; ".join(dict.fromkeys(note for note in notes if note)) or None
+    return list(dict.fromkeys(names)), shared_note
 
 
 def _date_after_day_anchor(text: str) -> str | None:

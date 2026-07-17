@@ -11,6 +11,12 @@ Last updated: 2026-07-14
 - Synthetic tests prove contracts only, not real OCR/extraction quality.
 - Cloud APIs remain disabled unless explicitly enabled for a benchmark.
 
+## Production Source Regions
+
+`source_region_policy.py` khóa ba canonical region: `front_pre_content`, `decision_tail` và `middle_excluded`. Production chỉ cho phép hai region đầu. Forward OCR/extraction dừng tại `NỘI DUNG VỤ ÁN`; reverse OCR bắt đầu từ cuối và dừng khi tìm được `QUYẾT ĐỊNH` trong guard cấu hình. Khoảng narrative, tranh luận và nhận định ở giữa không được OCR như một fallback và không được fill `FINAL_EXCEL`.
+
+Nhóm identity/case/panel của 11 cột final chỉ lấy từ `front_pre_content`. Tội danh và các field tuyên án thuộc `decision_tail`; task hiện tại chỉ map tội danh vào `QUAN HỆ PHÁP LUẬT`. Charge parser dùng front defendant entities làm dictionary, map bằng `entity_id`, giữ evidence nguồn `decision_tail` và không tạo defendant mới từ phần cuối. Local LLM không tham gia charge extraction hoặc final mapping.
+
 ## Candidate Path A: Surya OCR + Local LLM
 
 This is the main candidate because it is easier to debug than direct VLM extraction.
@@ -72,6 +78,9 @@ Likely main candidates:
 - Extraction orchestrator: canonical `src/court_ocr_extract/extraction_pipeline.py`.
 - Extractor backends: canonical `src/court_ocr_extract/extractors/`; Local LLM backend ở `extractors/local_llm_extractor.py`, rule helper ở `extractors/rule_support.py`.
 - Pre-content baseline: `extractors/pre_content_anchor_segmenter.py`, `extractors/rule_anchor_extractor.py`, `extractors/rule_anchor_strategies.py`; legacy hybrid/LLM-only modules chỉ phục vụ explicit comparison.
+- Final role/output policy: `final_excel_role_policy.py`, `final_excel_builder.py`, `other_participants_builder.py`; canonical 11-column schema vẫn ở `final_excel_schema.py`.
+- Decision tail: `decision_tail.py` sở hữu reverse-batch/cache contract; `charge_parser.py` chỉ parse explicit verdict language; Surya adapter cung cấp reusable explicit-page runner.
+- Source policy/audit: `source_region_policy.py` sở hữu field-source allowlist và `SOURCE_REGION_AUDIT`; middle text không phải nguồn production hợp lệ.
 - Local LLM client/parser: `src/court_ocr_extract/local_llm/`.
 - Typed merge/schema/validation compatibility: `src/court_ocr_extract/extraction/`; package này không còn sở hữu extractor backend.
 - Validation/QA: `src/court_ocr_extract/validation.py`, `src/court_ocr_extract/extraction/validators.py`, `src/court_ocr_extract/qa.py`.
@@ -87,7 +96,7 @@ Phase 1B/1E canonical decisions:
 - Config: `src/court_ocr_extract/settings.py` is canonical for the rebuild.
 - Compatibility config: `src/court_ocr_extract/config.py` remains for older imports and should not be expanded unless necessary.
 - Excel writer: `src/court_ocr_extract/excel_writer.py` là canonical path duy nhất.
-- Final output: sheet đầu `FINAL_EXCEL`, đúng 11 cột canonical; technical sheets chỉ là debug phụ.
+- Final output: sheet đầu `FINAL_EXCEL`, đúng 11 cột canonical và chỉ primary roles; sheet thứ hai `NGUOI_THAM_GIA_KHAC` là filtered user view; technical sheets chỉ là debug phụ.
 - Phase 1E đã migrate caller và xóa `src/court_ocr_extract/excel.py` cùng `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
 
 Phase 1F canonical decisions:

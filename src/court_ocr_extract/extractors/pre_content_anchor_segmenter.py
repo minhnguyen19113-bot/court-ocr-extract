@@ -7,12 +7,23 @@ from typing import Any
 
 PARTICIPANT_ROLE_PATTERNS = (
     ("nguoi bao ve quyen va loi ich hop phap cua bi hai", "Người bảo vệ quyền và lợi ích hợp pháp của bị hại"),
+    ("nguoi bao ve quyen va loi ich hop phap", "Người bảo vệ quyền và lợi ích hợp pháp"),
+    ("nguoi co quyen loi va nghia vu lien quan", "Người có quyền lợi và nghĩa vụ liên quan"),
     ("nguoi co quyen loi, nghia vu lien quan", "Người có quyền lợi, nghĩa vụ liên quan"),
     ("nguoi co quyen va nghia vu lien quan", "Người có quyền và nghĩa vụ liên quan"),
+    ("phap nhan thuong mai bi cao", "Pháp nhân thương mại bị cáo"),
+    ("nguoi dai dien", "Người đại diện"),
     ("nguoi bao chua cho bi cao", "Người bào chữa cho bị cáo"),
+    ("nguoi bao chua", "Người bào chữa"),
     ("nguoi giam ho cua bi cao", "Người giám hộ của bị cáo"),
     ("nguoi giam ho", "Người giám hộ"),
+    ("nguoi phien dich", "Người phiên dịch"),
+    ("nguoi giam dinh", "Người giám định"),
+    ("nguoi dinh gia", "Người định giá"),
+    ("nguoi chung kien", "Người chứng kiến"),
     ("nguoi lam chung", "Người làm chứng"),
+    ("nguyen don dan su", "Nguyên đơn dân sự"),
+    ("bi don dan su", "Bị đơn dân sự"),
     ("bi hai", "Bị hại"),
 )
 
@@ -30,14 +41,45 @@ DEFENDANT_BLOCKED_TERMS = (
     "doi voi cac bi cao",
 )
 
+DEFENDANT_INTRO_RE = re.compile(
+    r"\b(?:đối|đồi|doi)\s+(?:với|voi)\s+(?:(?:các|cac)\s+)?"
+    r"(?:bị|bi)\s+(?:cáo|cao)\s*[:：]",
+    re.IGNORECASE,
+)
+
+DEFENDANT_PROFILE_PREFIXES = (
+    "sinh ngay",
+    "sinh nam",
+    "noi sinh",
+    "noi o",
+    "cho o",
+    "thuong tru",
+    "ho khau thuong tru",
+    "nghe nghiep",
+    "trinh do",
+    "quoc tich",
+    "dan toc",
+    "ton giao",
+    "cccd",
+    "cmnd",
+    "can cuoc cong dan",
+    "so dinh danh ca nhan",
+)
+
 
 def segment_pre_content_anchors(segment: dict[str, Any], *, case_id: str) -> dict[str, Any]:
     lines = [_normalized_line(line) for line in segment.get("pre_content_lines", []) if _text(line)]
     warnings: list[str] = []
     metadata_lines = _metadata_region(lines)
     trial_panel_lines = _trial_panel_region(lines)
-    defendant_blocks = _split_defendants(lines, warnings)
     participant_blocks = _split_participants(lines, warnings)
+    defendant_blocks, defendant_region, rejected_defendant_candidates = _split_defendants(
+        lines,
+        warnings,
+        metadata_lines=metadata_lines,
+        trial_panel_lines=trial_panel_lines,
+        participant_blocks=participant_blocks,
+    )
     if not metadata_lines:
         warnings.append("anchor_metadata_region_empty")
     if not trial_panel_lines:
@@ -50,6 +92,8 @@ def segment_pre_content_anchors(segment: dict[str, Any], *, case_id: str) -> dic
         "metadata_lines": metadata_lines,
         "trial_panel_lines": trial_panel_lines,
         "defendant_blocks": defendant_blocks,
+        "defendant_region": defendant_region,
+        "rejected_defendant_candidates": rejected_defendant_candidates,
         "participant_blocks": participant_blocks,
         "warnings": _unique(warnings),
     }
@@ -90,15 +134,16 @@ def has_reviewable_warnings(warnings: list[str]) -> bool:
 
 
 def _metadata_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    first_entity = next(
-        (
-            index
-            for index, line in enumerate(lines)
-            if _is_defendant_intro(_text(line)) or participant_role(_text(line))
-        ),
-        len(lines),
-    )
-    return lines[:first_entity]
+    for index, line in enumerate(lines):
+        if _is_defendant_intro(_text(line)):
+            prefix = _text_before_defendant_intro(_text(line))
+            return [
+                *lines[:index],
+                *([_line_with_text(line, prefix)] if prefix else []),
+            ]
+        if participant_role(_text(line)):
+            return lines[:index]
+    return lines
 
 
 def _trial_panel_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -122,12 +167,25 @@ def _trial_panel_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return lines[start:end]
 
 
-def _split_defendants(lines: list[dict[str, Any]], warnings: list[str]) -> list[dict[str, Any]]:
+def _split_defendants(
+    lines: list[dict[str, Any]],
+    warnings: list[str],
+    *,
+    metadata_lines: list[dict[str, Any]],
+    trial_panel_lines: list[dict[str, Any]],
+    participant_blocks: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     intro = next((i for i, line in enumerate(lines) if _is_defendant_intro(_text(line))), None)
+    region: dict[str, Any] = {
+        "intro_found": intro is not None,
+        "intro_line_id": _line_id(lines[intro]) if intro is not None else None,
+        "start_line_id": None,
+        "end_line_id": None,
+        "stop_reason": None,
+    }
+    rejected: list[dict[str, Any]] = []
     if intro is None:
-        intro = next((i for i, line in enumerate(lines) if _defendant_start_reason(_text(line))), None)
-    if intro is None:
-        return []
+        return [], region, rejected
     stop = next(
         (
             i
@@ -136,37 +194,90 @@ def _split_defendants(lines: list[dict[str, Any]], warnings: list[str]) -> list[
         ),
         len(lines),
     )
+    region["stop_reason"] = "participant_region" if stop < len(lines) else "end_of_pre_content"
+    region["end_line_id"] = _line_id(lines[stop - 1]) if stop > intro + 1 else None
+
     starts: list[tuple[int, str]] = []
     intro_text = _text(lines[intro])
-    intro_value = _value_after_colon(intro_text)
-    if _is_defendant_intro(intro_text) and intro_value:
-        starts.append((intro, "intro_with_inline_defendant"))
-    for index in range(intro + 1 if _is_defendant_intro(intro_text) else intro, stop):
-        reason = _defendant_start_reason(_text(lines[index]))
+    intro_value = _defendant_intro_value(intro_text)
+    inline_reason = _inline_defendant_reason(
+        intro_value,
+        lines[intro + 1:stop],
+    )
+    line_overrides: dict[int, dict[str, Any]] = {}
+    if intro_value and inline_reason:
+        starts.append((intro, inline_reason))
+        line_overrides[intro] = _line_with_text(lines[intro], intro_value)
+        region["start_line_id"] = _line_id(lines[intro])
+    elif intro_value:
+        rejected.append(
+            _rejected_candidate(lines[intro], "inline_defendant_without_strong_identity_evidence")
+        )
+
+    for index in range(intro + 1, stop):
+        reason = _defendant_start_reason(
+            _text(lines[index]),
+            following_lines=lines[index + 1:stop],
+            defendant_region_established=True,
+        )
         if reason:
             starts.append((index, reason))
-    if not starts:
-        first = next(
-            (
-                i
-                for i in range(intro + 1, stop)
-                if not _is_page_number(_text(lines[i]))
-                and not any(term in fold_text(_text(lines[i])) for term in DEFENDANT_BLOCKED_TERMS)
-            ),
-            None,
-        )
-        if first is not None:
-            starts.append((first, "single_defendant_after_intro"))
-    blocks = []
+        elif _looks_like_weak_numbered_person(_text(lines[index])):
+            rejected.append(
+                _rejected_candidate(lines[index], "numbered_line_without_identity_profile")
+            )
+
+    starts = list(dict.fromkeys(starts))
+    if starts and region["start_line_id"] is None:
+        region["start_line_id"] = _line_id(lines[starts[0][0]])
+
+    forbidden_line_ids = {
+        _line_id(line)
+        for line in [*metadata_lines, *trial_panel_lines]
+        if _line_id(line) and _line_id(line) != region["intro_line_id"]
+    }
+    forbidden_line_ids.update(
+        line_id
+        for block in participant_blocks
+        for line_id in block.get("line_ids", [])
+        if line_id
+    )
+
+    blocks: list[dict[str, Any]] = []
     for position, (start, reason) in enumerate(starts):
         end = starts[position + 1][0] if position + 1 < len(starts) else stop
-        block_lines = [line for line in lines[start:end] if not _is_page_number(_text(line))]
+        raw_block_lines = [line_overrides.get(index, lines[index]) for index in range(start, end)]
+        block_lines = [line for line in raw_block_lines if not _is_page_number(_text(line))]
         if not block_lines:
+            continue
+        overlaps = [
+            _line_id(line)
+            for line in block_lines
+            if _line_id(line) in forbidden_line_ids
+        ]
+        if overlaps:
+            warnings.append("defendant_block_overlaps_forbidden_region")
+            rejected.append(
+                {
+                    "line_ids": overlaps,
+                    "text": "",
+                    "reason": "defendant_block_overlaps_forbidden_region",
+                }
+            )
+            continue
+        if not _block_has_identity_evidence(block_lines, reason):
+            rejected.append(
+                {
+                    "line_ids": [_line_id(line) for line in block_lines],
+                    "text": "\n".join(_text(line) for line in block_lines),
+                    "reason": "defendant_candidate_missing_identity_profile",
+                }
+            )
             continue
         blocks.append(_block_payload("defendant", len(blocks) + 1, block_lines, reason))
     if any(_is_page_number(_text(line)) for line in lines[intro:stop]):
         warnings.append("standalone_page_number_removed_from_defendant_blocks")
-    return blocks
+    return blocks, region, rejected
 
 
 def _split_participants(lines: list[dict[str, Any]], warnings: list[str]) -> list[dict[str, Any]]:
@@ -243,24 +354,128 @@ def _block_payload(prefix: str, index: int, lines: list[dict[str, Any]], reason:
     }
 
 
-def _defendant_start_reason(text: str) -> str | None:
+def _defendant_start_reason(
+    text: str,
+    *,
+    following_lines: list[dict[str, Any]] | None = None,
+    defendant_region_established: bool = False,
+) -> str | None:
     folded = fold_text(text)
     if not folded or _is_page_number(text) or any(term in folded for term in DEFENDANT_BLOCKED_TERMS):
         return None
-    if re.match(r"^bi cao\s*:\s*\S", folded):
+    if re.match(r"^(?:\d+[.)]\s*)?bi cao\s*:\s*\S", folded):
         return "defendant_label"
-    if re.match(r"^ho va ten\s*:\s*\S", folded):
+    if re.match(r"^(?:\d+[.)]\s*)?ho va ten\s*:\s*\S", folded):
         return "full_name_label"
-    if re.match(r"^\d+[.)]\s*(?:ho va ten\s*:\s*)?\S", folded):
-        return "numbered_defendant"
-    if re.match(r"^[^:;,]{3,100},?\s+sinh\s+(?:ngay|nam)\b", folded):
+    if re.match(r"^(?:\d+[.)]\s*)?[^:;,]{3,100},?\s+sinh\s+(?:ngay|nam)\b", folded):
         return "name_birth_pattern"
+    if (
+        defendant_region_established
+        and _looks_like_weak_numbered_person(text)
+        and _following_has_identity_profile(following_lines or [])
+    ):
+        return "numbered_person_with_profile_followup"
     return None
 
 
 def _is_defendant_intro(text: str) -> bool:
-    folded = fold_text(text).strip(" :.-")
-    return bool(re.match(r"^doi voi(?:(?: cac)? bi cao)?(?:\s*:.*)?$", folded))
+    return bool(DEFENDANT_INTRO_RE.search(normalize_ocr_text(text)))
+
+
+def _defendant_intro_value(text: str) -> str | None:
+    normalized = normalize_ocr_text(text)
+    match = DEFENDANT_INTRO_RE.search(normalized)
+    if not match:
+        return None
+    value = normalized[match.end():].strip(" -.;:")
+    return value or None
+
+
+def _text_before_defendant_intro(text: str) -> str | None:
+    normalized = normalize_ocr_text(text)
+    match = DEFENDANT_INTRO_RE.search(normalized)
+    if not match:
+        return None
+    value = normalized[:match.start()].strip(" -.;:")
+    return value or None
+
+
+def _inline_defendant_reason(
+    value: str | None,
+    following_lines: list[dict[str, Any]],
+) -> str | None:
+    if not value:
+        return None
+    reason = _defendant_start_reason(
+        value,
+        following_lines=following_lines,
+        defendant_region_established=True,
+    )
+    if reason:
+        return "intro_inline_" + reason
+    if _looks_like_person_line(value) and _following_has_identity_profile(following_lines):
+        return "intro_inline_with_profile_followup"
+    return None
+
+
+def _looks_like_weak_numbered_person(text: str) -> bool:
+    folded = fold_text(text)
+    if not re.match(r"^\d+[.)]\s+\S", folded):
+        return False
+    remainder = re.sub(r"^\d+[.)]\s+", "", folded)
+    return not any(prefix in remainder for prefix in DEFENDANT_PROFILE_PREFIXES)
+
+
+def _following_has_identity_profile(lines: list[dict[str, Any]]) -> bool:
+    for line in lines:
+        text = _text(line)
+        if _is_page_number(text):
+            continue
+        if participant_role(text) or _is_defendant_intro(text):
+            return False
+        if _defendant_start_reason(text):
+            return False
+        folded = fold_text(text)
+        if folded.startswith(DEFENDANT_PROFILE_PREFIXES):
+            return True
+        if re.search(r"\bsinh\s+(?:ngay|nam)\b", folded):
+            return True
+        if _looks_like_weak_numbered_person(text):
+            return False
+    return False
+
+
+def _block_has_identity_evidence(lines: list[dict[str, Any]], reason: str) -> bool:
+    if reason in {
+        "defendant_label",
+        "full_name_label",
+        "intro_inline_defendant_label",
+        "intro_inline_full_name_label",
+    }:
+        return True
+    folded = "\n".join(fold_text(_text(line)) for line in lines)
+    return bool(
+        re.search(r"\bsinh\s+(?:ngay|nam)\b", folded)
+        or any(
+            line.startswith(DEFENDANT_PROFILE_PREFIXES)
+            for line in folded.splitlines()
+        )
+    )
+
+
+def _line_with_text(line: dict[str, Any], text: str) -> dict[str, Any]:
+    output = dict(line)
+    output["text"] = text
+    output["normalized_text"] = normalize_ocr_text(text)
+    return output
+
+
+def _rejected_candidate(line: dict[str, Any], reason: str) -> dict[str, Any]:
+    return {
+        "line_ids": [_line_id(line)],
+        "text": _text(line),
+        "reason": reason,
+    }
 
 
 def participant_inline_value(text: str, role: str) -> str | None:

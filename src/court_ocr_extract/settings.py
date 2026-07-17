@@ -18,6 +18,15 @@ class PipelineSettings:
     ocr_dpi: int = 300
     save_debug_visual: bool = False
     save_debug_json: bool = False
+    decision_tail_batch_size: int = 4
+    decision_tail_max_scan_pages: int = 12
+    decision_heading_variants: tuple[str, ...] = (
+        "QUYẾT ĐỊNH",
+        "QUYẾT ĐỊNH CỦA TÒA ÁN",
+        "VÌ CÁC LẼ TRÊN, QUYẾT ĐỊNH",
+    )
+    decision_name_match_min_score: float = 88.0
+    decision_name_match_ambiguity_gap: float = 5.0
 
     # Canonical OCR default for the rebuild. Tesseract settings are legacy optional.
     ocr_backend: str = "surya"
@@ -112,6 +121,22 @@ def get_settings() -> PipelineSettings:
         ocr_dpi=_env_int("OCR_DPI", 300),
         save_debug_visual=_env_bool("SAVE_DEBUG_VISUAL", False),
         save_debug_json=_env_bool("SAVE_DEBUG_JSON", False),
+        decision_tail_batch_size=_env_int("DECISION_TAIL_BATCH_SIZE", 4),
+        decision_tail_max_scan_pages=_env_int("DECISION_TAIL_MAX_SCAN_PAGES", 12),
+        decision_heading_variants=tuple(
+            value.strip()
+            for value in _env(
+                "DECISION_HEADING_VARIANTS",
+                "QUYẾT ĐỊNH|QUYẾT ĐỊNH CỦA TÒA ÁN|VÌ CÁC LẼ TRÊN, QUYẾT ĐỊNH",
+            ).split("|")
+            if value.strip()
+        ),
+        decision_name_match_min_score=_env_float(
+            "DECISION_NAME_MATCH_MIN_SCORE", 88.0
+        ),
+        decision_name_match_ambiguity_gap=_env_float(
+            "DECISION_NAME_MATCH_AMBIGUITY_GAP", 5.0
+        ),
         ocr_backend=_env("OCR_BACKEND", "surya"),
         fallback_ocr_backend=_env("FALLBACK_OCR_BACKEND", ""),
         tesseract_cmd=_env("TESSERACT_CMD", ""),

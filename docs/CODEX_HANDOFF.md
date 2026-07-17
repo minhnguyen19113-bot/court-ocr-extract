@@ -1,12 +1,34 @@
 # Codex Handoff
 
+## Bàn Giao Front + Decision Source và Legal Relationship Theo Dòng
+
+Nguồn production hiện bị khóa ở `front_pre_content` và `decision_tail`. `middle_excluded` gồm narrative/tranh luận/nhận định không được fill final field, không được làm fallback và không xuất hiện trong charge/source review. Front entities có stable `entity_id`; decision parser chỉ đối chiếu với dictionary này, không tạo defendant mới từ phần cuối.
+
+`QUAN HỆ PHÁP LUẬT` của dòng bị cáo lấy riêng từ `defendant_charge_map[entity_id]`; primary role không phải bị cáo lấy `case_charges`. Mapping ambiguous/collective không chắc để trống và warning. Parser chỉ dùng explicit verdict language, hỗ trợ quoted/unquoted, không suy từ statute, behavior, document type, filename hoặc LLM.
+
+Reverse decision scan bắt buộc `--decision-tail-max-scan-pages` dương và hữu hạn. Khi heading vắng, status là `heading_not_found`, final relationship để trống có note và code không quét toàn PDF. Review workbook dùng `CHARGES`, `DEFENDANT_CHARGES`, `SOURCE_REGION_AUDIT`, `CHARGE_WARNINGS`; HTML đặt các section tương ứng sau hai preview user-facing.
+
+Gate local mới nhất: 242/242 synthetic tests passed; compile/guardrail/static checks cần được chạy lại sau khi docs hoàn tất. Task không mở PDF/cache/output thật, không gọi Surya/LLM/Docker/cloud và không commit/push. Project Owner phải dùng `data\raw_pdfs\pilot_one` và `outputs\ocr_cache_pre_content_early_stop_1`, review một case trước khi tăng batch.
+
+## Bàn Giao Final Role, Boundary và Decision Tail
+
+Pre-content hiện giữ toàn bộ line trước marker, chỉ dùng page limit khi marker vắng. Defendant segmenter không còn fallback từ numbered line toàn tài liệu; intro có thể nằm giữa/cuối metadata line, trial panel/metadata/participant IDs bị cô lập, và rejected candidate có reason trong HTML/anchor output. Metadata anchors được kiểm tra độc lập; ngày thụ lý chỉ parse sau số thụ lý.
+
+`FINAL_EXCEL` vẫn là sheet đầu với đúng 11 cột, nhưng chỉ chứa primary roles. Sheet thứ hai `NGUOI_THAM_GIA_KHAC` chứa guardian/representative/defense/protection/witness/support roles; court roles chỉ ở debug. `QUAN HỆ PHÁP LUẬT` không còn giá trị generic `Hình sự`; nếu chưa có explicit charge thì để trống và ghi note.
+
+Stage mới `ocr-decision-tail` chỉ chấp nhận Surya, scan ngược theo batch, dừng ở normalized decision heading và ghi cache riêng. Extraction có thể nhận `--decision-tail-cache-dir`; parser chỉ chấp nhận explicit verdict phrases, không suy đoán từ điều luật, hành vi, tên file hoặc document type. OCR cache cũ không đổi schema.
+
+Project Owner phải chạy cache-only extraction cho 1 case trước, review `FINAL_EXCEL` và `NGUOI_THAM_GIA_KHAC`, rồi mới chạy decision-tail OCR cho chính case đó. Codex chỉ chạy synthetic tests, chưa mở/chạy dữ liệu thật và không commit/push.
+
+Gate local đã qua: 226/226 test, compile, snapshot, repo/architecture guardrails, static Surya `0.20.0` adapter check và static Local LLM configuration check. Warning duy nhất là deprecation từ Surya/Pydantic.
+
 ## Bàn Giao Final Excel Schema First
 
 Output chính hiện là sheet đầu `FINAL_EXCEL`, đúng 11 cột từ `FINAL_EXCEL_COLUMNS`. `final_excel_builder.py` map metadata/panel/defendants/participants thành một dòng mỗi người; không đưa JSON, evidence blob hoặc field kỹ thuật vào final sheet. `DATA` và `Trich xuat` không còn là tên sheet final.
 
 Verification synthetic/static hiện tại: 199/199 test passed; repo guardrails, architecture guardrails, static Surya backend check và Local LLM config check đều passed. Architecture check chỉ còn các warning inventory đã biết, không có failure.
 
-Project Owner chạy `rule_anchor_only --limit 1` trước và chỉ review `FINAL_EXCEL`: số/ngày thụ lý, 6 bị cáo + 4 participant, role dài không bị collapse, năm sinh chỉ còn năm, judge lặp đúng, CCCD thiếu để trống kèm note. Sau đó mới dùng debug sheets để truy nguyên. Codex chưa chạy/đọc `case_001` hoặc runtime thật.
+Project Owner chạy `rule_anchor_only --limit 1` trước và review hai sheet user-facing: số/ngày thụ lý, primary/support role placement, role dài không bị collapse, năm sinh chỉ còn năm, judge lặp đúng và field thiếu để trống kèm note. Không dùng kỳ vọng số dòng lịch sử; sau đó mới dùng debug sheets để truy nguyên. Codex chưa chạy/đọc case hoặc runtime thật.
 
 ## Bàn Giao Bản Vá Rule Anchor Case001
 
@@ -44,7 +66,7 @@ Surya OCR CLI hiện fail-fast qua preflight mặc định. Trước pilot, Proj
 
 Các option mới: `--skip-surya-runtime-preflight`, `--surya-runtime-check-gpu-container`, `--surya-runtime-timeout-seconds`, `--surya-startup-timeout-seconds`; env startup là `SURYA_STARTUP_TIMEOUT_SECONDS`. Codex chưa chạy Docker/PDF/Surya thật và không sửa preprocess/stamp.
 
-Last updated: 2026-07-14
+Last updated: 2026-07-17
 
 ## Read First
 
@@ -237,7 +259,7 @@ Template report chuẩn:
 
 ## Suggested Next Step
 
-Project Owner chạy rule-only trên 1 OCR-cache case, review `FINAL_EXCEL` 11 cột và 10 dòng người trước; chỉ sau khi final mapping đạt mới review anchor/validator hoặc bật Local LLM.
+Project Owner chạy `rule_anchor_only` từ OCR cache cũ cho 1 case, review `FINAL_EXCEL` và `NGUOI_THAM_GIA_KHAC`. Khi role/boundary/metadata đạt mới chạy `ocr-decision-tail` cho case đó và rerun extraction với tail cache; chưa bật Local LLM và chưa tăng lên 3/9 PDF.
 ## Ban giao moi nhat
 
 Task hien tai da hoan thien contract cho Windows Surya runtime va stamp suppression V3. Dung `--stamp-suppression balanced` va `--ocr-stamp-filter balanced` khi co `--use-preprocessed`; dung aggressive chi sau visual review.

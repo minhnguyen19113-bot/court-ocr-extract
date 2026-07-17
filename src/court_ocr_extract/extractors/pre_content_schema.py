@@ -24,7 +24,8 @@ DEFENDANT_FIELDS = (
     "spouse", "children", "criminal_record", "detention_status", "presence_status", "cccd",
 )
 PARTICIPANT_FIELDS = (
-    "role", "full_name", "birth_date_or_year", "cccd", "address", "presence_status", "relationship",
+    "role", "full_name", "birth_date_or_year", "cccd", "address", "presence_status",
+    "represented_person", "relationship",
 )
 
 
@@ -102,6 +103,9 @@ def _normalize_entity(item: dict[str, Any], fields: tuple[str, ...]) -> dict[str
         {
             "raw_block": str(item.get("raw_block") or "").strip(),
             "evidence_line_ids": [str(value) for value in item.get("evidence_line_ids", []) if value],
+            "source_block_id": str(item.get("source_block_id") or "").strip(),
+            "entity_id": str(item.get("entity_id") or item.get("source_block_id") or "").strip(),
+            "source_region": str(item.get("source_region") or "").strip(),
             "needs_review": bool(item.get("needs_review", False)),
             "warnings": [str(value) for value in item.get("warnings", []) if value],
         }

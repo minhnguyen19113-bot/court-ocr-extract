@@ -135,7 +135,9 @@ python -m court_ocr_extract.cli extract --ocr-cache outputs\ocr_cache --output o
 python -m scripts.qa_output --excel outputs\excel\pilot_10.xlsx
 ```
 
-Excel output chính là sheet đầu `FINAL_EXCEL`, chỉ có đúng 11 cột nghiệp vụ trong `FINAL_EXCEL_COLUMNS`. `SOURCE_CASE_ID`, source page/line IDs, confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` chỉ nằm trong debug sheets/QA report phía sau, không được thêm vào final sheet.
+Excel output chính là sheet đầu `FINAL_EXCEL`, chỉ có đúng 11 cột nghiệp vụ trong `FINAL_EXCEL_COLUMNS` và chỉ chứa primary procedural roles. Sheet thứ hai `NGUOI_THAM_GIA_KHAC` giữ guardian/representative/defense/protection/witness/support roles cho người dùng; court roles chỉ nằm trong debug. `SOURCE_CASE_ID`, source page/line IDs, confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` không được thêm vào final sheet.
+
+Với án hình sự, `QUAN HỆ PHÁP LUẬT` để trống cho đến khi có explicit charge phrase từ decision-tail cache; không fallback thành `Hình sự`. Quy trình VM từng case và safe preprocess flags nằm trong `docs/RUNBOOK_EZYCLOUDX.md`.
 
 ## Real-Data Pilot And Full Run
 
@@ -170,6 +172,10 @@ python -m court_ocr_extract.cli zip-debug-visual --run-id latest --output output
 - QA report does not expose sensitive data.
 
 Do not call the pipeline production-ready until the Project Owner has reviewed and accepted real-data pilot outputs.
-# Pre-content extraction A/B
+## Pre-content Extraction và Decision Tail
 
-Nhánh thử nghiệm `compare-pre-content` so sánh hybrid rule+Local LLM với Local LLM-only trên filtered OCR trước `NỘI DUNG VỤ ÁN`. Đây chưa phải quyết định production; rule-only chỉ dùng để debug và correction notice được route riêng.
+Baseline hiện tại của `compare-pre-content` là deterministic rule anchors/blocks; `rule_anchor_only` phải được duyệt trên một case trước khi bật Local LLM hoặc tăng batch. Pre-content giữ mọi line trước `NỘI DUNG VỤ ÁN`; page limit chỉ là fallback khi marker vắng.
+
+Sau khi hai sheet user-facing của case đầu đạt, command Surya-only `ocr-decision-tail` có thể scan ngược theo batch và cache phần từ `QUYẾT ĐỊNH` đến cuối tài liệu. Rerun `compare-pre-content --decision-tail-cache-dir <dir>` để điền explicit charges mà không OCR lại phần đầu. Legacy `hybrid_rule_llm`/`llm_only` chỉ dùng khi gọi rõ để benchmark.
+
+Production extraction chỉ dùng hai source region: `front_pre_content` và `decision_tail`; toàn bộ narrative/reasoning ở giữa là `middle_excluded` và không được dùng làm fallback. `QUAN HỆ PHÁP LUẬT` chỉ lấy từ explicit verdict charge trong `decision_tail`: dòng `Bị cáo` dùng charge map theo đúng defendant `entity_id`, còn primary role không phải bị cáo dùng `case_charges`. Giá trị thiếu hoặc ambiguous để trống kèm ghi chú review; không fallback thành `Hình sự`, không tự OCR toàn văn bản và không dùng LLM để suy tội danh.

@@ -9,12 +9,22 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from court_ocr_extract.final_excel_builder import make_final_excel_row
+from court_ocr_extract.final_excel_role_policy import (
+    classify_final_role,
+    normalized_row_identity,
+)
 from court_ocr_extract.final_excel_schema import (
     FINAL_EXCEL_COLUMNS,
     FINAL_EXCEL_SHEET_NAME,
 )
 from court_ocr_extract.extractors.rule_parser import parse_vietnamese_date
-from court_ocr_extract.models import ExtractionResult, Participant
+from court_ocr_extract.models import ExtractionResult
+from court_ocr_extract.other_participants_builder import (
+    OTHER_PARTICIPANT_COLUMNS,
+    OTHER_PARTICIPANTS_SHEET_NAME,
+    make_other_participant_row,
+)
+from court_ocr_extract.source_region_policy import FRONT_PRE_CONTENT
 from court_ocr_extract.validation import row_needs_review
 
 
@@ -23,12 +33,24 @@ EXCEL_HEADERS = FINAL_EXCEL_COLUMNS
 
 def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
     case = payload.get("case") or {}
-    participants = payload.get("participants") or [
-        {"warnings": ["No participant row extracted."]}
-    ]
+    participants = payload.get("participants") or []
     rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
     document_note = "; ".join(payload.get("document_warnings", []))
     for participant in participants:
+        if str(participant.get("source_region") or "") not in {"", FRONT_PRE_CONTENT}:
+            continue
+        decision = classify_final_role(participant.get("procedural_role"))
+        if not decision.include_in_final:
+            continue
+        identity = normalized_row_identity(
+            case_id,
+            participant.get("full_name"),
+            decision.normalized_role,
+        )
+        if participant.get("full_name") and identity in seen:
+            continue
+        seen.add(identity)
         participant_note = "; ".join(participant.get("warnings", []))
         note = "; ".join(item for item in [document_note, participant_note] if item)
         row = _complete_final_row(
@@ -37,7 +59,7 @@ def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, A
                 "SỐ THỤ LÝ": case.get("filing_number"),
                 "NGÀY THỤ LÝ (DD/MM/YYYY)": case.get("filing_date"),
                 "QUAN HỆ PHÁP LUẬT": case.get("legal_relationship"),
-                "TƯ CÁCH TỐ TỤNG": participant.get("procedural_role"),
+                "TƯ CÁCH TỐ TỤNG": decision.normalized_role,
                 "HỌ TÊN ĐƯƠNG SỰ": participant.get("full_name"),
                 "NĂM SINH": participant.get("birth_year"),
                 "CCCD": participant.get("id_number"),
@@ -53,12 +75,23 @@ def rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, A
 
 
 def rows_from_result(result: ExtractionResult) -> list[dict[str, str]]:
-    participants = result.participants or [
-        Participant(ghi_chu="Không nhận diện được người tham gia tố tụng")
-    ]
-    rows: list[dict[str, str | None]] = []
+    participants = result.participants
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    case_id = result.source_file or ""
     common_note = "; ".join(result.warnings)
     for participant in participants:
+        decision = classify_final_role(participant.tu_cach_to_tung)
+        if not decision.include_in_final:
+            continue
+        identity = normalized_row_identity(
+            case_id,
+            participant.ho_ten,
+            decision.normalized_role,
+        )
+        if participant.ho_ten and identity in seen:
+            continue
+        seen.add(identity)
         note = "; ".join(item for item in [participant.ghi_chu, common_note] if item)
         rows.append(
             _complete_final_row(
@@ -67,7 +100,7 @@ def rows_from_result(result: ExtractionResult) -> list[dict[str, str]]:
                     "SỐ THỤ LÝ": result.case_info.so_thu_ly,
                     "NGÀY THỤ LÝ (DD/MM/YYYY)": result.case_info.ngay_thu_ly,
                     "QUAN HỆ PHÁP LUẬT": result.case_info.quan_he_phap_luat,
-                    "TƯ CÁCH TỐ TỤNG": participant.tu_cach_to_tung,
+                    "TƯ CÁCH TỐ TỤNG": decision.normalized_role,
                     "HỌ TÊN ĐƯƠNG SỰ": participant.ho_ten,
                     "NĂM SINH": participant.nam_sinh,
                     "CCCD": participant.cccd,
@@ -75,6 +108,80 @@ def rows_from_result(result: ExtractionResult) -> list[dict[str, str]]:
                     "HỌ TÊN CHỦ TỌA": result.case_info.chu_toa,
                 },
                 notes=[note],
+            )
+        )
+    return rows
+
+
+def other_rows_from_payload(case_id: str, payload: dict[str, Any]) -> list[dict[str, str]]:
+    case = payload.get("case") or {}
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, participant in enumerate(payload.get("participants") or []):
+        if str(participant.get("source_region") or "") not in {"", FRONT_PRE_CONTENT}:
+            continue
+        decision = classify_final_role(participant.get("procedural_role"))
+        if not decision.include_in_other:
+            continue
+        full_name = participant.get("full_name")
+        identity = normalized_row_identity(case_id, full_name, decision.normalized_role)
+        if full_name and identity in seen:
+            continue
+        seen.add(identity if full_name else (*identity[:2], f"{identity[2]}:{index}"))
+        notes = [
+            "; ".join(participant.get("warnings", [])),
+            participant.get("relationship_or_note") or participant.get("relationship"),
+        ]
+        if decision.category == "other_unclassified":
+            notes.append("Tư cách cần review")
+        rows.append(
+            make_other_participant_row(
+                {
+                    "LOẠI ÁN": case.get("case_type"),
+                    "SỐ THỤ LÝ": case.get("filing_number"),
+                    "TƯ CÁCH TỐ TỤNG": participant.get("procedural_role"),
+                    "HỌ TÊN": full_name,
+                    "NGƯỜI ĐƯỢC ĐẠI DIỆN/BẢO VỆ": participant.get(
+                        "represented_person"
+                    ),
+                    "ĐỊA CHỈ": participant.get("address"),
+                    "TÌNH TRẠNG THAM GIA": participant.get("presence_status"),
+                },
+                notes=notes,
+            )
+        )
+    return rows
+
+
+def other_rows_from_result(result: ExtractionResult) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    case_id = result.source_file or ""
+    for index, participant in enumerate(result.participants):
+        decision = classify_final_role(participant.tu_cach_to_tung)
+        if not decision.include_in_other:
+            continue
+        identity = normalized_row_identity(
+            case_id,
+            participant.ho_ten,
+            decision.normalized_role,
+        )
+        if participant.ho_ten and identity in seen:
+            continue
+        seen.add(identity if participant.ho_ten else (*identity[:2], f"{identity[2]}:{index}"))
+        notes = [participant.ghi_chu]
+        if decision.category == "other_unclassified":
+            notes.append("Tư cách cần review")
+        rows.append(
+            make_other_participant_row(
+                {
+                    "LOẠI ÁN": result.case_info.loai_an,
+                    "SỐ THỤ LÝ": result.case_info.so_thu_ly,
+                    "TƯ CÁCH TỐ TỤNG": participant.tu_cach_to_tung,
+                    "HỌ TÊN": participant.ho_ten,
+                    "ĐỊA CHỈ": participant.dia_chi,
+                },
+                notes=notes,
             )
         )
     return rows
@@ -96,6 +203,13 @@ def write_excel(
         for row in rows_from_payload(draft["case_id"], draft["payload"]):
             data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
     format_final_excel_sheet(data_sheet)
+
+    other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
+    other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
+    for draft in draft_records:
+        for row in other_rows_from_payload(draft["case_id"], draft["payload"]):
+            other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
+    format_other_participants_sheet(other_sheet)
 
     summary_sheet = workbook.create_sheet("RUN_SUMMARY")
     summary = run_summary or build_run_summary(draft_records)
@@ -122,6 +236,12 @@ def write_excel_from_results(
         for row in rows_from_result(result):
             data_sheet.append([row.get(header) for header in EXCEL_HEADERS])
     format_final_excel_sheet(data_sheet)
+    other_sheet = workbook.create_sheet(OTHER_PARTICIPANTS_SHEET_NAME)
+    other_sheet.append(OTHER_PARTICIPANT_COLUMNS)
+    for result in results:
+        for row in other_rows_from_result(result):
+            other_sheet.append([row[column] for column in OTHER_PARTICIPANT_COLUMNS])
+    format_other_participants_sheet(other_sheet)
     workbook.save(output_path)
     return output_path
 
@@ -156,6 +276,22 @@ def format_final_excel_sheet(sheet) -> None:
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
     widths = [16, 20, 22, 32, 28, 28, 12, 18, 48, 28, 44]
+    for index, width in enumerate(widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+
+
+def format_other_participants_sheet(sheet) -> None:
+    header_fill = PatternFill("solid", fgColor="E2F0D9")
+    for cell in sheet[1]:
+        cell.fill = header_fill
+        cell.font = Font(bold=True, color="000000")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for row in sheet.iter_rows(min_row=2):
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+    widths = [16, 20, 38, 28, 36, 44, 24, 44]
     for index, width in enumerate(widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
     sheet.freeze_panes = "A2"
@@ -205,10 +341,7 @@ def _complete_final_row(
         notes.append("Thiếu ngày thụ lý")
     if not values.get("QUAN HỆ PHÁP LUẬT"):
         if "hình sự" in str(values.get("LOẠI ÁN") or "").casefold():
-            values["QUAN HỆ PHÁP LUẬT"] = "Hình sự"
-            notes.append(
-                "Chưa xác định tội danh/quan hệ pháp luật chi tiết từ pre-content"
-            )
+            notes.append("Chưa trích xuất tội danh")
         else:
             notes.append("Không xác định chắc quan hệ pháp luật")
     if not values.get("TƯ CÁCH TỐ TỤNG"):

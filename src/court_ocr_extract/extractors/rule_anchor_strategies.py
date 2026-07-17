@@ -70,8 +70,23 @@ def run_rule_anchor_strategy(
         rule_entities = rule_output.get(kind, [])
         output_entities = output.get(kind, [])
         for index, block in enumerate(blocks):
-            rule_entity = rule_entities[index] if index < len(rule_entities) else None
-            current = output_entities[index] if index < len(output_entities) else None
+            block_id = str(block.get("block_id") or "")
+            rule_entity = next(
+                (
+                    entity
+                    for entity in rule_entities
+                    if str(entity.get("source_block_id") or "") == block_id
+                ),
+                rule_entities[index] if index < len(rule_entities) else None,
+            )
+            current = next(
+                (
+                    entity
+                    for entity in output_entities
+                    if str(entity.get("source_block_id") or "") == block_id
+                ),
+                output_entities[index] if index < len(output_entities) else None,
+            )
             if strategy == "rule_then_llm_per_block" and not _needs_repair(kind, rule_entity):
                 continue
             try:
@@ -206,6 +221,10 @@ def _entity_from_payload(payload: dict[str, Any], kind: str, block: dict[str, An
         entity["evidence_line_ids"] = list(block.get("line_ids", []))
     if entity is not None and not entity.get("raw_block"):
         entity["raw_block"] = str(block.get("text") or "")
+    if entity is not None:
+        entity["source_block_id"] = str(block.get("block_id") or "")
+        entity["entity_id"] = str(block.get("block_id") or "")
+        entity["split_reason"] = str(block.get("split_reason") or "")
     if entity is not None and kind == "participants":
         entity["relationship_or_note"] = entity.get("relationship")
     return entity

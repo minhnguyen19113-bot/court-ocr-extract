@@ -1,5 +1,19 @@
 # Testing
 
+## Front/Decision Source và Legal Relationship Tests
+
+Mười một modules bắt buộc kiểm source allowlist, middle exclusion, quoted/unquoted explicit verdict, multi-defendant mapping, no-statute inference, defendant-specific relationship, non-defendant case relationship, ambiguous mapping, same-person/different-role rows, workbook/HTML source audit và no-full-document fallback. Integrated fixture có ba front defendants, một victim, hai charges, một người có hai role và misleading middle charge text; toàn bộ là synthetic.
+
+Reverse scan test còn buộc `max_scan_pages` dương/hữu hạn. Charge evidence hợp lệ phải là `decision_tail`; middle evidence không được vào final relationship. Full suite sau task: 242/242 passed, một warning deprecation từ dependency Surya/Pydantic. Kết quả này chỉ chứng minh schema/control-flow, không chứng minh chất lượng OCR/extraction thật.
+
+## Final Role, Boundary và Decision Tail Tests
+
+Mười hai modules bắt buộc kiểm marker page 4/8, fallback khi thiếu marker, trial-panel isolation, embedded defendant intro, strong identity validator, nhiều metadata anchors cùng dòng, acceptance-date binding, primary role allowlist, other-participant sheet, safe multi-person split, role-aware dedupe, blank criminal relationship, reverse tail scan và explicit charge phrases. `test_decision_tail_reverse_scan.py` còn khóa CLI không chấp nhận Tesseract/backend khác.
+
+Tất cả input là OCR lines, cache records, page objects hoặc text synthetic; reverse scan dùng fake callable. Không test nào mở PDF thật, đọc cache/output thật, gọi Surya/LLM/Docker/cloud hoặc dùng allowlist tên người/file/page của một case thật.
+
+Focused regression sau hardening: 8/8 passed. Full suite cuối task: 226/226 passed; warning duy nhất là Pydantic deprecation từ dependency `surya`.
+
 ## Final Excel schema tests
 
 Năm modules `test_final_excel_*.py` kiểm đúng 11 cột/thứ tự, final row builder, cấu trúc synthetic 6 defendant + 4 participant, sheet đầu `FINAL_EXCEL`, không có cột thừa, HTML preview đứng trước debug, rule-only/rule-then strategy và missing-data notes. Fixtures chỉ dùng identity/case/address synthetic; không đọc PDF/cache/Excel/output thật và không gọi LLM/Surya/Docker/cloud.
@@ -34,7 +48,7 @@ Mười một test modules `test_rule_anchor_*.py` với 23 cases dùng OCR-line
 - `tests/test_surya_runtime_no_hang_diagnostics.py` kiểm `last_stage` và `SuryaRuntimeError` khi startup timeout.
 - Unit suite không được gọi Docker server, GPU container hoặc Surya inference thật.
 
-Last updated: 2026-07-14
+Last updated: 2026-07-17
 
 ## Allowed In Codex
 

@@ -1,5 +1,33 @@
 # Tasks
 
+## FRONT + DECISION ONLY SOURCE POLICY AND ROW-SPECIFIC LEGAL RELATIONSHIP
+
+- [x] Tạo canonical `source_region_policy.py` với front/decision allowlist và middle exclusion.
+- [x] Gắn `entity_id`/`source_region` vào front entities, field evidence và decision-tail lines.
+- [x] Chuẩn hóa `ChargeEvidence`, parser quoted/unquoted explicit verdict và entity-ID mapping có ambiguity guard cấu hình.
+- [x] Khóa final mapping: bị cáo dùng specific charges, primary role khác dùng case charges, thiếu/ambiguous để trống có note.
+- [x] Cấm reverse scan không giới hạn; không có full-document fallback khi decision heading vắng.
+- [x] Thêm `CHARGES`, `DEFENDANT_CHARGES`, `SOURCE_REGION_AUDIT`, `CHARGE_WARNINGS` và đúng thứ tự HTML review.
+- [x] Thêm 11 test modules bắt buộc cùng synthetic integrated fixture; full suite 242/242 passed.
+- [ ] Project Owner chạy cache-only front review cho đúng một case trên VM và duyệt source audit/final role mapping.
+- [ ] Chỉ sau khi front đạt, chạy decision-tail OCR giới hạn cho case đó rồi review từng defendant charge mapping.
+- [ ] Không tăng batch trước khi case đầu được chấp nhận; không dùng LLM để sửa/suy tội danh.
+
+## FINAL EXCEL PRIMARY ROLE + BOUNDARY + DECISION CHARGE
+
+- [x] Sửa marker boundary để page limit chỉ là fallback khi không tìm thấy stop heading.
+- [x] Cô lập defendant region, bỏ numbered-line fallback toàn văn bản, chặn trial panel/metadata/participant overlap và giữ rejection diagnostics.
+- [x] Parse độc lập nhiều metadata anchors cùng dòng; ràng buộc ngày thụ lý vào đúng number token sau anchor.
+- [x] Tạo canonical role policy, giữ `FINAL_EXCEL` đúng sáu primary roles và dedupe theo case + name + role.
+- [x] Thêm sheet user-facing `NGUOI_THAM_GIA_KHAC` sau `FINAL_EXCEL`; không xóa debug sheet `PARTICIPANTS`.
+- [x] Split an toàn nhiều person trong support-role block khi có nhiều honorific starts và không có address/organization marker.
+- [x] Bỏ generic criminal relationship fallback; chỉ điền từ explicit charge phrases.
+- [x] Thêm Surya-only `ocr-decision-tail`, reverse batch scan, cache riêng, configurable guard và explicit charge parser có evidence.
+- [x] Thêm/cập nhật 12 test modules bắt buộc cùng CLI no-fallback guard; chỉ dùng synthetic fixtures.
+- [ ] Project Owner rerun extraction cache-only cho 1 case và duyệt hai sheet user-facing.
+- [ ] Chỉ sau khi bước trên đạt, Project Owner chạy decision-tail OCR cho 1 case rồi rerun extraction với tail cache.
+- [ ] Không chạy 3/9 PDF trước khi case đầu đạt.
+
 ## FINAL EXCEL SCHEMA FIRST REALIGNMENT
 
 - [x] Audit toàn repo và xác nhận không có bộ final columns cạnh tranh với 11 cột được duyệt.
@@ -10,7 +38,7 @@
 - [x] Đặt `FINAL EXCEL PREVIEW` 11 cột trước mọi debug section trong HTML review.
 - [x] Thêm năm test modules bắt buộc và cập nhật writer contract cũ.
 - [x] Chạy full suite: 199/199 test passed; các static/architecture/repo checks đều passed.
-- [ ] Project Owner chạy rule-only trên `case_001`, review 10 dòng người và xác nhận mapping thật.
+- [ ] Project Owner chạy rule-only trên case đầu, review role-filtered `FINAL_EXCEL` cùng `NGUOI_THAM_GIA_KHAC` và xác nhận mapping thật; không dùng kỳ vọng số dòng lịch sử.
 
 ## FIX RULE ANCHOR METADATA + PARTICIPANT SPLITTER CASE001
 

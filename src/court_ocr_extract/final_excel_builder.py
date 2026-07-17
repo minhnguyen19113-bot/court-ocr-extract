@@ -6,15 +6,20 @@ from typing import Any
 
 from court_ocr_extract.extractors.pre_content_anchor_segmenter import fold_text
 from court_ocr_extract.extractors.rule_parser import extract_identity_number, parse_vietnamese_date
+from court_ocr_extract.final_excel_role_policy import (
+    classify_final_role,
+    normalized_row_identity,
+)
 from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
+from court_ocr_extract.source_region_policy import DECISION_TAIL, FRONT_PRE_CONTENT
 
 
 CRIMINAL_FIRST_INSTANCE = "Hình sự sơ thẩm"
 
 
 def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[str, str]]:
-    metadata = _mapping(extraction_result.get("metadata"))
-    trial_panel = _mapping(extraction_result.get("trial_panel"))
+    metadata = _front_group(extraction_result, "metadata")
+    trial_panel = _front_group(extraction_result, "trial_panel")
     common_notes: list[str] = []
 
     case_type = _final_case_type(extraction_result, metadata)
@@ -29,14 +34,9 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
     if not acceptance_date:
         common_notes.append("Thiếu ngày thụ lý")
 
-    legal_relationship = _legal_relationship(extraction_result, metadata)
-    if not legal_relationship and case_type == CRIMINAL_FIRST_INSTANCE:
-        legal_relationship = "Hình sự"
-        common_notes.append(
-            "Chưa xác định tội danh/quan hệ pháp luật chi tiết từ pre-content"
-        )
-    elif not legal_relationship:
-        common_notes.append("Không xác định chắc quan hệ pháp luật")
+    case_charges = _case_charges(extraction_result)
+    defendant_charge_map = _defendant_charge_map(extraction_result, case_charges)
+    decision_tail_status = _text(extraction_result.get("decision_tail_status"))
 
     presiding_judge = _text(trial_panel.get("presiding_judge"))
     if not presiding_judge:
@@ -51,21 +51,39 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
     entities: list[tuple[str, Mapping[str, Any], bool]] = [
         ("Bị cáo", _mapping(item), True)
         for item in _items(extraction_result.get("defendants"))
+        if _mapping(item).get("entity_valid", True) is not False
+        and _entity_is_front(_mapping(item))
     ]
-    entities.extend(
-        (_text(_mapping(item).get("role")), _mapping(item), False)
-        for item in _items(extraction_result.get("participants"))
-    )
-    if not entities:
-        entities = [("", {}, False)]
+    for item in _items(extraction_result.get("participants")):
+        entity = _mapping(item)
+        decision = classify_final_role(entity.get("role"))
+        if decision.include_in_final and _entity_is_front(entity):
+            entities.append((decision.normalized_role, entity, False))
 
     rows: list[dict[str, str]] = []
-    for role, entity, is_defendant in entities:
+    seen: set[tuple[str, str, str]] = set()
+    case_id = _text(extraction_result.get("case_id"))
+    for entity_index, (role, entity, is_defendant) in enumerate(entities):
         notes = list(common_notes)
         full_name = _text(entity.get("full_name"))
+        identity = normalized_row_identity(case_id, full_name, role)
+        if full_name and identity in seen:
+            continue
+        seen.add(identity if full_name else (*identity[:2], f"{identity[2]}:{entity_index}"))
         birth_year = _birth_year(entity.get("birth_date_or_year"))
         identity_number = _identity_number(entity)
         address = _entity_address(entity, defendant=is_defendant)
+        legal_relationship, relationship_notes = _row_legal_relationship(
+            role=role,
+            entity=entity,
+            entity_index=entity_index,
+            is_defendant=is_defendant,
+            criminal_case=case_type == CRIMINAL_FIRST_INSTANCE,
+            case_charges=case_charges,
+            defendant_charge_map=defendant_charge_map,
+            decision_tail_status=decision_tail_status,
+        )
+        notes.extend(relationship_notes)
 
         if not role:
             notes.append("Thiếu tư cách tố tụng")
@@ -155,6 +173,8 @@ def _acceptance_date(
     metadata: Mapping[str, Any],
     acceptance_number: str,
 ) -> str:
+    if not acceptance_number:
+        return ""
     direct = parse_vietnamese_date(_text(metadata.get("case_acceptance_date")))
     if direct:
         return direct
@@ -177,30 +197,126 @@ def _acceptance_date(
 
 
 def _date_after_acceptance_number(text: str, acceptance_number: str) -> str:
-    tail = text
-    if acceptance_number and acceptance_number in text:
-        tail = text.split(acceptance_number, 1)[1]
+    if not acceptance_number:
+        return ""
+    normalized_text = re.sub(r"\s*/\s*", "/", text)
+    if acceptance_number not in normalized_text:
+        return ""
+    tail = normalized_text.split(acceptance_number, 1)[1]
     return parse_vietnamese_date(tail) or ""
 
 
-def _legal_relationship(
-    extraction_result: Mapping[str, Any],
-    metadata: Mapping[str, Any],
-) -> str:
-    direct = _text(metadata.get("legal_relationship"))
-    if direct:
-        return direct
-    anchor = _mapping(extraction_result.get("anchor_segments"))
-    for line in _items(anchor.get("metadata_lines")):
-        text = _text(_mapping(line).get("text"))
-        match = re.search(
-            r"(?:Quan\s+hệ\s+pháp\s+luật|Tội\s+danh)\s*[:：]\s*([^;\n]+)",
-            text,
-            re.IGNORECASE,
+def _case_charges(extraction_result: Mapping[str, Any]) -> list[str]:
+    charge_output = _mapping(extraction_result.get("charge_output"))
+    evidence = [
+        _mapping(item)
+        for item in _items(charge_output.get("charge_evidence"))
+        if _text(_mapping(item).get("source_region")) == DECISION_TAIL
+    ]
+    allowed_charge_keys = {
+        _text(item.get("charge")).casefold()
+        for item in evidence
+        if _text(item.get("charge"))
+    }
+    if not allowed_charge_keys:
+        return []
+    charges = _items(extraction_result.get("case_charges")) or _items(
+        charge_output.get("case_charges")
+    )
+    return list(
+        dict.fromkeys(
+            _text(value)
+            for value in charges
+            if _text(value).casefold() in allowed_charge_keys
         )
-        if match:
-            return _text(match.group(1))
-    return ""
+    )
+
+
+def _defendant_charge_map(
+    extraction_result: Mapping[str, Any],
+    case_charges: list[str],
+) -> Mapping[str, Any]:
+    direct = _mapping(extraction_result.get("defendant_charge_map"))
+    source = direct or _mapping(
+        _mapping(extraction_result.get("charge_output")).get("defendant_charge_map")
+    )
+    allowed = {value.casefold() for value in case_charges}
+    return {
+        str(entity_id): [
+            _text(value)
+            for value in _items(values)
+            if _text(value).casefold() in allowed
+        ]
+        for entity_id, values in source.items()
+    }
+
+
+def _front_group(
+    extraction_result: Mapping[str, Any],
+    group_name: str,
+) -> dict[str, Any]:
+    values = dict(_mapping(extraction_result.get(group_name)))
+    if _text(values.get("source_region")) not in {"", FRONT_PRE_CONTENT}:
+        return {}
+    field_meta = _mapping(extraction_result.get("field_meta"))
+    for field in list(values):
+        meta = _mapping(field_meta.get(f"{group_name}.{field}"))
+        region = _text(meta.get("source_region"))
+        if region and region != FRONT_PRE_CONTENT:
+            values[field] = None
+    return values
+
+
+def _entity_is_front(entity: Mapping[str, Any]) -> bool:
+    return _text(entity.get("source_region")) in {"", FRONT_PRE_CONTENT}
+
+
+def _row_legal_relationship(
+    *,
+    role: str,
+    entity: Mapping[str, Any],
+    entity_index: int,
+    is_defendant: bool,
+    criminal_case: bool,
+    case_charges: list[str],
+    defendant_charge_map: Mapping[str, Any],
+    decision_tail_status: str,
+) -> tuple[str, list[str]]:
+    if not criminal_case:
+        return "", ["Không xác định chắc quan hệ pháp luật"]
+
+    notes: list[str] = []
+    if decision_tail_status == "heading_not_found":
+        notes.append(
+            "Không tìm thấy phần Quyết định trong phạm vi OCR cuối văn bản"
+        )
+
+    defendant_specific = is_defendant or fold_text(role) in {
+        "bi cao",
+        "phap nhan thuong mai bi cao",
+    }
+    if defendant_specific:
+        entity_id = _text(
+            entity.get("entity_id")
+            or entity.get("source_block_id")
+            or f"defendant_{entity_index + 1:03d}"
+        )
+        charges = [
+            _text(value)
+            for value in _items(defendant_charge_map.get(entity_id))
+            if _text(value)
+        ]
+        if charges:
+            return "; ".join(dict.fromkeys(charges)), notes
+        notes.append(
+            "Chưa gắn chắc tội danh với bị cáo từ phần Quyết định"
+        )
+        return "", notes
+
+    if case_charges:
+        return "; ".join(case_charges), notes
+    notes.append("Chưa trích xuất được tội danh từ phần Quyết định")
+    return "", notes
 
 
 def _birth_year(value: Any) -> str:

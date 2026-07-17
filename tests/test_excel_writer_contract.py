@@ -22,7 +22,7 @@ def test_canonical_writer_creates_draft_workbook_contract(tmp_path):
                 },
                 "participants": [
                     {
-                        "procedural_role": "Vai trò synthetic",
+                        "procedural_role": "Bị hại",
                         "full_name": "Người kiểm tra synthetic",
                     }
                 ],
@@ -33,7 +33,11 @@ def test_canonical_writer_creates_draft_workbook_contract(tmp_path):
     result_path = write_excel(drafts, output_path)
     workbook = load_workbook(result_path, read_only=True)
 
-    assert workbook.sheetnames == ["FINAL_EXCEL", "RUN_SUMMARY"]
+    assert workbook.sheetnames == [
+        "FINAL_EXCEL",
+        "NGUOI_THAM_GIA_KHAC",
+        "RUN_SUMMARY",
+    ]
     assert [cell.value for cell in workbook["FINAL_EXCEL"][1]] == EXCEL_HEADERS
     assert workbook["FINAL_EXCEL"].max_row == 2
 
@@ -47,7 +51,7 @@ def test_canonical_writer_creates_typed_result_workbook_contract(tmp_path):
         ),
         participants=[
             Participant(
-                tu_cach_to_tung="Vai trò synthetic",
+                tu_cach_to_tung="Bị hại",
                 ho_ten="Người kiểm tra synthetic",
             )
         ],
@@ -56,6 +60,6 @@ def test_canonical_writer_creates_typed_result_workbook_contract(tmp_path):
     result_path = write_excel_from_results([result], output_path)
     workbook = load_workbook(result_path, read_only=True)
 
-    assert workbook.sheetnames == ["FINAL_EXCEL"]
+    assert workbook.sheetnames == ["FINAL_EXCEL", "NGUOI_THAM_GIA_KHAC"]
     assert [cell.value for cell in workbook["FINAL_EXCEL"][1]] == EXCEL_HEADERS
     assert workbook["FINAL_EXCEL"].max_row == 2

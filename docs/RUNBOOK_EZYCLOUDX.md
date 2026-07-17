@@ -25,8 +25,8 @@ Sau khi `ok=true`, chạy một case:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
-  --input-dir data\test_pdfs\pre_content_9 `
-  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
+  --input-dir data\raw_pdfs\pilot_one `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_1 `
   --output-dir outputs\pre_content_rule_anchor_check_1 `
   --strategies rule_anchor_only,rule_then_llm_per_block `
   --require-llm --limit 1 --open
@@ -40,7 +40,7 @@ Command `ocr` mặc định scan từng page và dừng sau page chứa `NỘI D
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli ocr `
-  --input-dir data\test_pdfs\pre_content_9 `
+  --input-dir data\raw_pdfs\pilot_one `
   --limit 1 `
   --cache-dir outputs\ocr_cache_pre_content_early_stop_1 `
   --ocr-backend surya `
@@ -344,34 +344,57 @@ Khong sua `.venv\Lib\site-packages` thu cong. Project tu resolve Docker qua `SUR
 ```
 
 OCR review Mode 3 nen dung suppression/filter balanced. Kiem tra raw, filtered, excluded lines, suppression mask va OCR input trong HTML review. Neu balanced con doc dau moc, review aggressive rieng; khong auto-correct ten nguoi hay noi dung bang heuristic.
-## Chạy pre-content rule anchor trên VM
+## Chạy Front + Decision Source và Legal Relationship trên VM
 
-Đặt PDF local tại `data\test_pdfs\pre_content_9` và dùng OCR cache early-stop đã duyệt. Sau bản vá metadata/participant, chạy `rule_anchor_only` cho 1 case trước:
+Đầu tiên rerun extraction từ OCR cache early-stop cũ cho đúng một case. Command này không đọc source PDF, không OCR và không bật LLM:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
-  --input-dir data\test_pdfs\pre_content_9 `
-  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
-  --output-dir outputs\pre_content_final_excel_rule_only_check_1 `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_1 `
+  --output-dir outputs\front_decision_source_check_1 `
   --strategies rule_anchor_only `
   --limit 1 `
   --open
 ```
 
-Review sheet đầu `FINAL_EXCEL`: đúng 11 cột, 6 dòng `Bị cáo` + 4 participant, số/ngày thụ lý, chủ tọa, role dài, năm sinh và missing-data notes. Chỉ sau đó mới dùng `CASES`/`ANCHOR_*`/entity sheets để debug hoặc chạy rule + LLM:
+Review sheet đầu `FINAL_EXCEL` và sheet thứ hai `NGUOI_THAM_GIA_KHAC`. Kiểm marker-page content trước heading, số/ngày thụ lý, trial-panel không lọt thành defendant, stable `entity_id`, primary/support roles và blank charge note. `SOURCE_REGION_AUDIT` ở bước này chỉ được có front source cho các field front; chưa bật Local LLM.
+
+Chỉ khi bước trên đạt mới chạy decision-tail OCR cho đúng một case. Giữ Surya/vLLM container warm và dùng safe preprocess mode:
+
+```powershell
+.\.venv\Scripts\python.exe -m court_ocr_extract.cli ocr-decision-tail `
+  --input-dir data\raw_pdfs\pilot_one `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_1 `
+  --output-dir outputs\decision_tail_cache_pilot_one `
+  --ocr-backend surya `
+  --limit 1 `
+  --decision-tail-batch-size 4 `
+  --decision-tail-max-scan-pages 12 `
+  --use-preprocessed `
+  --deskew off `
+  --red-seal-removal on `
+  --red-removal-mode inpaint `
+  --text-enhance medium `
+  --preprocess-profile balanced `
+  --stamp-suppression balanced `
+  --stamp-erase-mode mask `
+  --ocr-stamp-filter balanced `
+  --surya-startup-timeout-seconds 900
+```
+
+Rerun extraction với tail cache; bước này không OCR lại phần đầu:
 
 ```powershell
 .\.venv\Scripts\python.exe -m court_ocr_extract.cli compare-pre-content `
-  --input-dir data\test_pdfs\pre_content_9 `
-  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_9 `
-  --output-dir outputs\pre_content_rule_anchor_check_1_fix `
-  --strategies rule_anchor_only,rule_then_llm_per_block `
-  --require-llm `
+  --ocr-cache-dir outputs\ocr_cache_pre_content_early_stop_1 `
+  --decision-tail-cache-dir outputs\decision_tail_cache_pilot_one `
+  --output-dir outputs\front_decision_legal_relationship_pilot_one `
+  --strategies rule_anchor_only `
   --limit 1 `
   --open
 ```
 
-Sau khi cả hai strategy đạt trên case đầu mới tăng `--limit 3` với output directory mới. Không commit PDF/output; correction notice phải xuất hiện trong `DOC_ROUTER` nhưng không tính như judgment benchmark. Muốn đối chiếu lịch sử mới truyền rõ `--strategies hybrid_rule_llm,llm_only`.
+Review `QUAN HỆ PHÁP LUẬT`, `CHARGES`, `DEFENDANT_CHARGES`, `SOURCE_REGION_AUDIT`, `CHARGE_WARNINGS` và HTML theo đúng thứ tự. Dòng bị cáo chỉ được có charge riêng của entity; primary role khác dùng toàn bộ case charges. Nếu heading vắng, tăng chủ động `--decision-tail-max-scan-pages` rồi chạy lại, không bật full-document fallback. Không tăng batch, không bật Local LLM và không đổi sang component/object erase trước khi case đầu được Project Owner chấp nhận. Không commit PDF, OCR cache hoặc output.
 ## Review stamp object erase
 
 `red_mask` chỉ chứng minh detector đã bắt pixel đỏ; residual xám vẫn có thể còn ngoài mask. Component/object erase chỉ dành cho thử nghiệm visual có chủ đích, không phải mode vận hành mặc định. Safe OCR phải dùng `--stamp-suppression balanced --stamp-erase-mode mask --ocr-stamp-filter balanced` để giảm nguy cơ xóa chữ thật.

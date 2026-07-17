@@ -1,5 +1,11 @@
 # Debug Output Spec
 
+## Role, Boundary và Charge Review
+
+Workbook compare phải đặt `FINAL_EXCEL` ở vị trí đầu, `NGUOI_THAM_GIA_KHAC` ở vị trí thứ hai rồi mới đến các debug sheets. `PARTICIPANTS` vẫn giữ raw structured participants. `ROLE_POLICY` ghi source group, role gốc/chuẩn hóa, category, quyết định include/exclude và reason. `CHARGES`, `DEFENDANT_CHARGES`, `SOURCE_REGION_AUDIT`, `CHARGE_WARNINGS` và legacy-compatible `CHARGE_EVIDENCE` giữ charge/evidence/mapping/source audit; không debug column nào được đưa vào `FINAL_EXCEL`.
+
+HTML index/per-case phải hiển thị theo thứ tự `FINAL EXCEL PREVIEW`, `NGƯỜI THAM GIA KHÁC`, `CHARGE SUMMARY`, `DEFENDANT → CHARGE MAP`, `SOURCE REGION AUDIT`, rồi mới đến debug section còn lại. Charge evidence được hiển thị từ decision tail; middle section content không được hiển thị trong các section mới. Terminal của decision-tail chỉ in case ID, số trang scan, heading found và warning count; không in OCR text.
+
 ## Final Excel preview trước debug
 
 Workbook compare phải đặt `FINAL_EXCEL` ở vị trí đầu tiên và sheet này chỉ có đúng 11 cột canonical. Tất cả sheet `SUMMARY`, `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `ANCHOR_*`, `LLM_STATUS`, `FIELD_LONG`, `EVIDENCE_LINES`, `RAW_JSON` và compare/validator sheets đều là debug phụ nằm sau.
@@ -25,7 +31,7 @@ OCR review phải hiển thị marker found/page/matched text/confidence, early-
 - Stage chuẩn: `stage_01_render_pdf`, `stage_02_preprocess`, `stage_03_resolve_docker`, `stage_04_patch_surya_resolver`, `stage_05_import_surya`, `stage_06_create_predictor`, `stage_07_predictor_call`, `stage_08_parse_predictions`.
 - Log terminal chỉ nêu trạng thái runtime, không in OCR text hoặc dữ liệu nhạy cảm.
 
-Last updated: 2026-07-14
+Last updated: 2026-07-17
 
 Debug output is mandatory for reviewer trust. It must be safe by default and should never print or expose full real OCR text in logs.
 

@@ -1,10 +1,40 @@
 # Pipeline Spec
 
+## Pre-content Boundary và Defendant Region Contract
+
+`segment_pre_content()` tìm stop heading trên toàn bộ filtered OCR lines trước. Nếu có heading, output là mọi line nằm strictly trước heading, không phụ thuộc `max_fallback_pages`; nếu không có heading mới giữ các line trong fallback page limit và ghi `pre_content_stop_heading_not_found_using_page_limit`.
+
+Defendant region cần intro normalized `Đối/Đồi với (các) bị cáo:` ở bất kỳ vị trí nào trong line. Metadata prefix trước intro vẫn thuộc metadata; region bắt đầu ở line kế tiếp, trừ inline value có strong identity evidence. Không được fallback từ toàn văn bản sang numbered line đầu tiên. Defendant block phải có full name và explicit label hoặc identity profile; line IDs overlap metadata-only/trial-panel/participant region bị reject với `defendant_block_overlaps_forbidden_region`.
+
+Metadata anchors `thụ lý số`, quyết định đưa vụ án ra xét xử và quyết định hoãn được kiểm tra bằng các nhánh độc lập. Acceptance number là token ngay sau anchor; acceptance date chỉ parse từ tail sau token này. Thiếu number thì date để trống và có `acceptance_date_blocked_missing_acceptance_number`.
+
+## Final Role và Other Participants Contract
+
+`FINAL_EXCEL` giữ nguyên 11 cột nhưng chỉ nhận `Bị cáo`, `Bị hại`, `Nguyên đơn dân sự`, `Bị đơn dân sự`, `Người có quyền lợi, nghĩa vụ liên quan` và `Pháp nhân thương mại bị cáo`, kể cả các alias được định nghĩa chính xác trong `final_excel_role_policy.py`. Không suy role chỉ vì một câu bất kỳ có chữ `liên quan`.
+
+Support roles được giữ trong sheet thứ hai `NGUOI_THAM_GIA_KHAC`; court procedural roles không phải final entity. Dedupe dùng case + normalized full name + normalized role. Multi-person support block chỉ split khi role cho phép, có nhiều honorific/name starts và không có address/organization marker; các entity con giữ cùng evidence IDs, represented person và relationship note.
+
+Criminal defendant row không có specific charge map phải để `QUAN HỆ PHÁP LUẬT` trống và thêm `Chưa gắn chắc tội danh với bị cáo từ phần Quyết định`. Primary role không phải bị cáo dùng toàn bộ `case_charges`; nếu chưa có charge thì để trống và thêm `Chưa trích xuất được tội danh từ phần Quyết định`. `Hình sự` chỉ được dùng trong `LOẠI ÁN`.
+
+## Source-region Contract
+
+Production chỉ chấp nhận `front_pre_content` và `decision_tail`. Các field loại án, thụ lý, role, identity, địa chỉ và chủ tọa là front-only. Tội danh và các field tuyên án là decision-only. Nội dung từ `NỘI DUNG VỤ ÁN`, tranh luận và `NHẬN ĐỊNH CỦA TÒA ÁN` thuộc `middle_excluded`; không được dùng để fill final field hoặc fallback khi hai vùng hợp lệ thiếu dữ liệu.
+
+Workflow là forward scan đến marker và reverse scan có giới hạn từ cuối đến decision heading. `scan_decision_tail()` bắt buộc nhận `max_scan_pages` dương, hữu hạn; thiếu guard phải fail rõ thay vì OCR toàn văn bản. Hết guard mà không thấy heading thì status là `heading_not_found`, relationship để trống và row có ghi chú ngắn tương ứng.
+
+## Decision Tail và Charge Contract
+
+`ocr-decision-tail` chỉ dùng Surya và tái sử dụng predictor runner. Stage bắt đầu từ cuối PDF, OCR theo batch page tăng dần trong từng batch nhưng các batch đi ngược về đầu, rồi dừng ở batch đầu tiên có normalized decision heading. Output chỉ giữ heading đến hết tài liệu và ghi cache riêng `DecisionTailRecord`; không sửa OCR cache pre-content cũ.
+
+`decision_tail_batch_size`, `decision_tail_max_scan_pages` và `decision_heading_variants` là cấu hình. Hết guard mà không có heading phải ghi `decision_heading_not_found_within_scan_limit`. Parser chỉ nhận explicit `Tuyên ... phạm tội`, `Xử phạt ... về tội` hoặc `Bị cáo ... phạm tội`; hỗ trợ quoted/unquoted charge có điểm dừng an toàn. Parser không suy từ điều luật, hành vi, cáo trạng, nhận định, tên file hoặc document type.
+
+`case_charges` unique theo thứ tự xuất hiện. `defendant_charge_map` dùng defendant `entity_id`; matching lần lượt exact normalized name, exact name sau honorific và unique fuzzy match qua `DECISION_NAME_MATCH_MIN_SCORE`/`DECISION_NAME_MATCH_AMBIGUITY_GAP`. Ambiguous hoặc collective không xác định chắc chỉ ghi warning, không gán charge và không tạo defendant mới. Dòng bị cáo chỉ dùng charge map riêng; primary role khác dùng `; `.join(case charges). Cùng người khác role vẫn là hai dòng độc lập.
+
 ## Final Excel schema contract
 
 `FINAL_EXCEL` là output nghiệp vụ chính và phải là sheet đầu tiên của mọi final workbook. Schema duy nhất là `FINAL_EXCEL_COLUMNS` trong `src/court_ocr_extract/final_excel_schema.py`, đúng 11 cột và đúng thứ tự Project Owner duyệt. Không được thêm source/evidence/confidence/strategy/JSON columns vào sheet này.
 
-`final_excel_builder.py` nhận rule-anchor output và tạo một dòng cho mỗi defendant/participant. Case type, số/ngày thụ lý, quan hệ pháp luật và chủ tọa được lặp trên từng dòng. Năm sinh chỉ giữ năm; CCCD/CMND chỉ nhận 9-12 chữ số liên tục sau label; defendant address ưu tiên current rồi permanent. Field thiếu để trống và thêm lý do vào `GHI CHÚ`; không suy đoán từ tên, địa chỉ hoặc số quyết định.
+`final_excel_builder.py` nhận rule-anchor output và tạo một dòng cho mỗi entity có primary role. Case type, số/ngày thụ lý, explicit legal relationship và chủ tọa được lặp trên từng dòng. Năm sinh chỉ giữ năm; CCCD/CMND chỉ nhận 9-12 chữ số liên tục sau label; defendant address ưu tiên current rồi permanent. Field thiếu để trống và thêm lý do vào `GHI CHÚ`; không suy đoán từ tên, địa chỉ hoặc số quyết định.
 
 Khi compare nhiều strategy, `FINAL_EXCEL` dùng primary strategy để tránh nhân đôi các dòng không có strategy column. `rule_anchor_only` hoặc `rule_then_llm_per_block` khi chạy riêng đều phải tạo final sheet. `CASES`, `DEFENDANTS`, `PARTICIPANTS`, `TRIAL_PANEL`, `ANCHOR_*`, `LLM_STATUS`, `RAW_JSON` và các sheet trace khác nằm sau và chỉ phục vụ debug.
 
