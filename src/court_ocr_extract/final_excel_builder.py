@@ -44,6 +44,7 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
 
     case_charges = _case_charges(extraction_result)
     defendant_charge_map = _defendant_charge_map(extraction_result, case_charges)
+    victim_charge_evidence = _victim_charge_evidence(extraction_result)
     decision_tail_status = _text(extraction_result.get("decision_tail_status"))
 
     presiding_judge = _text(trial_panel.get("presiding_judge"))
@@ -89,6 +90,7 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
             criminal_case=case_type == CRIMINAL_FIRST_INSTANCE,
             case_charges=case_charges,
             defendant_charge_map=defendant_charge_map,
+            victim_charge_evidence=victim_charge_evidence,
             decision_tail_status=decision_tail_status,
         )
         notes.extend(relationship_notes)
@@ -261,6 +263,18 @@ def _defendant_charge_map(
     }
 
 
+def _victim_charge_evidence(
+    extraction_result: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    charge_output = _mapping(extraction_result.get("charge_output"))
+    candidates = [
+        *_items(extraction_result.get("victim_charge_evidence")),
+        *_items(charge_output.get("victim_charge_evidence")),
+        *_items(charge_output.get("charge_evidence")),
+    ]
+    return [item for item in candidates if isinstance(item, Mapping)]
+
+
 def _front_group(
     extraction_result: Mapping[str, Any],
     group_name: str,
@@ -290,6 +304,7 @@ def _row_legal_relationship(
     criminal_case: bool,
     case_charges: list[str],
     defendant_charge_map: Mapping[str, Any],
+    victim_charge_evidence: list[Mapping[str, Any]],
     decision_tail_status: str,
 ) -> tuple[str, list[str]]:
     if not criminal_case:
@@ -323,10 +338,62 @@ def _row_legal_relationship(
         )
         return "", notes
 
+    if fold_text(role) == "bi hai":
+        charges = _victim_specific_charges(entity, victim_charge_evidence)
+        if charges:
+            return "; ".join(charges), notes
+        notes.append("Chưa xác định tội danh liên quan trực tiếp đến bị hại")
+        return "", notes
+
     if case_charges:
         return "; ".join(case_charges), notes
     notes.append("Chưa trích xuất được tội danh từ phần Quyết định")
     return "", notes
+
+
+def _victim_specific_charges(
+    entity: Mapping[str, Any],
+    evidence_items: list[Mapping[str, Any]],
+) -> list[str]:
+    entity_ids = {
+        value
+        for value in (
+            _text(entity.get("entity_id")),
+            _text(entity.get("source_block_id")),
+        )
+        if value
+    }
+    normalized_name = fold_text(_text(entity.get("full_name")))
+    charges: list[str] = []
+    for evidence in evidence_items:
+        if _text(evidence.get("source_region")) != DECISION_TAIL:
+            continue
+        evidence_ids = {
+            _text(value)
+            for value in (
+                evidence.get("victim_entity_id"),
+                *_items(evidence.get("victim_entity_ids")),
+            )
+            if _text(value)
+        }
+        evidence_names = {
+            fold_text(_text(value))
+            for value in (
+                evidence.get("normalized_victim_name"),
+                evidence.get("victim_name"),
+                *_items(evidence.get("victim_names")),
+            )
+            if _text(value)
+        }
+        matched = bool(entity_ids.intersection(evidence_ids)) or bool(
+            normalized_name and normalized_name in evidence_names
+        )
+        if not matched:
+            continue
+        charge = _text(evidence.get("normalized_charge") or evidence.get("charge"))
+        if charge and charge not in charges:
+            charges.append(charge)
+    return charges
 
 
 def _birth_year(value: Any) -> str:

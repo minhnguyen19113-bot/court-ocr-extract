@@ -50,6 +50,9 @@ def test_same_person_defendant_and_victim_keeps_role_specific_relationships() ->
         for row in rows
     } == {
         "Bị cáo": "Charge Synthetic A",
-        "Bị hại": "Charge Synthetic A; Charge Synthetic B",
+        "Bị hại": "",
     }
-
+    victim_row = next(row for row in rows if row["TƯ CÁCH TỐ TỤNG"] == "Bị hại")
+    assert "Chưa xác định tội danh liên quan trực tiếp đến bị hại" in victim_row[
+        "GHI CHÚ"
+    ]
