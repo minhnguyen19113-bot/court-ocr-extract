@@ -59,6 +59,26 @@ _INVALID_CHARGE_MARKERS = (
     "thoi gian thu thach",
     "nguoi duoc huong an treo",
 )
+_PROCEDURAL_CHARGE_VALUES = {
+    "pham khac",
+    "toi pham khac",
+    "ve toi pham khac",
+    "pham toi khac",
+    "mot toi pham khac",
+}
+_PROCEDURAL_VERDICT_MARKERS = (
+    "tuyen bo tra tu do",
+    "tuyen tra tu do",
+    "tra tu do cho bi cao",
+    "khong bi tam giam ve toi pham khac",
+    "khong bi tam giu ve toi pham khac",
+)
+_QUOTE_PAIRS = {
+    "“": "”",
+    '"': '"',
+    "‘": "’",
+    "'": "'",
+}
 
 
 @dataclass(frozen=True)
@@ -121,26 +141,55 @@ class _ChargeCapture:
     end_offset: int
 
 
+@dataclass(frozen=True)
+class _VerdictBlockScan:
+    blocks: list[dict[str, Any]]
+    warnings: list[str]
+    rejected_candidate_count: int
+
+
 def iter_verdict_blocks(
     lines_or_text: str | Iterable[Mapping[str, Any]],
     *,
     max_lines: int = DEFAULT_VERDICT_BLOCK_MAX_LINES,
     max_chars: int = DEFAULT_VERDICT_BLOCK_MAX_CHARS,
 ) -> list[dict[str, Any]]:
+    return _scan_verdict_blocks(
+        lines_or_text,
+        max_lines=max_lines,
+        max_chars=max_chars,
+    ).blocks
+
+
+def _scan_verdict_blocks(
+    lines_or_text: str | Iterable[Mapping[str, Any]],
+    *,
+    max_lines: int = DEFAULT_VERDICT_BLOCK_MAX_LINES,
+    max_chars: int = DEFAULT_VERDICT_BLOCK_MAX_CHARS,
+) -> _VerdictBlockScan:
     if max_lines < 1 or max_chars < 1:
         raise ValueError("verdict block guards must be positive")
 
     lines = _ordered_lines(_coerce_lines(lines_or_text))
     blocks: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    rejected_candidate_count = 0
     index = 0
     while index < len(lines):
-        if not _is_verdict_start(_text(lines[index].get("text"))):
+        initial_text = _text(lines[index].get("text"))
+        if _is_procedural_verdict_candidate(initial_text):
+            warnings.append("procedural_verdict_candidate_rejected")
+            rejected_candidate_count += 1
+            index += 1
+            continue
+        if not _is_verdict_start(initial_text):
             index += 1
             continue
 
         block_lines: list[dict[str, Any]] = []
         char_count = 0
         cursor = index
+        discard_block = False
         while cursor < len(lines) and len(block_lines) < max_lines:
             line = lines[cursor]
             text = _text(line.get("text"))
@@ -148,44 +197,70 @@ def iter_verdict_blocks(
                 current_text = "\n".join(
                     _text(item.get("text")) for item in block_lines
                 )
-                if _is_verdict_start(text):
-                    break
-                if _is_strong_item_boundary(text) and _block_has_charge(current_text):
-                    break
+                quote_state = _quoted_charge_state(current_text)
+                if quote_state == "open":
+                    if _is_strong_numbered_verdict_start(text):
+                        warnings.append("unterminated_quoted_charge")
+                        discard_block = True
+                        break
+                else:
+                    if _is_verdict_start(text):
+                        break
+                    if _is_strong_item_boundary(text) and _block_has_charge(current_text):
+                        break
             cursor += 1
             if not text or _is_standalone_page_number(text):
                 continue
             added = len(text) + (1 if block_lines else 0)
             if block_lines and char_count + added > max_chars:
+                if _quoted_charge_state(
+                    "\n".join(_text(item.get("text")) for item in block_lines)
+                ) == "open":
+                    warnings.append("unterminated_quoted_charge")
+                    discard_block = True
                 break
             block_lines.append(line)
             char_count += added
 
-        if block_lines:
+        if block_lines and _quoted_charge_state(
+            "\n".join(_text(item.get("text")) for item in block_lines)
+        ) == "open":
+            warnings.append("unterminated_quoted_charge")
+            discard_block = True
+
+        if block_lines and not discard_block:
             raw_text = "\n".join(
                 _text(item.get("text")) for item in block_lines
             )
-            blocks.append(
-                {
-                    "raw_text": raw_text,
-                    "line_ids": [
-                        _text(item.get("line_id"))
-                        for item in block_lines
-                        if _text(item.get("line_id"))
-                    ],
-                    "page_number": next(
-                        (
-                            _optional_int(item.get("page_number"))
+            if _is_procedural_verdict_candidate(raw_text):
+                warnings.append("procedural_verdict_candidate_rejected")
+                rejected_candidate_count += 1
+            else:
+                blocks.append(
+                    {
+                        "raw_text": raw_text,
+                        "line_ids": [
+                            _text(item.get("line_id"))
                             for item in block_lines
-                            if _optional_int(item.get("page_number")) is not None
+                            if _text(item.get("line_id"))
+                        ],
+                        "page_number": next(
+                            (
+                                _optional_int(item.get("page_number"))
+                                for item in block_lines
+                                if _optional_int(item.get("page_number")) is not None
+                            ),
+                            None,
                         ),
-                        None,
-                    ),
-                    "line_count": len(block_lines),
-                }
-            )
+                        "line_count": len(block_lines),
+                    }
+                )
         index = max(cursor, index + 1)
-    return blocks
+    return _VerdictBlockScan(
+        blocks=blocks,
+        warnings=list(dict.fromkeys(warnings)),
+        rejected_candidate_count=rejected_candidate_count,
+    )
 
 
 def parse_verdict_candidate(
@@ -233,9 +308,12 @@ def parse_verdict_candidate(
     ]
     used_line_count = text[:clause_end].count("\n") + 1
     line_ids = candidate_line_ids[:used_line_count]
+    procedural_charge = _is_procedural_charge_candidate(capture.normalized_charge)
     valid = validate_charge_candidate(capture.normalized_charge)
     warning = (
-        "invalid_charge_candidate_rejected"
+        "procedural_charge_candidate_rejected"
+        if procedural_charge
+        else "invalid_charge_candidate_rejected"
         if not valid
         else name_match.warning
     )
@@ -277,6 +355,8 @@ def validate_charge_candidate(
     if len(re.findall(r"\b\w+\b", charge, re.UNICODE)) > max_words:
         return False
     folded = fold_text(charge)
+    if _is_procedural_charge_candidate(charge):
+        return False
     return not any(marker in folded for marker in _INVALID_CHARGE_MARKERS)
 
 
@@ -303,7 +383,8 @@ def parse_explicit_decision_charges(
         for line in lines
         if _text(line.get("source_region")) in {"", DECISION_TAIL}
     ]
-    blocks = iter_verdict_blocks(decision_lines)
+    scan = _scan_verdict_blocks(decision_lines)
+    blocks = scan.blocks
     refs = _defendant_refs(defendants, defendant_names)
     charges: list[str] = []
     charge_keys: set[str] = set()
@@ -313,6 +394,7 @@ def parse_explicit_decision_charges(
         f"charge_lines_ignored_from_source_region:{region}"
         for region in sorted(excluded_regions)
     ]
+    warnings.extend(scan.warnings)
     seen_evidence: set[tuple[str, tuple[str, ...], tuple[str, ...]]] = set()
     invalid_charge_count = 0
 
@@ -325,6 +407,7 @@ def parse_explicit_decision_charges(
         )
         if parsed.invalid_charge:
             invalid_charge_count += 1
+            warnings.append("invalid_charge_candidate_rejected")
         if parsed.warning:
             warnings.append(parsed.warning)
         if not parsed.valid:
@@ -389,7 +472,7 @@ def parse_explicit_decision_charges(
         "charge_evidence": [item.to_dict() for item in evidence],
         "warnings": list(dict.fromkeys(warnings)),
     }
-    if blocks:
+    if blocks or scan.rejected_candidate_count or scan.warnings:
         result.update(
             verdict_candidate_count=len(blocks),
             parsed_charge_count=parsed_charge_count,
@@ -665,6 +748,48 @@ def _block_has_charge(text: str) -> bool:
     return parse_verdict_candidate({"raw_text": text}, ()).valid
 
 
+def _quoted_charge_state(text: str) -> str:
+    folded, positions = _fold_with_positions(text)
+    if not positions:
+        return "none"
+    start_match, _, _ = _find_verdict_start(folded)
+    if start_match is None:
+        return "none"
+    anchor_match, _ = _preferred_charge_anchor(folded, start_match.end())
+    if anchor_match is None:
+        return "none"
+    anchor_end = positions[anchor_match.end() - 1] + 1
+    tail = text[anchor_end:]
+    prefix = re.match(r"\s*(?:[:\-]\s*)?", tail)
+    tail = tail[prefix.end() if prefix else 0:]
+    if not tail or tail[0] not in _QUOTE_PAIRS:
+        return "none"
+    closing_quote = _QUOTE_PAIRS[tail[0]]
+    return "closed" if closing_quote in tail[1:] else "open"
+
+
+def _is_procedural_charge_candidate(value: object) -> bool:
+    return fold_text(normalize_charge(value)).strip(" ,;:.-") in _PROCEDURAL_CHARGE_VALUES
+
+
+def _is_procedural_verdict_candidate(text: str) -> bool:
+    folded = fold_text(text)
+    marker_positions = [
+        folded.find(marker)
+        for marker in _PROCEDURAL_VERDICT_MARKERS
+        if marker in folded
+    ]
+    if not marker_positions:
+        return False
+    start_match, _, _ = _find_verdict_start(folded)
+    if start_match is None:
+        return True
+    anchor_match, _ = _preferred_charge_anchor(folded, start_match.end())
+    if anchor_match is None:
+        return True
+    return min(marker_positions) <= anchor_match.end() + 24
+
+
 def _is_verdict_start(text: str) -> bool:
     folded = fold_text(text)
     if _VERDICT_START_FOLDED_RE.search(folded):
@@ -688,6 +813,14 @@ def _is_bounded_verdict_candidate(
 
 def _is_strong_item_boundary(text: str) -> bool:
     return bool(_DECISION_ITEM_RE.match(text))
+
+
+def _is_strong_numbered_verdict_start(text: str) -> bool:
+    folded = fold_text(text)
+    return bool(
+        re.match(r"^\d+(?:\.\d+)*[.)]\s*", folded)
+        and _STRONG_VERDICT_START_FOLDED_RE.match(folded)
+    )
 
 
 def _is_standalone_page_number(text: str) -> bool:
