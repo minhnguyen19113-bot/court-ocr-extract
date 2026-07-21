@@ -1,5 +1,14 @@
 # Project State
 
+## Pilot 10 Sentence Completeness and Evidence Hardening
+
+- `sentence_parser.py` nhận ngày Việt Nam dạng chữ, ba biến thể hẹp của `bắt giam`, probation nhiều đơn vị có dấu phẩy và `probation_start_text`; trường probation start không bị ghi nhầm vào custodial `sentence_start_text`.
+- Completion hỗ trợ `bằng với thời gian tạm giam` và OCR `hình phát tù`, luôn canonical về `hình phạt`; detention credit hỗ trợ `trừ ngày`/`trừ thời gian`/`được trừ` và chuẩn hóa date range mà không tự tính số ngày.
+- Hình phạt bổ sung được scan theo bounded clause trong `decision_tail`, kể cả numbered item riêng và OCR `hình phát/phát bổ sung`; chỉ explicit additional-penalty anchor mới cho phép map khoản tiền theo defendant entity, không dùng case fallback và không lấy án phí/nghĩa vụ dân sự.
+- Mỗi sentence evidence giữ `raw_text` khớp `line_ids`, bao gồm release/additional lines tạo display và dừng trước vật chứng, biện pháp tư pháp, án phí, kháng cáo hoặc nơi nhận.
+- Completeness validator phát bảy warning canonical và đẩy case/row có warning quan trọng vào review; victim không nhận sentence warning. `FINAL_EXCEL` vẫn đúng 14 cột, victim `HÌNH PHẠT` vẫn blank.
+- Verification synthetic: targeted sentence `61 passed`; regression schema/role/charge/address/source-region `94 passed`; full suite `367 passed`, `0 failed`, không thêm skip/xfail. Codex không đọc dữ liệu thật và không gọi OCR, Docker, Surya inference, LLM hoặc cloud.
+
 ## Defendant Sentence Column + Final Address Hardening
 
 - `FINAL_EXCEL` dùng contract mới đúng 14 cột; `HÌNH PHẠT` đứng sau `QUAN HỆ PHÁP LUẬT`, trước `TƯ CÁCH TỐ TỤNG`, và `GHI CHÚ` vẫn là cột cuối.

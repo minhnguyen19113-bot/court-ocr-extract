@@ -1,5 +1,16 @@
 # Tasks
 
+## PILOT 10 SENTENCE COMPLETENESS AND EVIDENCE HARDENING
+
+- [x] Parse textual Vietnamese sentence-start date và normalize ba OCR variant hẹp của `bắt giam`.
+- [x] Parse probation nhiều đơn vị, thêm `probation_start_text` và giữ field này độc lập với custodial start.
+- [x] Canonicalize completion/time-served và detention-credit date range mà không suy luận thời lượng.
+- [x] Scan bounded additional-penalty item riêng, map theo defendant matcher và loại civil/court-fee money.
+- [x] Đồng bộ `raw_text`/`line_ids`, giữ release/additional evidence và trim trước non-sentence sections.
+- [x] Thêm completeness warnings, case review flag, row note và đủ 20 test modules synthetic bắt buộc.
+- [x] Đạt targeted `61 passed`, regression `94 passed`, full suite `367 passed`; compile và guardrails chạy trong cùng task.
+- [ ] Project Owner rerun cache-only pilot 10 vào `outputs\pilot_10_sentence_completeness_check` và duyệt 19 defendant sentences, 8 victim blanks cùng additional-penalty coverage.
+
 ## DEFENDANT SENTENCE COLUMN + FINAL ADDRESS HARDENING
 
 - [x] Nâng `FINAL_EXCEL` từ 13 lên 14 cột, thêm `HÌNH PHẠT` đúng vị trí và giữ `GHI CHÚ` cuối.

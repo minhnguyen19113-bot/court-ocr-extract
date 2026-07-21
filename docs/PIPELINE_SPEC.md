@@ -30,6 +30,14 @@ Workflow là forward scan đến marker và reverse scan có giới hạn từ c
 
 `case_charges` unique theo thứ tự xuất hiện. `defendant_charge_map` dùng defendant `entity_id`; matching lần lượt exact normalized name, exact name sau honorific và unique fuzzy match qua `DECISION_NAME_MATCH_MIN_SCORE`/`DECISION_NAME_MATCH_AMBIGUITY_GAP`. Ambiguous hoặc collective không xác định chắc chỉ ghi warning, không gán charge và không tạo defendant mới. Dòng bị cáo chỉ dùng charge map riêng; primary role khác dùng `; `.join(case charges). Cùng người khác role vẫn là hai dòng độc lập.
 
+## Defendant Sentence và Evidence Contract
+
+Sentence parser chỉ đọc `decision_tail`, tái sử dụng verdict block và defendant matcher, rồi map theo defendant entity ID. Victim không nhận sentence. `probation_start_text` chỉ dùng cho án treo và được ghép vào probation display; không được ghi sang custodial `sentence_start_text`. Textual Vietnamese date, OCR `bất giam/bắt giảm`, time-served/completion và detention-credit chỉ được canonicalize trong các anchor hẹp đã duyệt, không thay thế OCR toàn cục và không tự tính thời lượng.
+
+Additional penalty ở numbered item riêng phải được scan theo bounded clause. Khoản tiền chỉ hợp lệ khi clause có explicit `hình phạt bổ sung/phạt bổ sung` hoặc OCR variant tương ứng và map được defendant; không dùng case-level fallback, án phí, bồi thường, nộp lại tiền, truy thu hoặc biện pháp tư pháp.
+
+Mỗi `sentence_evidence` phải có `raw_text` gồm đúng các line trong `line_ids`; mọi line tạo display phải có trong evidence. Evidence dừng trước vật chứng, biện pháp tư pháp, án phí, quyền kháng cáo và nơi nhận. Known anchor không parse thành structured field phải phát warning canonical và bật review thay vì im lặng.
+
 ## Final Excel schema contract
 
 `FINAL_EXCEL` là output nghiệp vụ chính và phải là sheet đầu tiên của mọi final workbook. Schema duy nhất là `FINAL_EXCEL_COLUMNS` trong `src/court_ocr_extract/final_excel_schema.py`, đúng 14 cột và đúng thứ tự Project Owner duyệt. `HÌNH PHẠT` đứng sau `QUAN HỆ PHÁP LUẬT`; source/evidence/confidence/strategy/JSON chỉ nằm trong debug sheets.

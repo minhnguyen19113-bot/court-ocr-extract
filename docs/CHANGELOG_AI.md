@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-07-21 - Pilot 10 Sentence Completeness and Evidence Hardening
+
+- Mở rộng deterministic sentence parser cho textual date, OCR `bất giam/bắt giảm`, probation nhiều đơn vị và structured `probation_start_text`.
+- Canonicalize time-served completion, OCR `hình phát tù` và detention-credit date range; không tính số ngày hay suy completion khi thiếu explicit evidence.
+- Thêm bounded follow-on scanner cho numbered additional-penalty item, OCR `hình phát/phát bổ sung`, defendant-specific mapping và civil/court-fee exclusions.
+- Làm nhất quán sentence evidence theo line, giữ release/additional lines và trim trước các section không liên quan.
+- Thêm bảy completeness warnings, case review flag và final-row note cho warning quan trọng; không phát warning sentence cho victim.
+- Thêm đủ 20 test modules synthetic; targeted `61 passed`, regression `94 passed`, full suite `367 passed`, `0 failed`, không thêm skip/xfail.
+- Không đọc/chạy dữ liệu thật, không gọi OCR/Docker/Surya inference/LLM/cloud và không commit/push.
+
 ## 2026-07-21 - Defendant Sentence Column + Final Address Hardening
 
 - Nâng canonical `FINAL_EXCEL` lên 14 cột và thêm `HÌNH PHẠT` đúng vị trí.

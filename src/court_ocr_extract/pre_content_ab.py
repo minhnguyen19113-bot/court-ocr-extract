@@ -41,6 +41,7 @@ from court_ocr_extract.other_participants_builder import (
 )
 from court_ocr_extract.settings import PipelineSettings
 from court_ocr_extract.sentence_parser import (
+    SENTENCE_COMPLETENESS_WARNINGS,
     empty_sentence_output,
     parse_defendant_sentences,
 )
@@ -617,7 +618,7 @@ def _write_workbook(
     sheets["DEFENDANT_SENTENCES"].append([
         "case_id", "defendant_entity_id", "defendant_name",
         "primary_penalty_kind", "primary_penalty_text", "display_text",
-        "suspended", "probation_text", "execution_status",
+        "suspended", "probation_text", "probation_start_text", "execution_status",
         "sentence_start_text", "detention_credit_text", "completion_text",
         "release_text", "aggregate_penalty_text", "additional_penalties",
         "source_region", "page_number", "line_ids", "confidence", "warnings",
@@ -1111,6 +1112,7 @@ def _append_structured_rows(sheets, case) -> None:
                 sentence.get("display_text"),
                 sentence.get("suspended"),
                 sentence.get("probation_text"),
+                sentence.get("probation_start_text"),
                 sentence.get("execution_status"),
                 sentence.get("sentence_start_text"),
                 sentence.get("detention_credit_text"),
@@ -1412,6 +1414,11 @@ def _attach_decision_tail_charges(
     output["warnings"].extend(sentence_output.get("warnings", []))
     output["warnings"].extend(tail_record.warnings)
     output["warnings"] = list(dict.fromkeys(output["warnings"]))
+    if any(
+        warning in SENTENCE_COMPLETENESS_WARNINGS
+        for warning in sentence_output.get("warnings", [])
+    ):
+        output["needs_review"] = True
 
 
 def _ensure_front_defendant_entity_ids(values: Any) -> list[dict[str, Any]]:

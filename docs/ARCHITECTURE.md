@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-14
+Last updated: 2026-07-21
 
 ## Target Principles
 
@@ -78,7 +78,7 @@ Likely main candidates:
 - Extraction orchestrator: canonical `src/court_ocr_extract/extraction_pipeline.py`.
 - Extractor backends: canonical `src/court_ocr_extract/extractors/`; Local LLM backend ở `extractors/local_llm_extractor.py`, rule helper ở `extractors/rule_support.py`.
 - Pre-content baseline: `extractors/pre_content_anchor_segmenter.py`, `extractors/rule_anchor_extractor.py`, `extractors/rule_anchor_strategies.py`; legacy hybrid/LLM-only modules chỉ phục vụ explicit comparison.
-- Final role/output policy: `final_excel_role_policy.py`, `final_excel_builder.py`, `other_participants_builder.py`; canonical 11-column schema vẫn ở `final_excel_schema.py`.
+- Final role/output policy: `final_excel_role_policy.py`, `final_excel_builder.py`, `other_participants_builder.py`; canonical 14-column schema ở `final_excel_schema.py`, còn deterministic sentence/evidence parsing ở `sentence_parser.py`.
 - Decision tail: `decision_tail.py` sở hữu reverse-batch/cache contract; `charge_parser.py` chỉ parse explicit verdict language; Surya adapter cung cấp reusable explicit-page runner.
 - Source policy/audit: `source_region_policy.py` sở hữu field-source allowlist và `SOURCE_REGION_AUDIT`; middle text không phải nguồn production hợp lệ.
 - Local LLM client/parser: `src/court_ocr_extract/local_llm/`.

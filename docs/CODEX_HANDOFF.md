@@ -1,5 +1,15 @@
 # Codex Handoff
 
+## Bàn Giao Pilot 10 Sentence Completeness và Evidence Hardening
+
+Sentence parser hiện hỗ trợ textual sentence-start date, OCR `bất giam/bắt giảm`, probation nhiều đơn vị cùng `probation_start_text`, time-served completion, OCR `hình phát tù` và detention-credit date range canonical. `probation_start_text` chỉ thuộc display án treo; custodial `sentence_start_text` vẫn độc lập.
+
+Hình phạt bổ sung có thể nằm ở numbered decision item riêng và được scan theo bounded clause trong `decision_tail`. Khoản tiền chỉ được nhận khi có explicit additional-penalty anchor và map được defendant entity; không có case fallback, không lấy án phí hoặc nghĩa vụ dân sự. Sentence evidence có raw line khớp line ID, giữ release/additional source lines và dừng trước vật chứng/biện pháp tư pháp/án phí/kháng cáo/nơi nhận.
+
+Completeness validator có bảy warning canonical; warning quan trọng bật `needs_review` và thêm note dòng bị cáo. Gate synthetic đạt targeted `61 passed`, regression `94 passed`, full suite `367 passed`; không thêm skip/xfail. Codex không đọc PDF/cache/output thật và không gọi OCR, Docker, Surya inference, LLM hoặc cloud.
+
+Project Owner chỉ rerun cache: `compare-pre-content --ocr-cache-dir outputs\ocr_cache_pre_content_pilot_10 --decision-tail-cache-dir outputs\decision_tail_cache_pilot_10 --output-dir outputs\pilot_10_sentence_completeness_check --strategies rule_anchor_only --limit 10 --open`. Duyệt 19/19 defendant sentence rows, 8/8 victim blanks, additional penalty và mọi row có sentence warning; không OCR lại.
+
 ## Bàn Giao Defendant Sentence Column + Final Address Hardening
 
 `FINAL_EXCEL` hiện có 14 cột với `HÌNH PHẠT` sau `QUAN HỆ PHÁP LUẬT`. Sentence chỉ lấy từ `decision_tail`, map bằng defendant entity ID và không fallback cấp vụ án; victim luôn blank. Structured/debug output gồm `defendant_sentence_map`, `sentence_evidence`, diagnostics và ba sheet `DEFENDANT_SENTENCES`, `SENTENCE_EVIDENCE`, `SENTENCE_WARNINGS`.

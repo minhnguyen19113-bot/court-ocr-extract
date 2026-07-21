@@ -11,7 +11,10 @@ from court_ocr_extract.final_excel_role_policy import (
     normalized_row_identity,
 )
 from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
-from court_ocr_extract.sentence_parser import format_sentence_for_excel
+from court_ocr_extract.sentence_parser import (
+    SENTENCE_COMPLETENESS_WARNINGS,
+    format_sentence_for_excel,
+)
 from court_ocr_extract.source_region_policy import DECISION_TAIL, FRONT_PRE_CONTENT
 
 
@@ -325,7 +328,15 @@ def _row_sentence(
     sentence = _mapping(defendant_sentence_map.get(entity_id))
     display = format_sentence_for_excel(sentence) if sentence else ""
     if display:
-        return display, []
+        warnings = {
+            _text(value) for value in _items(sentence.get("warnings")) if _text(value)
+        }
+        notes = (
+            ["Cần kiểm tra lại bằng chứng hình phạt"]
+            if warnings & SENTENCE_COMPLETENESS_WARNINGS
+            else []
+        )
+        return display, notes
     return "", ["Chưa trích xuất chắc hình phạt từ phần Quyết định"]
 
 

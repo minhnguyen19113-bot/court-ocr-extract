@@ -8,5 +8,5 @@ def test_sentence_detention_credit() -> None:
     )
     sentence = output["defendant_sentence_map"]["defendant_alpha"]
     assert sentence["detention_credit_text"] == (
-        "được trừ thời gian tạm giữ, tạm giam từ ngày 12/02/2099 đến ngày 06/06/2099"
+        "được trừ thời gian tạm giữ, tạm giam từ 12/02/2099 đến 06/06/2099"
     )
