@@ -1,5 +1,15 @@
 # Codex Handoff
 
+## Bàn Giao Defendant Sentence Column + Final Address Hardening
+
+`FINAL_EXCEL` hiện có 14 cột với `HÌNH PHẠT` sau `QUAN HỆ PHÁP LUẬT`. Sentence chỉ lấy từ `decision_tail`, map bằng defendant entity ID và không fallback cấp vụ án; victim luôn blank. Structured/debug output gồm `defendant_sentence_map`, `sentence_evidence`, diagnostics và ba sheet `DEFENDANT_SENTENCES`, `SENTENCE_EVIDENCE`, `SENTENCE_WARNINGS`.
+
+Address parser đã tách riêng permanent/current candidates, ưu tiên `Nơi ở`, dừng trước presence sentence và loại các suffix như `( vắng mặt).` mà không xóa `(nay là...)`.
+
+Verification synthetic đã đạt: address `29 passed`, sentence/schema/final `47 passed`, regression cuối `148 passed`, full suite `342 passed`; compile và guardrails cần được xem trong báo cáo task cùng lượt. Không có skip/xfail mới.
+
+Project Owner cần rerun cache-only bằng `compare-pre-content --ocr-cache-dir outputs\ocr_cache_pre_content_pilot_10 --decision-tail-cache-dir outputs\decision_tail_cache_pilot_10 --output-dir outputs\pilot_10_sentence_column_check --strategies rule_anchor_only --limit 10 --open`. Không OCR lại; kiểm 14 columns, 27 rows, 19 defendant sentences, 8 victim blanks và ba acceptance địa chỉ.
+
 ## Bàn Giao Fast Patch 13 Cột, Verdict Charge và Địa Chỉ Qua Trang
 
 `FINAL_EXCEL` hiện theo schema 13 cột và chỉ chứa `Bị cáo`/`Bị hại`. Số/ngày bản án và số/ngày thụ lý map độc lập; thiếu field nào để trống và note đúng field. Participant khác vẫn ở structured JSON/`PARTICIPANTS`; sheet và HTML `NGUOI_THAM_GIA_KHAC` chỉ bật khi caller truyền `include_other_participants_output=true`.

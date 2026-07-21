@@ -23,12 +23,13 @@ _QUOTE_OPEN = "“\"‘'"
 _QUOTE_CLOSE = "”\"’'"
 _VERDICT_START_FOLDED_RE = re.compile(
     r"(?:^|\s)(?:\d+(?:\.\d+)*[.)]?\s*)?"
-    r"(?:(?:xu phat|tuyen(?: bo)?)\s+(?:cac\s+)?bi cao|bi cao\s+.+?\s+pham toi)\b",
+    r"(?:(?:xu phat|tuyen(?: bo| phat)?)\s*:?\s+(?:cac\s+)?bi cao|"
+    r"bi cao\s+.+?\s+pham toi)\b",
     re.IGNORECASE,
 )
 _STRONG_VERDICT_START_FOLDED_RE = re.compile(
     r"(?:^|\s)(?:\d+(?:\.\d+)*[.)]?\s*)?"
-    r"(?:(?P<sentence>xu phat)|(?P<declare>tuyen(?: bo)?))\s+"
+    r"(?:(?P<sentence>xu phat)|(?P<declare>tuyen(?: bo| phat)?))\s*:?\s+"
     r"(?:cac\s+)?bi cao\b",
     re.IGNORECASE,
 )
@@ -358,6 +359,29 @@ def validate_charge_candidate(
     if _is_procedural_charge_candidate(charge):
         return False
     return not any(marker in folded for marker in _INVALID_CHARGE_MARKERS)
+
+
+def match_defendant_entities(
+    text: str,
+    defendants: Iterable[Mapping[str, Any]],
+    *,
+    min_name_match_score: float = DEFAULT_NAME_MATCH_MIN_SCORE,
+    name_match_ambiguity_gap: float = DEFAULT_NAME_MATCH_AMBIGUITY_GAP,
+) -> dict[str, Any]:
+    """Expose the verdict name matcher without duplicating its fuzzy policy."""
+    match = _match_defendant_entities(
+        text,
+        _defendant_refs(defendants, ()),
+        pattern_name="sentence_for_charge",
+        min_score=float(min_name_match_score),
+        ambiguity_gap=float(name_match_ambiguity_gap),
+    )
+    return {
+        "defendant_entity_ids": list(match.entity_ids),
+        "defendant_names": list(match.names),
+        "match_method": match.method,
+        "warning": match.warning,
+    }
 
 
 def parse_explicit_decision_charges(
@@ -787,7 +811,7 @@ def _is_procedural_verdict_candidate(text: str) -> bool:
     anchor_match, _ = _preferred_charge_anchor(folded, start_match.end())
     if anchor_match is None:
         return True
-    return min(marker_positions) <= anchor_match.end() + 24
+    return min(marker_positions) <= anchor_match.start()
 
 
 def _is_verdict_start(text: str) -> bool:

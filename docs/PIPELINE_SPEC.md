@@ -10,7 +10,7 @@ Metadata anchors `thụ lý số`, quyết định đưa vụ án ra xét xử v
 
 ## Final Role và Other Participants Contract
 
-`FINAL_EXCEL` giữ nguyên 11 cột nhưng chỉ nhận `Bị cáo`, `Bị hại`, `Nguyên đơn dân sự`, `Bị đơn dân sự`, `Người có quyền lợi, nghĩa vụ liên quan` và `Pháp nhân thương mại bị cáo`, kể cả các alias được định nghĩa chính xác trong `final_excel_role_policy.py`. Không suy role chỉ vì một câu bất kỳ có chữ `liên quan`.
+`FINAL_EXCEL` có đúng 14 cột và chỉ nhận `Bị cáo`, `Bị hại`, `Pháp nhân thương mại bị cáo` cùng alias chính xác trong `final_excel_role_policy.py`. Không suy role từ cụm từ tự do.
 
 Support roles được giữ trong sheet thứ hai `NGUOI_THAM_GIA_KHAC`; court procedural roles không phải final entity. Dedupe dùng case + normalized full name + normalized role. Multi-person support block chỉ split khi role cho phép, có nhiều honorific/name starts và không có address/organization marker; các entity con giữ cùng evidence IDs, represented person và relationship note.
 
@@ -32,7 +32,7 @@ Workflow là forward scan đến marker và reverse scan có giới hạn từ c
 
 ## Final Excel schema contract
 
-`FINAL_EXCEL` là output nghiệp vụ chính và phải là sheet đầu tiên của mọi final workbook. Schema duy nhất là `FINAL_EXCEL_COLUMNS` trong `src/court_ocr_extract/final_excel_schema.py`, đúng 11 cột và đúng thứ tự Project Owner duyệt. Không được thêm source/evidence/confidence/strategy/JSON columns vào sheet này.
+`FINAL_EXCEL` là output nghiệp vụ chính và phải là sheet đầu tiên của mọi final workbook. Schema duy nhất là `FINAL_EXCEL_COLUMNS` trong `src/court_ocr_extract/final_excel_schema.py`, đúng 14 cột và đúng thứ tự Project Owner duyệt. `HÌNH PHẠT` đứng sau `QUAN HỆ PHÁP LUẬT`; source/evidence/confidence/strategy/JSON chỉ nằm trong debug sheets.
 
 `final_excel_builder.py` nhận rule-anchor output và tạo một dòng cho mỗi entity có primary role. Case type, số/ngày thụ lý, explicit legal relationship và chủ tọa được lặp trên từng dòng. Năm sinh chỉ giữ năm; CCCD/CMND chỉ nhận 9-12 chữ số liên tục sau label; defendant address ưu tiên current rồi permanent. Field thiếu để trống và thêm lý do vào `GHI CHÚ`; không suy đoán từ tên, địa chỉ hoặc số quyết định.
 
@@ -230,7 +230,7 @@ Terminal summary must include:
 - output Excel path
 - output QA report path
 
-Sheet `FINAL_EXCEL` chỉ có 11 cột canonical. `SOURCE_CASE_ID`, source page/line IDs, OCR/extraction confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` phải nằm trong debug sheets/QA report, không được thêm vào final columns.
+Sheet `FINAL_EXCEL` chỉ có 14 cột canonical. `SOURCE_CASE_ID`, source page/line IDs, OCR/extraction confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` phải nằm trong debug sheets/QA report, không được thêm vào final columns.
 
 ## Fallback Rules
 

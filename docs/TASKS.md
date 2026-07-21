@@ -1,5 +1,15 @@
 # Tasks
 
+## DEFENDANT SENTENCE COLUMN + FINAL ADDRESS HARDENING
+
+- [x] Nâng `FINAL_EXCEL` từ 13 lên 14 cột, thêm `HÌNH PHẠT` đúng vị trí và giữ `GHI CHÚ` cuối.
+- [x] Tạo deterministic `sentence_parser.py`, dùng chung verdict scanner và defendant matcher với charge parser.
+- [x] Map sentence theo entity ID, giữ victim blank và thêm note chỉ cho defendant thiếu evidence.
+- [x] Wire sentence output vào cache-only compare flow, source audit và ba debug sheets.
+- [x] Sửa presence suffix có dấu câu, presence-line boundary và tách permanent/current address.
+- [x] Thêm toàn bộ synthetic parser/address/schema/final/workbook tests bắt buộc; không thêm skip/xfail.
+- [ ] Project Owner rerun pilot 10 từ hai cache hiện có và duyệt coverage 19 defendant/8 victim cùng address acceptance.
+
 ## FRONT + DECISION ONLY SOURCE POLICY AND ROW-SPECIFIC LEGAL RELATIONSHIP
 
 - [x] Tạo canonical `source_region_policy.py` với front/decision allowlist và middle exclusion.

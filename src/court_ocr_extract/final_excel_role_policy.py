@@ -9,6 +9,7 @@ PRIMARY_FINAL_ROLES = frozenset(
     {
         "Bị cáo",
         "Bị hại",
+        "Pháp nhân thương mại bị cáo",
     }
 )
 

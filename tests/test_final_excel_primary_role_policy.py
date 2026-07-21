@@ -36,7 +36,11 @@ def test_final_excel_contains_only_primary_roles_and_exact_aliases() -> None:
         "Bị cáo",
         "Bị hại",
     ]
-    assert PRIMARY_FINAL_ROLES == {"Bị cáo", "Bị hại"}
+    assert PRIMARY_FINAL_ROLES == {
+        "Bị cáo",
+        "Bị hại",
+        "Pháp nhân thương mại bị cáo",
+    }
     assert all(row["TƯ CÁCH TỐ TỤNG"] in PRIMARY_FINAL_ROLES for row in rows)
     assert all("Hội thẩm" not in row["TƯ CÁCH TỐ TỤNG"] for row in rows)
     related = classify_final_role("Người có quyền và nghĩa vụ liên quan")

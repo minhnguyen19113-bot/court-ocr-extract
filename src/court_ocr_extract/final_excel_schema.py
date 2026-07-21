@@ -10,6 +10,7 @@ FINAL_EXCEL_COLUMNS = [
     "SỐ THỤ LÝ",
     "NGÀY THỤ LÝ (DD/MM/YYYY)",
     "QUAN HỆ PHÁP LUẬT",
+    "HÌNH PHẠT",
     "TƯ CÁCH TỐ TỤNG",
     "HỌ TÊN ĐƯƠNG SỰ",
     "NĂM SINH",

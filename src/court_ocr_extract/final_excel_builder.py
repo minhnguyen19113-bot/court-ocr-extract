@@ -11,6 +11,7 @@ from court_ocr_extract.final_excel_role_policy import (
     normalized_row_identity,
 )
 from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
+from court_ocr_extract.sentence_parser import format_sentence_for_excel
 from court_ocr_extract.source_region_policy import DECISION_TAIL, FRONT_PRE_CONTENT
 
 
@@ -45,6 +46,7 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
     case_charges = _case_charges(extraction_result)
     defendant_charge_map = _defendant_charge_map(extraction_result, case_charges)
     victim_charge_evidence = _victim_charge_evidence(extraction_result)
+    defendant_sentence_map = _defendant_sentence_map(extraction_result)
     decision_tail_status = _text(extraction_result.get("decision_tail_status"))
 
     presiding_judge = _text(trial_panel.get("presiding_judge"))
@@ -58,7 +60,7 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
         common_notes.append("Field bị validator loại")
 
     entities: list[tuple[str, Mapping[str, Any], bool]] = [
-        ("Bị cáo", _mapping(item), True)
+        (_defendant_role(_mapping(item)), _mapping(item), True)
         for item in _items(extraction_result.get("defendants"))
         if _mapping(item).get("entity_valid", True) is not False
         and _entity_is_front(_mapping(item))
@@ -94,6 +96,14 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
             decision_tail_status=decision_tail_status,
         )
         notes.extend(relationship_notes)
+        sentence, sentence_notes = _row_sentence(
+            role=role,
+            entity=entity,
+            is_defendant=is_defendant,
+            defendant_sentence_map=defendant_sentence_map,
+            decision_tail_status=decision_tail_status,
+        )
+        notes.extend(sentence_notes)
 
         if not role:
             notes.append("Thiếu tư cách tố tụng")
@@ -135,6 +145,7 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
                     "SỐ THỤ LÝ": acceptance_number,
                     "NGÀY THỤ LÝ (DD/MM/YYYY)": acceptance_date,
                     "QUAN HỆ PHÁP LUẬT": legal_relationship,
+                    "HÌNH PHẠT": sentence,
                     "TƯ CÁCH TỐ TỤNG": role,
                     "HỌ TÊN ĐƯƠNG SỰ": full_name,
                     "NĂM SINH": birth_year,
@@ -275,6 +286,49 @@ def _victim_charge_evidence(
     return [item for item in candidates if isinstance(item, Mapping)]
 
 
+def _defendant_sentence_map(
+    extraction_result: Mapping[str, Any],
+) -> Mapping[str, Mapping[str, Any]]:
+    direct = _mapping(extraction_result.get("defendant_sentence_map"))
+    source = direct or _mapping(
+        _mapping(extraction_result.get("sentence_output")).get(
+            "defendant_sentence_map"
+        )
+    )
+    return {
+        str(entity_id): _mapping(sentence)
+        for entity_id, sentence in source.items()
+        if _text(entity_id)
+        and _text(_mapping(sentence).get("source_region")) == DECISION_TAIL
+    }
+
+
+def _row_sentence(
+    *,
+    role: str,
+    entity: Mapping[str, Any],
+    is_defendant: bool,
+    defendant_sentence_map: Mapping[str, Mapping[str, Any]],
+    decision_tail_status: str,
+) -> tuple[str, list[str]]:
+    defendant_role = is_defendant or fold_text(role) in {
+        "bi cao",
+        "phap nhan thuong mai bi cao",
+    }
+    if not defendant_role:
+        return "", []
+
+    if decision_tail_status == "heading_not_found":
+        return "", ["Không có nguồn để trích xuất hình phạt"]
+
+    entity_id = _text(entity.get("entity_id") or entity.get("source_block_id"))
+    sentence = _mapping(defendant_sentence_map.get(entity_id))
+    display = format_sentence_for_excel(sentence) if sentence else ""
+    if display:
+        return display, []
+    return "", ["Chưa trích xuất chắc hình phạt từ phần Quyết định"]
+
+
 def _front_group(
     extraction_result: Mapping[str, Any],
     group_name: str,
@@ -289,6 +343,13 @@ def _front_group(
         if region and region != FRONT_PRE_CONTENT:
             values[field] = None
     return values
+
+
+def _defendant_role(entity: Mapping[str, Any]) -> str:
+    role = _text(entity.get("role"))
+    if fold_text(role) == "phap nhan thuong mai bi cao":
+        return "Pháp nhân thương mại bị cáo"
+    return "Bị cáo"
 
 
 def _entity_is_front(entity: Mapping[str, Any]) -> bool:

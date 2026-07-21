@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-07-21 - Defendant Sentence Column + Final Address Hardening
+
+- Nâng canonical `FINAL_EXCEL` lên 14 cột và thêm `HÌNH PHẠT` đúng vị trí.
+- Thêm `sentence_parser.py` deterministic, tái sử dụng verdict scanner/name matcher, hỗ trợ primary sentence, duration, án treo/thử thách, execution details, aggregate và additional penalties.
+- Map sentence theo defendant entity ID; victim blank, same-person/different-role độc lập và defendant thiếu evidence có note riêng.
+- Wire sentence output vào cache-only compare flow, source audit và ba workbook sheets mới.
+- Tách permanent/current address, thêm `Nơi ở` priority, presence-line boundary và punctuation-aware presence suffix cleanup.
+- Thêm synthetic tests bắt buộc; không đọc dữ liệu thật, không gọi OCR/Docker/Surya inference/LLM/cloud và không commit/push.
+- Verification: address `29 passed`; sentence/schema/final `47 passed`; regression cuối `148 passed`; full suite `342 passed`, `0 failed`, không có skip/xfail mới.
+
 ## 2026-07-17 - Fast Patch Final Excel 13 Cột, Verdict Block và Địa Chỉ Qua Trang
 
 - Nâng canonical `FINAL_EXCEL` lên đúng 13 cột, thêm số/ngày tuyên án và khóa mapping độc lập với số/ngày thụ lý.

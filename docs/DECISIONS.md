@@ -1,12 +1,14 @@
 # Decisions
 
-Last updated: 2026-07-17
+Last updated: 2026-07-21
 
 | ID | Status | Decision | Reason |
 | --- | --- | --- | --- |
+| D-055 | Accepted | Address extraction thu candidate permanent/current riêng, ưu tiên explicit/current labels và `Nơi ở` trước permanent fallback; presence sentence là boundary, presence-only parenthetical suffix được loại kể cả khi có dấu câu cuối. | Ngăn ghép hộ khẩu với nơi ở và ngăn trạng thái có/vắng mặt lọt vào `ĐỊA CHỈ`, đồng thời giữ parenthetical địa giới hợp lệ. |
+| D-054 | Accepted | `FINAL_EXCEL` có đúng 14 cột với `HÌNH PHẠT` sau `QUAN HỆ PHÁP LUẬT`. Sentence chỉ lấy từ `decision_tail`, map theo defendant entity ID, không fallback cấp vụ án; victim luôn blank. | Hình phạt là dữ liệu theo từng bị cáo và phải có evidence từ phần Quyết định, độc lập với charge/victim role. |
 | D-053 | Accepted | Verdict charge được thu theo block có guard `max_lines`/`max_chars`, đi qua page break và bỏ standalone page number; địa chỉ hiện tại được nối theo line sequence qua trang đến identity/entity boundary. | OCR có thể tách verdict và địa chỉ thành nhiều dòng/trang; window cố định và regex một dòng làm mất dữ liệu hợp lệ. |
 | D-052 | Accepted | `FINAL_EXCEL` mặc định chỉ có `Bị cáo` và `Bị hại`. Participant khác vẫn ở structured JSON và `PARTICIPANTS`; sheet/HTML `NGUOI_THAM_GIA_KHAC` chỉ xuất khi `include_other_participants_output=true`. | Deliverable chính cần giới hạn đúng hai role nhưng vẫn bảo toàn dữ liệu debug và khả năng bật lại output phụ. |
-| D-051 | Accepted | `FINAL_EXCEL` có đúng 13 cột, thêm `SỐ BẢN ÁN` và `NGÀY TUYÊN ÁN (DD/MM/YYYY)`. Bốn field số/ngày bản án/thụ lý map độc lập, thiếu field nào để trống và ghi note đúng field, không fallback chéo. | Tránh nhầm số/ngày tuyên án với số/ngày thụ lý và khớp schema cuối Project Owner vừa chốt. |
+| D-051 | Superseded by D-054 | `FINAL_EXCEL` có đúng 13 cột, thêm `SỐ BẢN ÁN` và `NGÀY TUYÊN ÁN (DD/MM/YYYY)`. Bốn field số/ngày bản án/thụ lý map độc lập, thiếu field nào để trống và ghi note đúng field, không fallback chéo. | D-054 bổ sung `HÌNH PHẠT`, nâng schema lên 14 cột; mapping metadata độc lập vẫn giữ nguyên. |
 | D-050 | Accepted | `QUAN HỆ PHÁP LUẬT` của dòng bị cáo chỉ dùng `defendant_charge_map[entity_id]`; primary role không phải bị cáo dùng `case_charges`. Missing/ambiguous để trống kèm row note; cùng người khác role vẫn là hai dòng. | Tránh gán mọi tội danh cấp vụ án cho từng bị cáo nhưng vẫn cung cấp đúng context vụ án cho các đương sự chính khác. |
 | D-049 | Accepted | Charge parser chỉ đọc `decision_tail`, chỉ nhận explicit verdict language, map vào front defendant entities theo exact/honorific/unique-fuzzy policy và không tạo defendant mới. `defendant_charge_map` dùng entity ID; LLM không tham gia. | Tội danh cần evidence tuyên án rõ và identity ổn định; fuzzy/collective ambiguity không đủ căn cứ để tự động gán. |
 | D-048 | Accepted | Production extraction chỉ dùng `front_pre_content` và `decision_tail`; narrative/tranh luận/nhận định là `middle_excluded`, không được fill final field hay fallback. Reverse scan bắt buộc max-page guard dương, hữu hạn và không tự OCR toàn văn bản. | Khóa nguồn theo cấu trúc pháp lý, giảm OCR thừa và ngăn middle text gây sai metadata/tội danh khi front hoặc decision thiếu dữ liệu. |

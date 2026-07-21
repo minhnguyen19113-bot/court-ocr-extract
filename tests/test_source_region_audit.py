@@ -76,6 +76,9 @@ def test_workbook_and_html_expose_source_and_entity_charge_audit(tmp_path) -> No
         "DEFENDANT_CHARGES",
         "SOURCE_REGION_AUDIT",
         "CHARGE_WARNINGS",
+        "DEFENDANT_SENTENCES",
+        "SENTENCE_EVIDENCE",
+        "SENTENCE_WARNINGS",
     ):
         assert sheet_name in workbook.sheetnames
     audit_regions = {

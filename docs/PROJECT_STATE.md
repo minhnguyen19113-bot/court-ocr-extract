@@ -1,5 +1,16 @@
 # Project State
 
+## Defendant Sentence Column + Final Address Hardening
+
+- `FINAL_EXCEL` dùng contract mới đúng 14 cột; `HÌNH PHẠT` đứng sau `QUAN HỆ PHÁP LUẬT`, trước `TƯ CÁCH TỐ TỤNG`, và `GHI CHÚ` vẫn là cột cuối.
+- `sentence_parser.py` chỉ đọc `decision_tail`, tái sử dụng verdict blocks và defendant matcher từ `charge_parser.py`, tạo `defendant_sentence_map`, `sentence_evidence`, warnings và diagnostics. Không có case-level sentence fallback.
+- Defendant row lấy sentence theo `entity_id`/`source_block_id`; victim row luôn để `HÌNH PHẠT` trống và không nhận missing-sentence note. Cùng người khác role vẫn độc lập.
+- Parser deterministic hỗ trợ tù có thời hạn, án treo/thử thách, cải tạo không giam giữ, phạt tiền hình sự, chung thân, tử hình, cảnh cáo, trục xuất, miễn hình phạt, execution details, hình phạt chung và hình phạt bổ sung; không tự cộng aggregate và không lấy án phí/nghĩa vụ dân sự.
+- Workbook review có `DEFENDANT_SENTENCES`, `SENTENCE_EVIDENCE`, `SENTENCE_WARNINGS`; source-region audit nhận `HÌNH PHẠT` từ `decision_tail`.
+- Address parser tách permanent/current candidates, ưu tiên `Nơi ở`, chặn presence sentence khỏi địa chỉ và loại presence suffix có dấu câu nhưng giữ parenthetical không phải presence.
+- Verification synthetic: address `29 passed`; sentence/schema/final `47 passed`; regression group cuối `148 passed`; full suite `342 passed`, `0 failed`, không có skip/xfail mới.
+- Codex chỉ dùng synthetic tests; không đọc PDF/cache/output thật và không gọi OCR, Docker, Surya inference, LLM hoặc cloud.
+
 ## Fast Patch 13 Cột, Verdict Block và Địa Chỉ Qua Trang
 
 - `FINAL_EXCEL` hiện có đúng 13 cột; `SỐ BẢN ÁN`, `NGÀY TUYÊN ÁN`, `SỐ THỤ LÝ`, `NGÀY THỤ LÝ` map độc lập từ metadata và không fallback chéo. Field thiếu để trống, kèm note đúng field.

@@ -15,7 +15,7 @@ Last updated: 2026-07-14
 
 `source_region_policy.py` khóa ba canonical region: `front_pre_content`, `decision_tail` và `middle_excluded`. Production chỉ cho phép hai region đầu. Forward OCR/extraction dừng tại `NỘI DUNG VỤ ÁN`; reverse OCR bắt đầu từ cuối và dừng khi tìm được `QUYẾT ĐỊNH` trong guard cấu hình. Khoảng narrative, tranh luận và nhận định ở giữa không được OCR như một fallback và không được fill `FINAL_EXCEL`.
 
-Nhóm identity/case/panel của 11 cột final chỉ lấy từ `front_pre_content`. Tội danh và các field tuyên án thuộc `decision_tail`; task hiện tại chỉ map tội danh vào `QUAN HỆ PHÁP LUẬT`. Charge parser dùng front defendant entities làm dictionary, map bằng `entity_id`, giữ evidence nguồn `decision_tail` và không tạo defendant mới từ phần cuối. Local LLM không tham gia charge extraction hoặc final mapping.
+Nhóm identity/case/panel của 14 cột final chỉ lấy từ `front_pre_content`. `QUAN HỆ PHÁP LUẬT` và `HÌNH PHẠT` chỉ lấy từ `decision_tail`. Charge và sentence parser dùng front defendant entities làm dictionary, map bằng `entity_id`, giữ evidence nguồn và không tạo defendant mới từ phần cuối. Local LLM không tham gia charge/sentence extraction hoặc final mapping.
 
 ## Candidate Path A: Surya OCR + Local LLM
 
@@ -96,7 +96,7 @@ Phase 1B/1E canonical decisions:
 - Config: `src/court_ocr_extract/settings.py` is canonical for the rebuild.
 - Compatibility config: `src/court_ocr_extract/config.py` remains for older imports and should not be expanded unless necessary.
 - Excel writer: `src/court_ocr_extract/excel_writer.py` là canonical path duy nhất.
-- Final output: sheet đầu `FINAL_EXCEL`, đúng 11 cột canonical và chỉ primary roles; sheet thứ hai `NGUOI_THAM_GIA_KHAC` là filtered user view; technical sheets chỉ là debug phụ.
+- Final output: sheet đầu `FINAL_EXCEL`, đúng 14 cột canonical và chỉ primary roles; `NGUOI_THAM_GIA_KHAC` là filtered user view opt-in; technical sheets chỉ là debug phụ.
 - Phase 1E đã migrate caller và xóa `src/court_ocr_extract/excel.py` cùng `src/court_ocr_extract/export/excel_writer.py`; restore bằng Git history trước Phase 1E nếu cần.
 
 Phase 1F canonical decisions:

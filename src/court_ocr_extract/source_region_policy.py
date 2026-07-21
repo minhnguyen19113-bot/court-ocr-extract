@@ -38,6 +38,7 @@ DECISION_TAIL_FIELDS = frozenset(
     {
         "TỘI DANH",
         "QUAN HỆ PHÁP LUẬT",
+        "HÌNH PHẠT",
         "MỨC HÌNH PHẠT",
         "ÁN TREO",
         "THỜI GIAN THỬ THÁCH",
@@ -71,6 +72,8 @@ _DECISION_TECHNICAL_FIELDS = frozenset(
         "defendant_charge_map",
         "charge_output.case_charges",
         "charge_output.defendant_charge_map",
+        "defendant_sentence_map",
+        "sentence_output.defendant_sentence_map",
         "metadata.legal_relationship",
     }
 )
@@ -234,6 +237,22 @@ def build_extraction_source_region_audit(
             seen,
             audit_source_region(
                 "QUAN HỆ PHÁP LUẬT",
+                evidence.get("source_region") or DECISION_TAIL,
+                source_page=_optional_int(evidence.get("page_number")),
+                evidence_line_ids=evidence.get("line_ids") or [],
+            ),
+        )
+    sentence_output = extraction_result.get("sentence_output")
+    sentence_output = sentence_output if isinstance(sentence_output, Mapping) else {}
+    sentence_evidence = sentence_output.get("sentence_evidence")
+    for evidence in sentence_evidence if isinstance(sentence_evidence, list) else []:
+        if not isinstance(evidence, Mapping):
+            continue
+        _append_audit(
+            rows,
+            seen,
+            audit_source_region(
+                "HÌNH PHẠT",
                 evidence.get("source_region") or DECISION_TAIL,
                 source_page=_optional_int(evidence.get("page_number")),
                 evidence_line_ids=evidence.get("line_ids") or [],

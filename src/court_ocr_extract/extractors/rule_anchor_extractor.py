@@ -33,7 +33,13 @@ CASE_NUMBER_TOKEN_RE = re.compile(
 )
 PRESENCE_SUFFIX_RE = re.compile(
     r"\s*(?:[-–—;]?\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)"
-    r"|\(\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)\s*\))\s*$",
+    r"|\(\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)\s*\))"
+    r"\s*[.,;]?\s*$",
+    re.I,
+)
+PRESENCE_LINE_RE = re.compile(
+    r"^\s*(?:Bị\s+cáo\s+)?(?:có\s+mặt|vắng\s+mặt|có\s+đơn\s+xin\s+vắng\s+mặt)"
+    r"(?:\s+tại\s+phiên\s+tòa)?\s*[.,;]?\s*$",
     re.I,
 )
 SHORT_FIELDS = ("gender", "nationality", "ethnicity", "religion", "occupation")
@@ -90,18 +96,30 @@ DEFENDANT_LABELS = (
 
 CURRENT_ADDRESS_CANDIDATE_PATTERNS = (
     (1, re.compile(r"Nơi\s+ở\s+(?:hiện\s+tại|hiện\s+nay)", re.I)),
-    (2, re.compile(r"Chỗ\s+ở\s+hiện\s+tại", re.I)),
-    (3, re.compile(r"Chỗ\s+ở(?!\s+hiện\s+tại)", re.I)),
-    (4, re.compile(r"Nơi\s+cư\s+trú", re.I)),
+    (2, re.compile(r"Nơi\s+ở(?!\s+(?:hiện\s+tại|hiện\s+nay))", re.I)),
+    (3, re.compile(r"Chỗ\s+ở\s+hiện\s+tại", re.I)),
+    (4, re.compile(r"Chỗ\s+ở(?!\s+hiện\s+tại)", re.I)),
+    (5, re.compile(r"Nơi\s+cư\s+trú", re.I)),
     (
-        5,
+        6,
         re.compile(
-            r"Địa\s+chỉ(?!\s+(?:cũ|trước\s+đây|trước\s+kia))",
+            r"Địa\s+chỉ(?:\s+hiện\s+tại)?"
+            r"(?!\s+(?:cũ|trước\s+đây|trước\s+kia))",
             re.I,
         ),
     ),
     (
-        6,
+        7,
+        re.compile(
+            r"Hộ\s+khẩu\s+thường\s+trú|Thường\s+trú|"
+            r"Nơi\s+đăng\s+ký\s+HKTT|Nơi\s+ĐKHKTT",
+            re.I,
+        ),
+    ),
+)
+PERMANENT_ADDRESS_CANDIDATE_PATTERNS = (
+    (
+        1,
         re.compile(
             r"Hộ\s+khẩu\s+thường\s+trú|Thường\s+trú|"
             r"Nơi\s+đăng\s+ký\s+HKTT|Nơi\s+ĐKHKTT",
@@ -110,8 +128,9 @@ CURRENT_ADDRESS_CANDIDATE_PATTERNS = (
     ),
 )
 CURRENT_ADDRESS_LABEL_PATTERN = (
-    r"(?:Nơi\s+ở\s+(?:hiện\s+tại|hiện\s+nay)|Chỗ\s+ở(?:\s+hiện\s+tại)?"
-    r"|Nơi\s+cư\s+trú|Địa\s+chỉ(?!\s+(?:cũ|trước\s+đây|trước\s+kia))"
+    r"(?:Nơi\s+ở(?:\s+(?:hiện\s+tại|hiện\s+nay))?|Chỗ\s+ở(?:\s+hiện\s+tại)?"
+    r"|Nơi\s+cư\s+trú|Địa\s+chỉ(?:\s+hiện\s+tại)?"
+    r"(?!\s+(?:cũ|trước\s+đây|trước\s+kia))"
     r"|Hộ\s+khẩu\s+thường\s+trú|Thường\s+trú|Nơi\s+đăng\s+ký\s+HKTT|Nơi\s+ĐKHKTT)"
 )
 OLD_ADDRESS_LABEL_PATTERN = r"(?:Địa\s+chỉ\s+(?:cũ|trước\s+đây|trước\s+kia))"
@@ -121,7 +140,9 @@ ANY_ADDRESS_LABEL_PATTERN = (
 ADDRESS_STOP_LABEL_PATTERN = (
     r"(?:Nghề\s+nghiệp|Trình\s+độ(?:\s+văn\s+hóa)?|Dân\s+tộc|Giới\s+tính"
     r"|Tôn\s+giáo|Quốc\s+tịch|Cha|Mẹ|con\s+ông|con\s+bà|Vợ|Chồng"
-    r"|Vợ\s+con|Con|Tiền\s+án|Tiền\s+sự|Nhân\s+thân|Bị\s+cáo\s+bị)"
+    r"|Vợ\s+con|Con|Tiền\s+án|Tiền\s+sự|Nhân\s+thân|Bị\s+cáo\s+bị"
+    r"|(?:Bị\s+cáo\s+)?(?:có\s+mặt|vắng\s+mặt|có\s+đơn\s+xin\s+vắng\s+mặt)"
+    r"(?:\s+tại\s+phiên\s+tòa)?)"
 )
 CURRENT_ADDRESS_LINE_RE = re.compile(
     rf"^{CURRENT_ADDRESS_LABEL_PATTERN}\s*[:：]?\s*(.*)$",
@@ -229,7 +250,7 @@ def parse_defendant_block(block: dict[str, Any]) -> dict[str, Any]:
         folded = fold_text(line)
         if not result["detention_status"] and any(value in folded for value in ("tam giam", "tam giu", "cam di khoi noi cu tru")):
             result["detention_status"] = line.strip()
-        if not result["presence_status"] and ("bi cao co mat" in folded or "bi cao vang mat" in folded):
+        if not result["presence_status"] and _is_presence_line(line):
             result["presence_status"] = _presence(line)
 
     validate_defendant_entity(result)
@@ -425,6 +446,22 @@ def _parse_current_address(
     raw: str,
     result: dict[str, Any],
 ) -> None:
+    result["permanent_address"] = None
+    result["permanent_address_evidence_line_ids"] = []
+    permanent_value, permanent_line_ids = _collect_address_lines(
+        block,
+        raw,
+        PERMANENT_ADDRESS_CANDIDATE_PATTERNS,
+    )
+    if permanent_value:
+        result["permanent_address"] = permanent_value
+        result["permanent_address_evidence_line_ids"] = list(permanent_line_ids)
+        result["evidence_line_ids"] = list(
+            dict.fromkeys(
+                [*result.get("evidence_line_ids", []), *permanent_line_ids]
+            )
+        )
+
     result["current_address"] = None
     result["current_address_evidence_line_ids"] = []
     value, used_line_ids = _collect_current_address_lines(block, raw)
@@ -441,11 +478,23 @@ def _collect_current_address_lines(
     block: dict[str, Any],
     raw: str,
 ) -> tuple[str, list[str]]:
+    return _collect_address_lines(
+        block,
+        raw,
+        CURRENT_ADDRESS_CANDIDATE_PATTERNS,
+    )
+
+
+def _collect_address_lines(
+    block: dict[str, Any],
+    raw: str,
+    candidate_patterns: tuple[tuple[int, re.Pattern[str]], ...],
+) -> tuple[str, list[str]]:
     lines = raw.splitlines()
     line_ids = [str(value) for value in block.get("line_ids", [])]
     candidates: list[tuple[int, int, int, re.Match[str]]] = []
     for index, line in enumerate(lines):
-        for priority, pattern in CURRENT_ADDRESS_CANDIDATE_PATTERNS:
+        for priority, pattern in candidate_patterns:
             for match in pattern.finditer(line):
                 candidates.append((priority, index, match.start(), match))
     if not candidates:
@@ -511,6 +560,8 @@ def _normalize_current_address(value: str) -> str:
 
 
 def _is_address_stop_line(value: str) -> bool:
+    if _is_presence_line(value):
+        return True
     if CURRENT_ADDRESS_LINE_RE.match(value) or re.match(
         rf"^\s*{OLD_ADDRESS_LABEL_PATTERN}\s*[:：]?",
         value,
@@ -520,6 +571,10 @@ def _is_address_stop_line(value: str) -> bool:
     if ADDRESS_STOP_LABEL_RE.match(value) or NEXT_DEFENDANT_RE.match(value):
         return True
     return any(pattern.match(value) for _, pattern in DEFENDANT_LABELS)
+
+
+def _is_presence_line(value: str) -> bool:
+    return bool(PRESENCE_LINE_RE.match(value))
 
 
 def _defendant_name(raw: str) -> str | None:
