@@ -1,5 +1,16 @@
 # AI Changelog
 
+## 2026-07-21 - Pilot 10 Sentence Audit Final Hardening
+
+- Mở rộng probation-start parser cho `sơ thảm/sơ thẳm`, parenthesized/bare/textual date trong bounded clause; không sửa raw OCR hoặc dùng metadata fallback.
+- Thay probation partial heuristic bằng kiểm tra capture + phần dư, loại warning sai cho year-only/month-only/year-month duration hoàn chỉnh.
+- Tách sentence evidence thành tám loại, thu hẹp span và thêm custody/UBND/section/numbered-item boundaries mà không chặn additional item hợp lệ phía sau.
+- Thêm structured warning records có severity/scope/entity/source evidence; workbook warning/evidence sheets xuất đầy đủ audit columns.
+- Thay validator-note substring matching bằng field-level whitelist; procedural rejection không còn lan note hoặc review state tới mọi đương sự.
+- Thêm cross-source name audit với similarity và explicit disagreement warning; front name/FINAL_EXCEL name không bị thay đổi.
+- Targeted `30 passed`, sentence regression `84 passed`, regression group `150 passed`, full suite `394 passed`, `0 failed`, không thêm skip/xfail.
+- Không đọc/chạy dữ liệu thật, không gọi OCR/Docker/Surya inference/LLM/cloud và không commit/push.
+
 ## 2026-07-21 - Pilot 10 Sentence Completeness and Evidence Hardening
 
 - Mở rộng deterministic sentence parser cho textual date, OCR `bất giam/bắt giảm`, probation nhiều đơn vị và structured `probation_start_text`.

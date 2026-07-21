@@ -12,7 +12,7 @@ from court_ocr_extract.final_excel_role_policy import (
 )
 from court_ocr_extract.final_excel_schema import FINAL_EXCEL_COLUMNS
 from court_ocr_extract.sentence_parser import (
-    SENTENCE_COMPLETENESS_WARNINGS,
+    SENTENCE_REVIEW_WARNINGS,
     format_sentence_for_excel,
 )
 from court_ocr_extract.source_region_policy import DECISION_TAIL, FRONT_PRE_CONTENT
@@ -59,8 +59,6 @@ def build_final_excel_rows(extraction_result: Mapping[str, Any]) -> list[dict[st
     output_warnings = _warning_strings(extraction_result.get("warnings"))
     if _contains_ocr_warning(output_warnings):
         common_notes.append("OCR nghi ngờ")
-    if _contains_validator_rejection(output_warnings):
-        common_notes.append("Field bị validator loại")
 
     entities: list[tuple[str, Mapping[str, Any], bool]] = [
         (_defendant_role(_mapping(item)), _mapping(item), True)
@@ -333,7 +331,7 @@ def _row_sentence(
         }
         notes = (
             ["Cần kiểm tra lại bằng chứng hình phạt"]
-            if warnings & SENTENCE_COMPLETENESS_WARNINGS
+            if warnings & SENTENCE_REVIEW_WARNINGS
             else []
         )
         return display, notes
@@ -503,8 +501,20 @@ def _contains_ocr_warning(warnings: list[str]) -> bool:
 
 
 def _contains_validator_rejection(warnings: list[str]) -> bool:
-    markers = ("field_too_long", "forbidden", "invalid", "validator", "rejected")
-    return any(any(marker in warning.casefold() for marker in markers) for warning in warnings)
+    field_level_prefixes = (
+        "metadata_field_rejected",
+        "entity_field_rejected",
+        "sentence_duration_rejected",
+        "identity_number_rejected",
+        "address_candidate_rejected",
+        "field_too_long",
+        "forbidden_name",
+        "forbidden_field",
+    )
+    return any(
+        warning.casefold().startswith(field_level_prefixes)
+        for warning in warnings
+    )
 
 
 def _warning_strings(value: Any) -> list[str]:

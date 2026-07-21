@@ -1,5 +1,16 @@
 # Tasks
 
+## PILOT 10 SENTENCE AUDIT FINAL HARDENING
+
+- [x] Hỗ trợ bounded probation-start OCR variants và bốn dạng explicit date, không metadata fallback.
+- [x] Loại false-positive `probation_duration_partial` cho duration đầy đủ một/nhiều đơn vị.
+- [x] Tách tám `evidence_type`, thu hẹp primary/probation span và thêm procedural/section boundaries.
+- [x] Tạo structured `sentence_warnings` có entity/case scope, source evidence và workbook audit đầy đủ.
+- [x] Phân loại procedural rejection là informational; giữ field-level validator note theo đúng entity.
+- [x] Thêm cross-source name disagreement audit, không sửa front name hoặc FINAL_EXCEL name.
+- [x] Thêm synthetic tests bắt buộc; targeted `30 passed`, regression `150 passed`, full suite `394 passed`.
+- [ ] Project Owner rerun cache-only pilot 10 vào `outputs\pilot_10_sentence_audit_final_check` và duyệt warning/evidence/name audit thực tế.
+
 ## PILOT 10 SENTENCE COMPLETENESS AND EVIDENCE HARDENING
 
 - [x] Parse textual Vietnamese sentence-start date và normalize ba OCR variant hẹp của `bắt giam`.

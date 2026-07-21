@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from copy import deepcopy
+from difflib import SequenceMatcher
 from typing import Any
 
 from court_ocr_extract.charge_parser import (
@@ -74,7 +76,8 @@ _START_RE = re.compile(
 )
 _PROBATION_START_RE = re.compile(
     rf"(?P<value>tính\s+từ\s+ngày\s+tuyên\s+án"
-    rf"(?:\s+sơ\s+thẩm)?(?:\s*\((?P<date>{_DATE_VALUE})\))?)",
+    rf"(?:\s+sơ\s+th(?:ẩm|ảm|ẳm))?"
+    rf"(?:\s*(?:\(\s*|ngày\s+)?(?P<date>{_DATE_VALUE})\s*\)?)?)",
     re.I,
 )
 _DETENTION_CREDIT_RE = re.compile(
@@ -115,7 +118,15 @@ _SENTENCE_SECTION_BOUNDARIES = (
     "bien phap tu phap",
     "an phi",
     "quyen khang cao",
+    "khang cao",
     "noi nhan",
+)
+_SENTENCE_PROCEDURAL_BOUNDARIES = (
+    "tiep tuc tam giam",
+    "tam giam bi cao trong thoi han",
+    "giao bi cao cho uy ban nhan dan",
+    "giao cho uy ban nhan dan",
+    "gia dinh bi cao co trach nhiem",
 )
 SENTENCE_COMPLETENESS_WARNINGS = {
     "sentence_start_anchor_unparsed",
@@ -126,6 +137,10 @@ SENTENCE_COMPLETENESS_WARNINGS = {
     "additional_penalty_anchor_unparsed",
     "sentence_evidence_span_inconsistent",
 }
+SENTENCE_REVIEW_WARNINGS = {
+    *SENTENCE_COMPLETENESS_WARNINGS,
+    "cross_source_person_name_disagreement",
+}
 
 
 def parse_defendant_sentences(
@@ -133,6 +148,7 @@ def parse_defendant_sentences(
     *,
     defendants: Iterable[Mapping[str, Any]] = (),
     source_region: str = DECISION_TAIL,
+    case_id: str = "",
     min_name_match_score: float = 88.0,
     name_match_ambiguity_gap: float = 5.0,
 ) -> dict[str, Any]:
@@ -144,6 +160,7 @@ def parse_defendant_sentences(
     blocks = iter_verdict_blocks(decision_input)
     sentence_map: dict[str, dict[str, Any]] = {}
     evidence: list[dict[str, Any]] = []
+    warning_records: list[dict[str, Any]] = []
     warnings = list(source_warnings)
     invalid_count = 0
     parsed_count = 0
@@ -182,8 +199,6 @@ def parse_defendant_sentences(
             warnings.append(_sentence_mapping_warning(match_warning))
 
         base = _parse_sentence_fields(raw_text)
-        completeness_warnings = _sentence_completeness_warnings(raw_text, base)
-        warnings.extend(completeness_warnings)
         if not base["primary_penalty_text"]:
             invalid_count += 1
             warnings.extend(
@@ -206,27 +221,69 @@ def parse_defendant_sentences(
             records = {}
 
         for entity_id, fields in records.items():
-            names = [_defendant_name(entity_id, defendant_list)]
-            line_ids = [
-                str(value) for value in block.get("line_ids", []) if str(value)
-            ]
-            record_warnings = list(completeness_warnings)
-            if not _evidence_span_is_consistent(raw_text, line_ids):
+            front_name = _defendant_name(entity_id, defendant_list)
+            primary_lines = _block_lines_for_ids(block, parsed_verdict.line_ids)
+            if not primary_lines:
+                primary_lines = _block_lines_for_ids(
+                    block, list(block.get("line_ids", []))[:1]
+                )
+            primary_raw_text = _span_raw_text(primary_lines)
+            line_ids = _span_line_ids(primary_lines)
+            primary_fields = _fields_for_evidence_type(
+                "primary_penalty", fields
+            )
+            name_audit = _cross_source_name_audit(
+                raw_text,
+                front_name=front_name,
+                match_method=match_method,
+            )
+            record_warnings: list[str] = []
+            if name_audit["name_disagreement"]:
+                record_warnings.append("cross_source_person_name_disagreement")
+                warnings.append("cross_source_person_name_disagreement")
+                warning_records.append(
+                    _sentence_warning_record(
+                        case_id=case_id,
+                        warning="cross_source_person_name_disagreement",
+                        scope="entity",
+                        defendant_entity_id=entity_id,
+                        defendant_name=front_name,
+                        page_number=_optional_int(block.get("page_number")),
+                        line_ids=line_ids,
+                        raw_text=primary_raw_text,
+                        **name_audit,
+                    )
+                )
+            if not _evidence_span_is_consistent(primary_raw_text, line_ids):
                 record_warnings.append("sentence_evidence_span_inconsistent")
                 warnings.append("sentence_evidence_span_inconsistent")
+                warning_records.append(
+                    _sentence_warning_record(
+                        case_id=case_id,
+                        warning="sentence_evidence_span_inconsistent",
+                        scope="entity",
+                        defendant_entity_id=entity_id,
+                        defendant_name=front_name,
+                        page_number=_optional_int(block.get("page_number")),
+                        line_ids=line_ids,
+                        raw_text=primary_raw_text,
+                    )
+                )
             record = _sentence_record(
-                fields,
+                primary_fields,
+                evidence_type="primary_penalty",
                 defendant_entity_ids=[entity_id],
-                defendant_names=[name for name in names if name],
+                defendant_names=[front_name] if front_name else [],
                 source_region=DECISION_TAIL,
                 page_number=_optional_int(block.get("page_number")),
                 line_ids=line_ids,
-                raw_text=raw_text,
+                raw_text=primary_raw_text,
                 match_method=match_method,
                 confidence="high" if entity_id in entity_ids else "medium",
                 warnings=record_warnings,
+                audit=name_audit,
             )
-            _merge_sentence(sentence_map, entity_id, record, warnings)
+            _merge_sentence(sentence_map, entity_id, deepcopy(record), warnings)
             evidence.append(record)
             parsed_count += 1
 
@@ -236,6 +293,8 @@ def parse_defendant_sentences(
         sentence_map,
         evidence,
         warnings,
+        warning_records,
+        case_id=case_id,
         min_name_match_score=min_name_match_score,
         name_match_ambiguity_gap=name_match_ambiguity_gap,
     )
@@ -246,6 +305,13 @@ def parse_defendant_sentences(
     mapped_count = len(sentence_map)
     if mapped_count < len(defendant_list):
         warnings.append(f"sentence_coverage_incomplete:{mapped_count}/{len(defendant_list)}")
+    warning_records = _complete_sentence_warning_records(
+        case_id=case_id,
+        warnings=warnings,
+        warning_records=warning_records,
+        evidence=evidence,
+        lines=_sentence_lines(decision_input),
+    )
     diagnostics = {
         "sentence_candidate_count": len(blocks),
         "parsed_sentence_count": parsed_count,
@@ -265,6 +331,7 @@ def parse_defendant_sentences(
     return {
         "defendant_sentence_map": sentence_map,
         "sentence_evidence": evidence,
+        "sentence_warnings": warning_records,
         "warnings": list(dict.fromkeys(item for item in warnings if item)),
         "diagnostics": diagnostics,
     }
@@ -464,6 +531,7 @@ def _blank_sentence_fields() -> dict[str, Any]:
 def _sentence_record(
     fields: Mapping[str, Any],
     *,
+    evidence_type: str,
     defendant_entity_ids: list[str],
     defendant_names: list[str],
     source_region: str,
@@ -473,10 +541,12 @@ def _sentence_record(
     match_method: str,
     confidence: str,
     warnings: list[str],
+    audit: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         **_blank_sentence_fields(),
         **dict(fields),
+        "evidence_type": evidence_type,
         "defendant_entity_ids": defendant_entity_ids,
         "defendant_names": defendant_names,
         "source_region": source_region,
@@ -486,6 +556,7 @@ def _sentence_record(
         "match_method": match_method,
         "confidence": confidence,
         "warnings": list(dict.fromkeys(warnings)),
+        **dict(audit or {}),
     }
 
 
@@ -554,68 +625,127 @@ def _sentence_lines(
     return [dict(line) for line in lines_or_text if _text(line.get("text"))]
 
 
-def _follow_on_clauses(lines: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    clauses: list[list[dict[str, Any]]] = []
-    index = 0
-    while index < len(lines):
-        text = _text(lines[index].get("text"))
-        if _is_sentence_section_boundary(text):
-            break
-        if not _has_follow_on_anchor(text):
-            index += 1
-            continue
-        clause: list[dict[str, Any]] = []
-        cursor = index
-        while cursor < len(lines) and len(clause) < 4:
-            current = _text(lines[cursor].get("text"))
-            if _is_sentence_section_boundary(current):
-                break
-            if cursor > index and _is_numbered_decision_item(current):
-                break
-            clause.append(lines[cursor])
-            if _has_parsed_follow_on(
-                _parse_sentence_fields(
-                    "\n".join(_text(item.get("text")) for item in clause)
-                )
-            ):
-                cursor += 1
-                break
-            cursor += 1
-        if clause:
-            clauses.append(clause)
-        index = max(cursor, index + 1)
+def _typed_detail_clauses(
+    lines: list[dict[str, Any]],
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    clauses: list[tuple[str, list[dict[str, Any]]]] = []
+    evidence_types = (
+        "probation",
+        "sentence_start",
+        "detention_credit",
+        "completion",
+        "release",
+        "aggregate_penalty",
+        "additional_penalty",
+    )
+    for evidence_type in evidence_types:
+        used_line_ids: set[str] = set()
+        for index, line in enumerate(lines):
+            line_id = _text(line.get("line_id"))
+            text = _text(line.get("text"))
+            if line_id in used_line_ids or _is_sentence_evidence_boundary(text):
+                continue
+            if not _has_evidence_anchor(evidence_type, text):
+                continue
+            clause = _collect_typed_clause(lines, index, evidence_type)
+            if not clause:
+                continue
+            clauses.append((evidence_type, clause))
+            used_line_ids.update(_span_line_ids(clause))
+    clauses.sort(
+        key=lambda item: min(
+            (
+                index
+                for index, line in enumerate(lines)
+                if _text(line.get("line_id")) in set(_span_line_ids(item[1]))
+            ),
+            default=len(lines),
+        )
+    )
     return clauses
 
 
-def _has_follow_on_anchor(value: str) -> bool:
+def _collect_typed_clause(
+    lines: list[dict[str, Any]], start: int, evidence_type: str
+) -> list[dict[str, Any]]:
+    clause: list[dict[str, Any]] = []
+    cursor = start
+    while cursor < len(lines) and len(clause) < 4:
+        current = _text(lines[cursor].get("text"))
+        if cursor > start and (
+            _is_sentence_evidence_boundary(current)
+            or _is_numbered_decision_item(current)
+        ):
+            break
+        clause.append(lines[cursor])
+        fields = _parse_sentence_fields(_span_raw_text(clause))
+        next_line = lines[cursor + 1] if cursor + 1 < len(lines) else None
+        if _typed_clause_is_complete(evidence_type, fields, clause):
+            if not _typed_clause_needs_next(evidence_type, fields, clause, next_line):
+                break
+        cursor += 1
+    return clause
+
+
+def _has_evidence_anchor(evidence_type: str, value: str) -> bool:
     folded = fold_text(value)
-    markers = (
-        "phat bo sung",
-        "hinh phat chung",
-        "thoi gian thu thach",
-        "tinh tu ngay tuyen an",
-        "thoi han tu tinh tu ngay",
-        "tru ngay tam giu",
-        "tru thoi gian tam giu",
-        "duoc tru thoi gian tam giu",
-        "thoi han tu bang",
-        "chap hanh xong",
-        "tra tu do",
-    )
-    return any(marker in folded for marker in markers)
+    markers = {
+        "probation": ("cho huong an treo", "thoi gian thu thach", "tinh tu ngay tuyen an"),
+        "sentence_start": ("thoi han tu tinh tu ngay",),
+        "detention_credit": (
+            "tru ngay tam giu",
+            "tru thoi gian tam giu",
+            "duoc tru thoi gian tam giu",
+        ),
+        "completion": ("thoi han tu bang", "chap hanh xong"),
+        "release": ("tra tu do",),
+        "aggregate_penalty": ("hinh phat chung",),
+        "additional_penalty": ("phat bo sung",),
+    }
+    return any(marker in folded for marker in markers[evidence_type])
 
 
-def _has_parsed_follow_on(fields: Mapping[str, Any]) -> bool:
+def _typed_clause_is_complete(
+    evidence_type: str,
+    fields: Mapping[str, Any],
+    clause: list[dict[str, Any]],
+) -> bool:
+    if evidence_type == "probation":
+        folded = fold_text(_span_raw_text(clause))
+        return bool(fields.get("probation_text")) and (
+            "tinh tu ngay tuyen an" not in folded
+            or bool(fields.get("probation_start_text"))
+        )
     return bool(
-        fields.get("aggregate_penalty_text")
-        or fields.get("additional_penalties")
-        or fields.get("probation_text")
-        or fields.get("probation_start_text")
-        or fields.get("sentence_start_text")
-        or fields.get("detention_credit_text")
-        or fields.get("completion_text")
-        or fields.get("release_text")
+        {
+            "sentence_start": fields.get("sentence_start_text"),
+            "detention_credit": fields.get("detention_credit_text"),
+            "completion": fields.get("completion_text"),
+            "release": fields.get("release_text"),
+            "aggregate_penalty": fields.get("aggregate_penalty_text"),
+            "additional_penalty": fields.get("additional_penalties"),
+        }[evidence_type]
     )
+
+
+def _typed_clause_needs_next(
+    evidence_type: str,
+    fields: Mapping[str, Any],
+    clause: list[dict[str, Any]],
+    next_line: dict[str, Any] | None,
+) -> bool:
+    if next_line is None:
+        return False
+    next_text = _text(next_line.get("text"))
+    if _is_sentence_evidence_boundary(next_text) or _is_numbered_decision_item(next_text):
+        return False
+    if evidence_type == "probation":
+        if _has_evidence_anchor("probation", next_text):
+            return True
+        return bool(fields.get("probation_start_text")) and _looks_like_date_line(next_text)
+    if evidence_type == "completion":
+        return _has_evidence_anchor("completion", next_text)
+    return False
 
 
 def _is_sentence_section_boundary(value: str) -> bool:
@@ -623,8 +753,139 @@ def _is_sentence_section_boundary(value: str) -> bool:
     return any(marker in folded for marker in _SENTENCE_SECTION_BOUNDARIES)
 
 
+def _is_sentence_evidence_boundary(value: str) -> bool:
+    folded = fold_text(value)
+    return _is_sentence_section_boundary(value) or any(
+        marker in folded for marker in _SENTENCE_PROCEDURAL_BOUNDARIES
+    )
+
+
 def _is_numbered_decision_item(value: str) -> bool:
     return bool(re.match(r"^\s*\d+(?:\.\d+)*\.?\s+", value))
+
+
+def _looks_like_date_line(value: str) -> bool:
+    return bool(re.fullmatch(rf"\s*\(?\s*(?:ngày\s+)?{_DATE_VALUE}\s*\)?[.;]?\s*", value, re.I))
+
+
+def _span_line_ids(lines: Iterable[Mapping[str, Any]]) -> list[str]:
+    return list(
+        dict.fromkeys(
+            _text(line.get("line_id"))
+            for line in lines
+            if _text(line.get("line_id"))
+        )
+    )
+
+
+def _span_raw_text(lines: Iterable[Mapping[str, Any]]) -> str:
+    return "\n".join(
+        _text(line.get("text"))
+        for line in lines
+        if _text(line.get("text"))
+    )
+
+
+def _block_lines_for_ids(
+    block: Mapping[str, Any], line_ids: Iterable[object]
+) -> list[dict[str, Any]]:
+    wanted = {_text(value) for value in line_ids if _text(value)}
+    raw_lines = str(block.get("raw_text") or "").splitlines()
+    block_line_ids = [_text(value) for value in block.get("line_ids", [])]
+    return [
+        {
+            "line_id": line_id,
+            "page_number": block.get("page_number"),
+            "text": raw_lines[index],
+        }
+        for index, line_id in enumerate(block_line_ids)
+        if line_id in wanted and index < len(raw_lines)
+    ]
+
+
+def _nearest_primary_entity_ids(
+    clause_lines: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+    line_indexes: Mapping[str, int],
+) -> list[str]:
+    clause_indexes = [
+        line_indexes[line_id]
+        for line_id in _span_line_ids(clause_lines)
+        if line_id in line_indexes
+    ]
+    if not clause_indexes:
+        return []
+    clause_start = min(clause_indexes)
+    candidates: list[tuple[int, list[str]]] = []
+    for item in evidence:
+        if item.get("evidence_type") != "primary_penalty":
+            continue
+        indexes = [
+            line_indexes[line_id]
+            for line_id in item.get("line_ids", [])
+            if line_id in line_indexes
+        ]
+        if indexes and max(indexes) <= clause_start:
+            candidates.append((max(indexes), list(item.get("defendant_entity_ids", []))))
+    return max(candidates, default=(-1, []), key=lambda item: item[0])[1]
+
+
+def _has_parsed_evidence(
+    evidence_type: str, fields: Mapping[str, Any]
+) -> bool:
+    return bool(
+        {
+            "probation": fields.get("suspended") or fields.get("probation_text"),
+            "sentence_start": fields.get("sentence_start_text"),
+            "detention_credit": fields.get("detention_credit_text"),
+            "completion": fields.get("completion_text"),
+            "release": fields.get("release_text"),
+            "aggregate_penalty": fields.get("aggregate_penalty_text"),
+            "additional_penalty": fields.get("additional_penalties"),
+        }[evidence_type]
+    )
+
+
+def _fields_for_evidence_type(
+    evidence_type: str, fields: Mapping[str, Any]
+) -> dict[str, Any]:
+    keys = {
+        "primary_penalty": (
+            "primary_penalty_kind",
+            "primary_penalty_text",
+            "duration_years",
+            "duration_months",
+            "duration_days",
+        ),
+        "probation": (
+            "suspended",
+            "probation_duration_years",
+            "probation_duration_months",
+            "probation_duration_days",
+            "probation_text",
+            "probation_start_text",
+        ),
+        "sentence_start": ("sentence_start_text",),
+        "detention_credit": ("detention_credit_text",),
+        "completion": ("completion_text", "execution_status"),
+        "release": ("release_text",),
+        "aggregate_penalty": (
+            "aggregate_penalty_text",
+            "component_penalties",
+            "is_aggregate",
+        ),
+        "additional_penalty": ("additional_penalties",),
+    }[evidence_type]
+    selected = _blank_sentence_fields()
+    for key in keys:
+        selected[key] = fields.get(key)
+    if evidence_type == "primary_penalty" and fields.get("suspended"):
+        selected["primary_penalty_kind"] = "term_imprisonment"
+    if evidence_type == "probation" and fields.get("suspended"):
+        selected["primary_penalty_kind"] = "suspended_imprisonment"
+        selected["execution_status"] = "suspended"
+    selected["display_text"] = format_sentence_for_excel(selected)
+    return selected
 
 
 def _apply_follow_on_details(
@@ -633,30 +894,27 @@ def _apply_follow_on_details(
     sentence_map: dict[str, dict[str, Any]],
     evidence: list[dict[str, Any]],
     warnings: list[str],
+    warning_records: list[dict[str, Any]],
     *,
+    case_id: str,
     min_name_match_score: float,
     name_match_ambiguity_gap: float,
 ) -> None:
     lines = _sentence_lines(lines_or_text)
-    used_line_ids = {
-        line_id
-        for item in evidence
-        for line_id in item.get("line_ids", [])
-        if line_id
+    line_indexes = {
+        _text(line.get("line_id")): index
+        for index, line in enumerate(lines)
+        if _text(line.get("line_id"))
     }
-    for clause_lines in _follow_on_clauses(lines):
-        line_ids = [_text(line.get("line_id")) for line in clause_lines]
-        line_ids = [line_id for line_id in line_ids if line_id]
-        if line_ids and set(line_ids).issubset(used_line_ids):
-            continue
-        text = "\n".join(_text(line.get("text")) for line in clause_lines)
-        fields = _parse_sentence_fields(text)
+    for evidence_type, clause_lines in _typed_detail_clauses(lines):
+        line_ids = _span_line_ids(clause_lines)
+        text = _span_raw_text(clause_lines)
+        parsed_fields = _parse_sentence_fields(text)
+        fields = _fields_for_evidence_type(evidence_type, parsed_fields)
         clause_warnings = _sentence_completeness_warnings(text, fields)
         if not _evidence_span_is_consistent(text, line_ids):
             clause_warnings.append("sentence_evidence_span_inconsistent")
         warnings.extend(clause_warnings)
-        if not _has_parsed_follow_on(fields):
-            continue
         matched = match_defendant_entities(
             text,
             defendants,
@@ -664,9 +922,32 @@ def _apply_follow_on_details(
             name_match_ambiguity_gap=name_match_ambiguity_gap,
         )
         entity_ids = list(matched["defendant_entity_ids"])
+        match_method = str(matched["match_method"])
         if not entity_ids:
-            continue
+            entity_ids = _nearest_primary_entity_ids(
+                clause_lines, evidence, line_indexes
+            )
+            if entity_ids:
+                match_method = "preceding_primary_sentence"
         entity_names = list(matched["defendant_names"])
+        if clause_warnings:
+            targets = entity_ids or [""]
+            for entity_id in targets:
+                warning_records.extend(
+                    _sentence_warning_record(
+                        case_id=case_id,
+                        warning=warning,
+                        scope="entity" if entity_id else "case",
+                        defendant_entity_id=entity_id,
+                        defendant_name=_defendant_name(entity_id, defendants),
+                        page_number=_optional_int(clause_lines[0].get("page_number")),
+                        line_ids=line_ids,
+                        raw_text=text,
+                    )
+                    for warning in clause_warnings
+                )
+        if not _has_parsed_evidence(evidence_type, fields) or not entity_ids:
+            continue
         for entity_id in entity_ids:
             existing = sentence_map.get(entity_id)
             if existing is None:
@@ -674,6 +955,7 @@ def _apply_follow_on_details(
                 continue
             record = _sentence_record(
                 fields,
+                evidence_type=evidence_type,
                 defendant_entity_ids=[entity_id],
                 defendant_names=[
                     _defendant_name(entity_id, defendants)
@@ -683,18 +965,21 @@ def _apply_follow_on_details(
                 page_number=_optional_int(clause_lines[0].get("page_number")),
                 line_ids=line_ids,
                 raw_text=text,
-                match_method=str(matched["match_method"]),
+                match_method=match_method,
                 confidence="high",
                 warnings=clause_warnings,
             )
             _merge_follow_on_sentence(existing, record)
             evidence.append(record)
-            used_line_ids.update(line_ids)
 
 
 def _merge_follow_on_sentence(
     existing: dict[str, Any], record: Mapping[str, Any]
 ) -> None:
+    if record.get("suspended"):
+        existing["suspended"] = True
+        existing["primary_penalty_kind"] = "suspended_imprisonment"
+        existing["execution_status"] = "suspended"
     if record.get("aggregate_penalty_text"):
         existing["aggregate_penalty_text"] = record["aggregate_penalty_text"]
         existing["is_aggregate"] = True
@@ -707,6 +992,13 @@ def _merge_follow_on_sentence(
         "release_text",
     ):
         if record.get(key):
+            existing[key] = record[key]
+    for key in (
+        "probation_duration_years",
+        "probation_duration_months",
+        "probation_duration_days",
+    ):
+        if record.get(key) is not None:
             existing[key] = record[key]
     if record.get("execution_status"):
         existing["execution_status"] = record["execution_status"]
@@ -898,14 +1190,7 @@ def _sentence_completeness_warnings(
     ):
         warnings.append("sentence_start_anchor_unparsed")
     if "thoi gian thu thach" in folded:
-        probation_partial = not fields.get("probation_text") or bool(
-            re.search(
-                r"thời\s+gian\s+thử\s+thách[^\n.;]*,\s*\d{1,3}(?:\s*[.;]|\s*$)",
-                raw_text,
-                re.I,
-            )
-        )
-        if probation_partial:
+        if _probation_duration_is_partial(raw_text):
             warnings.append("probation_duration_partial")
     if "tinh tu ngay tuyen an" in folded and not fields.get("probation_start_text"):
         warnings.append("probation_start_unparsed")
@@ -931,6 +1216,168 @@ def _sentence_completeness_warnings(
     if "phat bo sung" in folded and not fields.get("additional_penalties"):
         warnings.append("additional_penalty_anchor_unparsed")
     return list(dict.fromkeys(warnings))
+
+
+def _cross_source_name_audit(
+    raw_text: str, *, front_name: str, match_method: str
+) -> dict[str, Any]:
+    decision_name = _decision_sentence_name(raw_text)
+    normalized_front = fold_text(_strip_name_honorific(front_name))
+    normalized_decision = fold_text(_strip_name_honorific(decision_name))
+    similarity = (
+        round(
+            SequenceMatcher(None, normalized_front, normalized_decision).ratio() * 100,
+            2,
+        )
+        if normalized_front and normalized_decision
+        else None
+    )
+    fuzzy_match = "fuzzy" in match_method.casefold()
+    return {
+        "front_name": front_name,
+        "decision_name": decision_name,
+        "normalized_front_name": normalized_front,
+        "normalized_decision_name": normalized_decision,
+        "name_match_method": match_method,
+        "similarity": similarity,
+        "name_disagreement": bool(
+            fuzzy_match
+            and normalized_front
+            and normalized_decision
+            and normalized_front != normalized_decision
+        ),
+    }
+
+
+def _decision_sentence_name(raw_text: str) -> str:
+    match = re.search(
+        rf"(?:xử\s+phạt|tuyên\s+phạt|tuyên\s+xử)\s+"
+        rf"(?:bị\s+cáo\s+)?(?P<name>[^\n,;:]{{2,160}}?)"
+        rf"(?=\s+(?:{_DURATION_PART}|tù\s+chung\s+thân|tử\s+hình|"
+        rf"cải\s+tạo\s+không\s+giam\s+giữ|phạt\s+tiền|về\s+tội|phạm\s+tội)\b)",
+        raw_text,
+        re.I,
+    )
+    return _text(match.group("name")) if match else ""
+
+
+def _strip_name_honorific(value: str) -> str:
+    return re.sub(
+        r"^(?:bị\s+cáo|ông|bà|anh|chị)\s+",
+        "",
+        _text(value),
+        flags=re.I,
+    )
+
+
+def _sentence_warning_record(
+    *,
+    case_id: str,
+    warning: str,
+    scope: str,
+    defendant_entity_id: str,
+    defendant_name: str,
+    page_number: int | None,
+    line_ids: list[str],
+    raw_text: str,
+    severity: str = "warning",
+    **audit: Any,
+) -> dict[str, Any]:
+    record = {
+        "case_id": case_id,
+        "warning": warning,
+        "severity": severity,
+        "scope": scope,
+        "defendant_entity_id": defendant_entity_id,
+        "defendant_name": defendant_name,
+        "page_number": page_number,
+        "line_ids": list(dict.fromkeys(line_ids)),
+        "raw_text": raw_text,
+        "source_region": DECISION_TAIL,
+        "front_name": "",
+        "decision_name": "",
+        "match_method": "",
+        "similarity": None,
+    }
+    record.update(audit)
+    if audit.get("name_match_method") and not audit.get("match_method"):
+        record["match_method"] = audit["name_match_method"]
+    return record
+
+
+def _complete_sentence_warning_records(
+    *,
+    case_id: str,
+    warnings: list[str],
+    warning_records: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+    lines: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    records = list(warning_records)
+    existing_codes = {str(record.get("warning") or "") for record in records}
+    first_source = evidence[0] if evidence else (lines[0] if lines else {})
+    for warning in dict.fromkeys(value for value in warnings if value):
+        if warning in existing_codes:
+            continue
+        records.append(
+            _sentence_warning_record(
+                case_id=case_id,
+                warning=warning,
+                severity=("info" if "ignored_from_source_region" in warning else "warning"),
+                scope="case",
+                defendant_entity_id="",
+                defendant_name="",
+                page_number=_optional_int(first_source.get("page_number")),
+                line_ids=[
+                    _text(value)
+                    for value in first_source.get("line_ids", [])
+                    if _text(value)
+                ]
+                or ([
+                    _text(first_source.get("line_id"))
+                ] if _text(first_source.get("line_id")) else []),
+                raw_text=str(
+                    first_source.get("raw_text") or first_source.get("text") or ""
+                ).strip(),
+            )
+        )
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, tuple[str, ...]]] = set()
+    for record in records:
+        key = (
+            str(record.get("warning") or ""),
+            str(record.get("defendant_entity_id") or ""),
+            tuple(record.get("line_ids", [])),
+        )
+        if key not in seen:
+            seen.add(key)
+            deduped.append(record)
+    return deduped
+
+
+def _probation_duration_is_partial(raw_text: str) -> bool:
+    match = _PROBATION_RE.search(raw_text)
+    if match is None or not _DURATION_COMPONENT_RE.search(match.group("duration")):
+        return True
+    remainder = raw_text[match.end():]
+    remainder = re.split(
+        r"(?:\n\s*\d+(?:\.\d+)*\.?\s+|"
+        r"\b(?:thời\s+hạn\s+tù|được\s+trừ|đã\s+chấp\s+hành|"
+        r"hình\s+ph(?:ạt|át)\s+bổ\s+sung|trả\s+tự\s+do)\b)",
+        remainder,
+        maxsplit=1,
+        flags=re.I,
+    )[0]
+    stripped = remainder.lstrip()
+    if not stripped or stripped.startswith((".", ";", "\n")):
+        return False
+    if re.match(r"^,?\s*tính\s+từ\s+ngày\b", stripped, re.I):
+        return False
+    return bool(
+        re.match(r"^,\s*\d{1,3}(?!\s*(?:năm|tháng|ngày)\b)", stripped, re.I)
+        or re.match(r"^(?:,\s*)?và(?:\s*\.{2,}|\s*$)", stripped, re.I)
+        or re.match(r"^,\s*$", stripped)
+    )
 
 
 def _evidence_span_is_consistent(raw_text: str, line_ids: list[str]) -> bool:
@@ -988,6 +1435,7 @@ def _empty_output(warning: str = "") -> dict[str, Any]:
     return {
         "defendant_sentence_map": {},
         "sentence_evidence": [],
+        "sentence_warnings": [],
         "warnings": [warning] if warning else [],
         "diagnostics": {
             "sentence_candidate_count": 0,

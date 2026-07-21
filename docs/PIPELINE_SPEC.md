@@ -38,6 +38,12 @@ Additional penalty ở numbered item riêng phải được scan theo bounded cl
 
 Mỗi `sentence_evidence` phải có `raw_text` gồm đúng các line trong `line_ids`; mọi line tạo display phải có trong evidence. Evidence dừng trước vật chứng, biện pháp tư pháp, án phí, quyền kháng cáo và nơi nhận. Known anchor không parse thành structured field phải phát warning canonical và bật review thay vì im lặng.
 
+Sentence evidence phải khai báo một trong tám `evidence_type`: `primary_penalty`, `probation`, `sentence_start`, `detention_credit`, `completion`, `release`, `aggregate_penalty`, `additional_penalty`. Custody measure, UBND supervision và family-supervision instruction là procedural boundary của primary/probation evidence; boundary không xóa raw cache và không cấm scanner nhận additional item hợp lệ ở phần sau.
+
+`sentence_warnings` dùng structured record với severity, case/entity scope, defendant identity và source evidence. Procedural candidate rejection là informational/debug, không phải field validator failure và không được tạo common FINAL_EXCEL note hoặc review state. Field validator note chỉ dựa trên field-level warning whitelist của đúng entity.
+
+Khi decision-tail name chỉ map bằng unique fuzzy và normalized decision name khác front name, parser phát `cross_source_person_name_disagreement`, lưu hai tên/method/similarity và giữ nguyên front name trong FINAL_EXCEL. Khác biệt chỉ do whitespace, case, punctuation hoặc honorific không warning; không hard-code OCR name correction.
+
 ## Final Excel schema contract
 
 `FINAL_EXCEL` là output nghiệp vụ chính và phải là sheet đầu tiên của mọi final workbook. Schema duy nhất là `FINAL_EXCEL_COLUMNS` trong `src/court_ocr_extract/final_excel_schema.py`, đúng 14 cột và đúng thứ tự Project Owner duyệt. `HÌNH PHẠT` đứng sau `QUAN HỆ PHÁP LUẬT`; source/evidence/confidence/strategy/JSON chỉ nằm trong debug sheets.

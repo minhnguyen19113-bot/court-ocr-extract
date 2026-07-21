@@ -41,6 +41,12 @@ def test_sentence_workbook_audit_sheets_and_final_column(tmp_path) -> None:
                     "về tội “Charge Synthetic”."
                 ),
             },
+            {
+                "line_id": "p009_l0003",
+                "page_number": 9,
+                "source_region": DECISION_TAIL,
+                "text": "Thời hạn tù tính từ ngày chưa xác định.",
+            },
         ],
     )
     run_pre_content_ab_test(
@@ -64,6 +70,23 @@ def test_sentence_workbook_audit_sheets_and_final_column(tmp_path) -> None:
     assert row[sentence_index] == "2 năm tù"
     assert workbook["DEFENDANT_SENTENCES"].max_row == 2
     assert workbook["SENTENCE_EVIDENCE"].max_row == 2
+    evidence_headers = list(
+        next(workbook["SENTENCE_EVIDENCE"].iter_rows(max_row=1, values_only=True))
+    )
+    assert evidence_headers == [
+        "case_id", "evidence_type", "defendant_entity_ids", "defendant_names",
+        "raw_text", "page_number", "line_ids", "source_region", "match_method",
+        "confidence", "warnings",
+    ]
+    warning_rows = list(workbook["SENTENCE_WARNINGS"].iter_rows(values_only=True))
+    warning_headers = list(warning_rows[0])
+    warning = dict(zip(warning_headers, warning_rows[1], strict=True))
+    assert warning["warning"] == "sentence_start_anchor_unparsed"
+    assert warning["scope"] == "entity"
+    assert warning["defendant_entity_id"] == "defendant_001"
+    assert warning["page_number"] == 9
+    assert warning["line_ids"] == "p009_l0003"
+    assert warning["raw_text"] == "Thời hạn tù tính từ ngày chưa xác định."
 
 
 def _front_record() -> OCRCacheRecord:

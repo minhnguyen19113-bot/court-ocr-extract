@@ -1,5 +1,15 @@
 # Codex Handoff
 
+## Bàn Giao Pilot 10 Sentence Audit Final Hardening
+
+Probation start hiện canonicalize `sơ thảm/sơ thẳm` chỉ trong clause `tính từ ngày tuyên án`, hỗ trợ date trong ngoặc, sau từ `ngày`, dạng số trần và ngày Việt Nam dạng chữ. Không có metadata fallback; raw evidence giữ nguyên OCR. Duration một đơn vị hợp lệ không còn bị gắn `probation_duration_partial`.
+
+Sentence evidence đã tách thành tám `evidence_type`. Primary/probation span dừng trước custody measure, UBND supervision, vật chứng, biện pháp tư pháp, án phí, kháng cáo và nơi nhận. Release/additional penalty có evidence riêng; raw line và line IDs giữ nhất quán. Structured `sentence_warnings` gắn đúng entity hoặc case scope và có source evidence.
+
+Procedural rejection chỉ còn trong debug, không thêm `Field bị validator loại` và không tự bật `needs_review`. Cross-source fuzzy name disagreement tạo audit/warning có front name, decision name, normalized values, method và similarity; FINAL_EXCEL vẫn dùng front name, không auto-correct.
+
+Gate synthetic đạt targeted `30 passed`, regression `150 passed`, full suite `394 passed`; không thêm skip/xfail. Project Owner rerun cache-only với output `outputs\pilot_10_sentence_audit_final_check`, kiểm 14 cột, 27 dòng, 19 defendant sentences, 8 victim blanks, typed evidence, warning scope và name audit; không OCR lại.
+
 ## Bàn Giao Pilot 10 Sentence Completeness và Evidence Hardening
 
 Sentence parser hiện hỗ trợ textual sentence-start date, OCR `bất giam/bắt giảm`, probation nhiều đơn vị cùng `probation_start_text`, time-served completion, OCR `hình phát tù` và detention-credit date range canonical. `probation_start_text` chỉ thuộc display án treo; custodial `sentence_start_text` vẫn độc lập.

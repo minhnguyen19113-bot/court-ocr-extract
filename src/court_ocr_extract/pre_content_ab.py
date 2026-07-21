@@ -41,7 +41,7 @@ from court_ocr_extract.other_participants_builder import (
 )
 from court_ocr_extract.settings import PipelineSettings
 from court_ocr_extract.sentence_parser import (
-    SENTENCE_COMPLETENESS_WARNINGS,
+    SENTENCE_REVIEW_WARNINGS,
     empty_sentence_output,
     parse_defendant_sentences,
 )
@@ -624,12 +624,14 @@ def _write_workbook(
         "source_region", "page_number", "line_ids", "confidence", "warnings",
     ])
     sheets["SENTENCE_EVIDENCE"].append([
-        "case_id", "defendant_entity_ids", "defendant_names", "raw_text",
-        "page_number", "line_ids", "match_method", "confidence", "source_region",
+        "case_id", "evidence_type", "defendant_entity_ids", "defendant_names",
+        "raw_text", "page_number", "line_ids", "source_region", "match_method",
+        "confidence", "warnings",
     ])
     sheets["SENTENCE_WARNINGS"].append([
-        "case_id", "warning", "defendant_entity_id", "defendant_name",
-        "page_number", "line_ids", "raw_text",
+        "case_id", "warning", "severity", "scope", "defendant_entity_id",
+        "defendant_name", "page_number", "line_ids", "raw_text", "source_region",
+        "front_name", "decision_name", "match_method", "similarity",
     ])
 
     for case in cases:
@@ -1129,18 +1131,33 @@ def _append_structured_rows(sheets, case) -> None:
         for sentence in sentence_output.get("sentence_evidence", []):
             sheets["SENTENCE_EVIDENCE"].append([
                 case_id,
+                sentence.get("evidence_type"),
                 "; ".join(sentence.get("defendant_entity_ids", [])),
                 "; ".join(sentence.get("defendant_names", [])),
                 sentence.get("raw_text"),
                 sentence.get("page_number"),
                 "; ".join(sentence.get("line_ids", [])),
+                sentence.get("source_region"),
                 sentence.get("match_method"),
                 sentence.get("confidence"),
-                sentence.get("source_region"),
+                "; ".join(sentence.get("warnings", [])),
             ])
-        for warning in sentence_output.get("warnings", []):
+        for warning in sentence_output.get("sentence_warnings", []):
             sheets["SENTENCE_WARNINGS"].append([
-                case_id, warning, "", "", None, "", "",
+                case_id,
+                warning.get("warning"),
+                warning.get("severity"),
+                warning.get("scope"),
+                warning.get("defendant_entity_id"),
+                warning.get("defendant_name"),
+                warning.get("page_number"),
+                "; ".join(warning.get("line_ids", [])),
+                warning.get("raw_text"),
+                warning.get("source_region"),
+                warning.get("front_name"),
+                warning.get("decision_name"),
+                warning.get("match_method"),
+                warning.get("similarity"),
             ])
         for audit in output.get("source_region_audit", []):
             sheets["SOURCE_REGION_AUDIT"].append([
@@ -1298,6 +1315,7 @@ def _attach_decision_tail_charges(
         )
         output["defendant_sentence_map"] = {}
         output["sentence_evidence"] = []
+        output["sentence_warnings"] = []
         output["warnings"].append("decision_tail_cache_missing")
         output["needs_review"] = True
         return
@@ -1325,6 +1343,7 @@ def _attach_decision_tail_charges(
             tail_record.lines,
             defendants=defendants,
             source_region=DECISION_TAIL,
+            case_id=tail_record.case_id,
             min_name_match_score=settings.decision_name_match_min_score,
             name_match_ambiguity_gap=settings.decision_name_match_ambiguity_gap,
         )
@@ -1336,6 +1355,7 @@ def _attach_decision_tail_charges(
         sentence_output["defendant_sentence_map"]
     )
     output["sentence_evidence"] = list(sentence_output["sentence_evidence"])
+    output["sentence_warnings"] = list(sentence_output.get("sentence_warnings", []))
     output.update(sentence_output.get("diagnostics", {}))
     parsed_charge_count = len(charge_output["charge_evidence"])
     mapped_defendant_count = sum(
@@ -1415,7 +1435,7 @@ def _attach_decision_tail_charges(
     output["warnings"].extend(tail_record.warnings)
     output["warnings"] = list(dict.fromkeys(output["warnings"]))
     if any(
-        warning in SENTENCE_COMPLETENESS_WARNINGS
+        warning in SENTENCE_REVIEW_WARNINGS
         for warning in sentence_output.get("warnings", [])
     ):
         output["needs_review"] = True

@@ -1,5 +1,15 @@
 # Project State
 
+## Pilot 10 Sentence Audit Final Hardening
+
+- Probation start nhận bounded OCR variants `sơ thảm/sơ thẳm`, parenthesized/bare/textual date và canonicalize display về `sơ thẩm DD/MM/YYYY`; raw evidence giữ nguyên OCR và không fallback judgment metadata.
+- `probation_duration_partial` chỉ phát khi phần dư cho thấy unit/value bị cắt thật. Duration hợp lệ một hoặc nhiều đơn vị như `3 năm`, `18 tháng`, `4 năm 6 tháng` không warning.
+- Sentence evidence được tách theo `evidence_type`: `primary_penalty`, `probation`, `sentence_start`, `detention_credit`, `completion`, `release`, `aggregate_penalty`, `additional_penalty`. Primary/probation dừng trước custody measure, UBND supervision, vật chứng, tư pháp, án phí, kháng cáo và nơi nhận; scanner vẫn có thể nhận additional penalty hợp lệ ở item sau.
+- `sentence_warnings` là structured audit theo case/entity với severity, scope, page, line IDs, raw text và source region. Name disagreement bổ sung front/decision names, normalized names, match method và similarity; FINAL_EXCEL luôn giữ front name.
+- `procedural_verdict_candidate_rejected` và procedural rejection tương tự chỉ là debug/informational, không tạo `Field bị validator loại` cho mọi dòng và không tự bật `needs_review`. Field-level whitelist vẫn gắn note đúng entity.
+- Workbook `SENTENCE_EVIDENCE` và `SENTENCE_WARNINGS` có đầy đủ typed/source/audit columns; không còn sentence warning row rỗng khi parser có source evidence.
+- Verification synthetic: targeted `30 passed`; sentence regression `84 passed`; regression group `150 passed`; full suite `394 passed`, `0 failed`, không thêm skip/xfail. Không đọc dữ liệu thật và không gọi OCR, Docker, Surya inference, LLM hoặc cloud.
+
 ## Pilot 10 Sentence Completeness and Evidence Hardening
 
 - `sentence_parser.py` nhận ngày Việt Nam dạng chữ, ba biến thể hẹp của `bắt giam`, probation nhiều đơn vị có dấu phẩy và `probation_start_text`; trường probation start không bị ghi nhầm vào custodial `sentence_start_text`.
