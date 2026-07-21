@@ -10,7 +10,10 @@ def test_sentence_evidence_raw_line_ids_exact() -> None:
         line(8, 5, "Phạt bổ sung bị cáo Person Synthetic Alpha 30.000.000 đồng."),
     ]
     output = parse_sentence(lines)
-    lookup = {item["line_id"]: item["text"] for item in lines}
     for evidence in output["sentence_evidence"]:
-        assert evidence["raw_text"].splitlines() == [lookup[line_id] for line_id in evidence["line_ids"]]
-
+        assert evidence["raw_text"] == "\n".join(
+            span["raw_clause"] for span in evidence["clause_spans"]
+        )
+        assert evidence["line_ids"] == list(
+            dict.fromkeys(span["line_id"] for span in evidence["clause_spans"])
+        )

@@ -625,13 +625,15 @@ def _write_workbook(
     ])
     sheets["SENTENCE_EVIDENCE"].append([
         "case_id", "evidence_type", "defendant_entity_ids", "defendant_names",
-        "raw_text", "page_number", "line_ids", "source_region", "match_method",
+        "front_names", "decision_names", "raw_text", "raw_clause", "page_number",
+        "line_ids", "clause_spans", "source_region", "match_method", "similarity",
         "confidence", "warnings",
     ])
     sheets["SENTENCE_WARNINGS"].append([
         "case_id", "warning", "severity", "scope", "defendant_entity_id",
-        "defendant_name", "page_number", "line_ids", "raw_text", "source_region",
-        "front_name", "decision_name", "match_method", "similarity",
+        "defendant_name", "front_name", "decision_name", "normalized_front_name",
+        "normalized_decision_name", "match_method", "similarity", "page_number",
+        "line_ids", "raw_text", "source_region",
     ])
 
     for case in cases:
@@ -1134,11 +1136,20 @@ def _append_structured_rows(sheets, case) -> None:
                 sentence.get("evidence_type"),
                 "; ".join(sentence.get("defendant_entity_ids", [])),
                 "; ".join(sentence.get("defendant_names", [])),
+                "; ".join(sentence.get("front_names", [])),
+                "; ".join(sentence.get("decision_names", [])),
                 sentence.get("raw_text"),
+                sentence.get("raw_clause"),
                 sentence.get("page_number"),
                 "; ".join(sentence.get("line_ids", [])),
+                json.dumps(
+                    sentence.get("clause_spans", []),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
                 sentence.get("source_region"),
                 sentence.get("match_method"),
+                sentence.get("similarity"),
                 sentence.get("confidence"),
                 "; ".join(sentence.get("warnings", [])),
             ])
@@ -1150,14 +1161,16 @@ def _append_structured_rows(sheets, case) -> None:
                 warning.get("scope"),
                 warning.get("defendant_entity_id"),
                 warning.get("defendant_name"),
+                warning.get("front_name"),
+                warning.get("decision_name"),
+                warning.get("normalized_front_name"),
+                warning.get("normalized_decision_name"),
+                warning.get("match_method"),
+                warning.get("similarity"),
                 warning.get("page_number"),
                 "; ".join(warning.get("line_ids", [])),
                 warning.get("raw_text"),
                 warning.get("source_region"),
-                warning.get("front_name"),
-                warning.get("decision_name"),
-                warning.get("match_method"),
-                warning.get("similarity"),
             ])
         for audit in output.get("source_region_audit", []):
             sheets["SOURCE_REGION_AUDIT"].append([

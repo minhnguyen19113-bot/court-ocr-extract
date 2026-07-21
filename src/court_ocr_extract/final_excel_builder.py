@@ -329,11 +329,13 @@ def _row_sentence(
         warnings = {
             _text(value) for value in _items(sentence.get("warnings")) if _text(value)
         }
-        notes = (
-            ["Cần kiểm tra lại bằng chứng hình phạt"]
-            if warnings & SENTENCE_REVIEW_WARNINGS
-            else []
-        )
+        notes: list[str] = []
+        if "cross_source_person_name_disagreement" in warnings:
+            notes.append("Tên giữa phần đầu và Quyết định không thống nhất, cần đối chiếu")
+        if warnings & (
+            SENTENCE_REVIEW_WARNINGS - {"cross_source_person_name_disagreement"}
+        ):
+            notes.append("Cần kiểm tra lại bằng chứng hình phạt")
         return display, notes
     return "", ["Chưa trích xuất chắc hình phạt từ phần Quyết định"]
 

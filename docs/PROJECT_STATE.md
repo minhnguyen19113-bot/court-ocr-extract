@@ -1,5 +1,14 @@
 # Project State
 
+## Sentence Aggregate Completeness, Clause Evidence và Name Audit Fix
+
+- Sentence start nhận các dạng `được tính từ`, `được tính kể từ`, `thời hạn chấp hành hình phạt tù tính từ` cùng hai OCR variant hẹp `tỉnh từ`/`tính tử`; output luôn canonical về `thời hạn tù tính từ ngày ...`, không dùng metadata fallback.
+- Completeness warning chỉ được tính một lần sau khi toàn bộ typed evidence của từng defendant entity đã parse/map/merge. Evidence đến sau có thể giải quyết anchor trước; warning stale không còn xuất sang `sentence_warnings`, `needs_review` hoặc final-row note.
+- Administrative tail được cắt trước verdict scanner và typed scanner tại các marker giao nhận/xác nhận/danh sách đã duyệt. Procedural instruction sau probation không được nhận làm duration/evidence.
+- Mọi sentence evidence có `raw_clause` và `clause_spans` gồm raw line, đoạn mệnh đề, offset đầu/cuối; `raw_text` được dựng từ các span này. Nhiều mệnh đề trên cùng OCR line có offset riêng, không còn dùng toàn bộ line làm bằng chứng cho từng field.
+- Name audit giữ độc lập `front_entity_name` và `decision_raw_name`, semantic `match_method` cùng similarity. Unique fuzzy disagreement chỉ phát warning/review, không thay tên front; ambiguous không map sentence và không positional guess.
+- Workbook `SENTENCE_EVIDENCE`/`SENTENCE_WARNINGS` đã realign theo contract audit mới. Verification synthetic: acceptance `38 passed`; sentence regression `77 passed`; regression group `174 passed`; full suite `424 passed`, `0 failed`, không thêm skip/xfail. Không đọc dữ liệu thật và không gọi OCR, Docker, Surya inference, LLM hoặc cloud.
+
 ## Pilot 10 Sentence Audit Final Hardening
 
 - Probation start nhận bounded OCR variants `sơ thảm/sơ thẳm`, parenthesized/bare/textual date và canonicalize display về `sơ thẩm DD/MM/YYYY`; raw evidence giữ nguyên OCR và không fallback judgment metadata.

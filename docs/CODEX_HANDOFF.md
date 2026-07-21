@@ -1,5 +1,13 @@
 # Codex Handoff
 
+## Bàn Giao Sentence Aggregate Completeness, Clause Evidence và Name Audit Fix
+
+Sentence completeness hiện chạy sau khi merge toàn bộ evidence theo defendant entity. Anchor chưa parse ở một clause không còn tạo warning nếu clause sau đã điền được field; release clause không kéo theo sentence-start warning. Evidence thuộc administrative tail bị loại trước scanner, còn instruction UBND/vi phạm/nghĩa vụ/thay đổi nơi cư trú là probation boundary và không được suy thành duration.
+
+Mỗi record trong `sentence_evidence` có `raw_clause` và JSON-compatible `clause_spans` với `line_id`, `raw_line_text`, `raw_clause`, `char_start`, `char_end`; `raw_text` được dựng từ đúng các span. Name audit giữ cả tên entity phần đầu và tên raw trong Quyết định trước mapping, ghi semantic method/similarity; unique fuzzy disagreement chỉ tạo review note đúng entity, ambiguous không map sentence.
+
+Gate synthetic đạt acceptance `38 passed`, sentence regression `77 passed`, regression group `174 passed`, full suite `424 passed`, `0 failed`. Project Owner chỉ cần chạy cache-only command ở cuối handoff này; không OCR lại và không dùng LLM.
+
 ## Bàn Giao Pilot 10 Sentence Audit Final Hardening
 
 Probation start hiện canonicalize `sơ thảm/sơ thẳm` chỉ trong clause `tính từ ngày tuyên án`, hỗ trợ date trong ngoặc, sau từ `ngày`, dạng số trần và ngày Việt Nam dạng chữ. Không có metadata fallback; raw evidence giữ nguyên OCR. Duration một đơn vị hợp lệ không còn bị gắn `probation_duration_partial`.

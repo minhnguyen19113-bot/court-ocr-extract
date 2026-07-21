@@ -1,5 +1,15 @@
 # AI Changelog
 
+## 2026-07-21 - Sentence Aggregate Completeness, Clause Evidence và Name Audit Fix
+
+- Mở rộng sentence-start parser cho `được tính từ`, `được tính kể từ`, full execution prefix và hai OCR variant hẹp; canonical output giữ nguyên contract cũ.
+- Dời completeness validation xuống sau aggregate merge theo defendant entity, suppress warning đã được evidence sau giải quyết và deduplicate theo case/scope/entity/page/line.
+- Cắt administrative tail trước mọi sentence scan; thêm UBND, probation instruction, violation và residence-change boundaries.
+- Thêm `raw_clause`/`clause_spans` có char offsets; workbook xuất clause spans JSON và các cột front/decision name audit.
+- Giữ raw decision name trước canonical mapping, dùng semantic match method, fail-safe ambiguity và entity-specific name disagreement note.
+- Thêm/cập nhật toàn bộ synthetic acceptance tests; acceptance `38 passed`, sentence regression `77 passed`, regression group `174 passed`, full suite `424 passed`, `0 failed`, không thêm skip/xfail.
+- Không đọc/chạy dữ liệu thật, không gọi OCR/Docker/Surya inference/LLM/cloud và không commit/push.
+
 ## 2026-07-21 - Pilot 10 Sentence Audit Final Hardening
 
 - Mở rộng probation-start parser cho `sơ thảm/sơ thẳm`, parenthesized/bare/textual date trong bounded clause; không sửa raw OCR hoặc dùng metadata fallback.

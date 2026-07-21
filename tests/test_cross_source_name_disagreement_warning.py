@@ -7,6 +7,5 @@ def test_cross_source_name_disagreement_warning() -> None:
     assert warning["defendant_entity_id"] == "defendant_alpha"
     assert warning["front_name"] == "Person Synthetic Alpha"
     assert warning["decision_name"] == "Person Synthetic Alpho"
-    assert warning["match_method"].endswith("unique_fuzzy_name")
+    assert warning["match_method"] == "unique_fuzzy"
     assert 88 <= warning["similarity"] < 100
-

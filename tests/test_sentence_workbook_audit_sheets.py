@@ -69,13 +69,14 @@ def test_sentence_workbook_audit_sheets_and_final_column(tmp_path) -> None:
     row = next(final_sheet.iter_rows(min_row=2, values_only=True))
     assert row[sentence_index] == "2 năm tù"
     assert workbook["DEFENDANT_SENTENCES"].max_row == 2
-    assert workbook["SENTENCE_EVIDENCE"].max_row == 2
+    assert workbook["SENTENCE_EVIDENCE"].max_row == 3
     evidence_headers = list(
         next(workbook["SENTENCE_EVIDENCE"].iter_rows(max_row=1, values_only=True))
     )
     assert evidence_headers == [
         "case_id", "evidence_type", "defendant_entity_ids", "defendant_names",
-        "raw_text", "page_number", "line_ids", "source_region", "match_method",
+        "front_names", "decision_names", "raw_text", "raw_clause", "page_number",
+        "line_ids", "clause_spans", "source_region", "match_method", "similarity",
         "confidence", "warnings",
     ]
     warning_rows = list(workbook["SENTENCE_WARNINGS"].iter_rows(values_only=True))

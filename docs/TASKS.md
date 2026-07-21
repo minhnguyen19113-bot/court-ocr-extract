@@ -1,5 +1,16 @@
 # Tasks
 
+## SENTENCE AGGREGATE COMPLETENESS, CLAUSE EVIDENCE AND NAME-AUDIT FIX
+
+- [x] Mở rộng sentence-start grammar và canonicalization cho bốn dạng chuẩn cùng hai OCR variant hẹp.
+- [x] Chuyển completeness validation từ từng evidence sang defendant aggregate cuối cùng; loại warning đã được evidence sau giải quyết.
+- [x] Cắt administrative tail trước cả verdict/typed scanner và bổ sung probation procedural boundaries.
+- [x] Thêm `raw_clause`/`clause_spans` có char offsets cho mọi sentence evidence, kể cả nhiều mệnh đề cùng line và mệnh đề nhiều line.
+- [x] Giữ raw decision name trước canonical mapping, phân loại semantic match và không map ambiguity.
+- [x] Realign hai workbook audit sheet và ghi chú entity riêng cho cross-source name disagreement.
+- [x] Đạt acceptance `38 passed`, sentence regression `77 passed`, regression group `174 passed`, full suite `424 passed`; không thêm skip/xfail.
+- [ ] Project Owner chạy cache-only pilot 10 vào `outputs\pilot_10_sentence_aggregate_fix_check` và duyệt warning/evidence/name audit thực tế.
+
 ## PILOT 10 SENTENCE AUDIT FINAL HARDENING
 
 - [x] Hỗ trợ bounded probation-start OCR variants và bốn dạng explicit date, không metadata fallback.

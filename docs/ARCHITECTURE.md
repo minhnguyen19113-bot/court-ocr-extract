@@ -17,7 +17,7 @@ Last updated: 2026-07-21
 
 Nhóm identity/case/panel của 14 cột final chỉ lấy từ `front_pre_content`. `QUAN HỆ PHÁP LUẬT` và `HÌNH PHẠT` chỉ lấy từ `decision_tail`. Charge và sentence parser dùng front defendant entities làm dictionary, map bằng `entity_id`, giữ evidence nguồn và không tạo defendant mới từ phần cuối. Local LLM không tham gia charge/sentence extraction hoặc final mapping.
 
-Sentence audit dùng typed evidence spans và structured warning records. Fuzzy decision-tail name disagreement chỉ tạo audit/review, không sửa identity front; procedural candidate rejection giữ ở debug và không được nâng thành field-level failure của mọi final row.
+Sentence audit dùng typed clause-level evidence spans và structured warning records. Completeness chỉ validate sau khi mọi evidence của defendant entity đã merge; administrative tail bị loại trước scanner. Fuzzy decision-tail name disagreement giữ raw decision name và front entity name, chỉ tạo audit/review, không sửa identity front; ambiguity không map sentence. Procedural candidate rejection giữ ở debug và không được nâng thành field-level failure của mọi final row.
 
 ## Candidate Path A: Surya OCR + Local LLM
 
