@@ -32,7 +32,8 @@ CASE_NUMBER_TOKEN_RE = re.compile(
     re.I,
 )
 PRESENCE_SUFFIX_RE = re.compile(
-    r"\s*[-–—]?\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)\s*$",
+    r"\s*(?:[-–—;]?\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)"
+    r"|\(\s*(?:có\s+đơn\s+xin\s+vắng\s+mặt|có\s+mặt|vắng\s+mặt)\s*\))\s*$",
     re.I,
 )
 SHORT_FIELDS = ("gender", "nationality", "ethnicity", "religion", "occupation")
@@ -52,6 +53,7 @@ MULTI_PERSON_ROLE_PREFIXES = (
     "nguoi bao ve quyen va loi ich hop phap",
 )
 HONORIFIC_RE = re.compile(r"\b(?:Ông|Bà|Anh|Chị)\s+", re.IGNORECASE)
+LEADING_HONORIFIC_RE = re.compile(r"^\s*(?:Ông|Bà|Anh|Chị)\s+", re.IGNORECASE)
 
 PANEL_LABELS = (
     (re.compile(r"(?:Thẩm\s+phán(?:\s*-\s*Chủ\s+tọa\s+phiên\s+tòa)?|Chủ\s+tọa\s+phiên\s+tòa)(?=\s*(?::|$))", re.I), "presiding_judge"),
@@ -108,12 +110,12 @@ ADDRESS_STOP_LABEL_RE = re.compile(
     re.IGNORECASE,
 )
 ADDRESS_STOP_INLINE_RE = re.compile(
-    rf"(?:^|;)\s*{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]",
+    rf"(?:^|[;.\n])\s*{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]",
     re.IGNORECASE,
 )
 CURRENT_ADDRESS_FLAT_RE = re.compile(
     rf"{CURRENT_ADDRESS_LABEL_PATTERN}\s*[:：]?\s*(?P<value>.*?)"
-    rf"(?=(?:\n|;)\s*{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]"
+    rf"(?=(?:\n|;|\.)\s*{ADDRESS_STOP_LABEL_PATTERN}\s*[:：]"
     rf"|\n\s*(?:\d+[.)]\s+.*\b(?:sinh\s+ngày|sinh\s+năm)\b|Bị\s+cáo\s+\S)"
     rf"|\Z)",
     re.IGNORECASE | re.DOTALL,
@@ -122,6 +124,17 @@ STANDALONE_PAGE_NUMBER_RE = re.compile(r"^\s*(?:trang\s+)?\d+\s*$", re.IGNORECAS
 NEXT_DEFENDANT_RE = re.compile(
     r"^\s*(?:\d+[.)]\s+.*\b(?:sinh\s+ngày|sinh\s+năm)\b|Bị\s+cáo\s+\S)",
     re.IGNORECASE,
+)
+PARTICIPANT_ADDRESS_PATTERNS = (
+    re.compile(r"(?:Nơi\s+ở\s+hiện\s+tại|Nơi\s+ở\s+hiện\s+nay|Chỗ\s+ở)\s*[:：]?", re.I),
+    re.compile(r"(?:Địa\s+chỉ|Cùng\s+địa\s+chỉ)\s*[:：]?", re.I),
+    re.compile(r"Nơi\s+cư\s+trú\s*[:：]?", re.I),
+    re.compile(r"(?:Hộ\s+khẩu\s+)?Thường\s+trú\s*[:：]?", re.I),
+)
+PARTICIPANT_ADDRESS_STOP_RE = re.compile(
+    rf"(?:[;.\n])\s*(?:{ADDRESS_STOP_LABEL_PATTERN}|Quan\s+hệ|Ghi\s+chú|"
+    r"Sinh\s+(?:ngày|năm)|Có\s+mặt|Vắng\s+mặt|Có\s+đơn\s+xin\s+vắng\s+mặt)\s*[:：]?",
+    re.I,
 )
 
 
@@ -231,13 +244,7 @@ def parse_participant_block(block: dict[str, Any]) -> dict[str, Any]:
     birth = re.search(r"\b(?:sinh\s+ngày\s+)?(\d{1,2}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{4})\b|\bsinh\s+năm\s+(\d{4})\b", raw, re.I)
     if birth:
         result["birth_date_or_year"] = _normalize_date(birth.group(1)) if birth.group(1) else birth.group(2)
-    address = re.search(
-        r"(?:Địa\s+chỉ|Nơi\s+cư\s+trú|Thường\s+trú|Nơi\s+ở\s+hiện\s+nay|Cùng\s+địa\s+chỉ)\s*[:：]?\s*([^;\n]+)",
-        raw,
-        re.I,
-    )
-    if address:
-        result["address"] = _clean_value(address.group(1))
+    result["address"] = _participant_address(raw)
     relationship = re.search(r"(?:Quan\s+hệ|Ghi\s+chú)\s*[:：]\s*([^;\n]+)", raw, re.I)
     if relationship:
         result["relationship"] = _clean_value(relationship.group(1))
@@ -476,6 +483,22 @@ def _address_fragment(value: str) -> tuple[str, bool]:
     return value[:stop.start()].strip(), True
 
 
+def _participant_address(raw: str) -> str | None:
+    for pattern in PARTICIPANT_ADDRESS_PATTERNS:
+        match = pattern.search(raw)
+        if match is None:
+            continue
+        value = raw[match.end():]
+        stop = PARTICIPANT_ADDRESS_STOP_RE.search(value)
+        if stop is not None:
+            value = value[:stop.start()]
+        value = PRESENCE_SUFFIX_RE.sub("", value)
+        value = re.sub(r"\s+", " ", value).strip(" ,;:.-")
+        if value:
+            return value
+    return None
+
+
 def _normalize_current_address(value: str) -> str:
     normalized = re.sub(r"\s+", " ", value).strip(" ,;:.-")
     return re.sub(
@@ -498,7 +521,14 @@ def _defendant_name(raw: str) -> str | None:
     for line in raw.splitlines():
         candidate = re.sub(r"^\s*\d+[.)]\s*", "", line).strip()
         candidate = re.sub(r"^(?:Đối\s+với(?:\s+các)?\s+bị\s+cáo|Bị\s+cáo|Họ\s+và\s+tên)\s*:\s*", "", candidate, flags=re.I)
-        candidate = re.split(r"(?:[,;]\s*|\s+)(?:sinh\s+(?:ngày|năm)|tên\s+gọi\s+khác)", candidate, maxsplit=1, flags=re.I)[0]
+        candidate = re.split(
+            r"(?:[,;]\s*|\s+)(?:sinh\s+(?:ngày|năm)|tên\s+gọi\s+khác|"
+            r"giới\s+tính|hộ\s+khẩu\s+thường\s+trú|thường\s+trú|nơi\s+ở|"
+            r"chỗ\s+ở|quốc\s+tịch|dân\s+tộc|tôn\s+giáo|nghề\s+nghiệp|trình\s+độ)",
+            candidate,
+            maxsplit=1,
+            flags=re.I,
+        )[0]
         candidate = candidate.strip(" ,;:-")
         if candidate and not any(term in fold_text(candidate) for term in DEFENDANT_BLOCKED_TERMS):
             return candidate
@@ -524,6 +554,7 @@ def _participant_name(primary_line: str | None) -> str | None:
     candidate = re.split(r"\s*\([^)]*\)", candidate, maxsplit=1)[0]
     candidate = re.split(r"[,;]", candidate, maxsplit=1)[0]
     candidate = re.split(r"\s+sinh\s+(?:ngày|năm)\b", candidate, maxsplit=1, flags=re.I)[0]
+    candidate = LEADING_HONORIFIC_RE.sub("", candidate)
     return _clean_value(candidate)
 
 

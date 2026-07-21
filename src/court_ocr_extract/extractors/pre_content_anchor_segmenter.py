@@ -41,9 +41,21 @@ DEFENDANT_BLOCKED_TERMS = (
     "doi voi cac bi cao",
 )
 
-DEFENDANT_INTRO_RE = re.compile(
-    r"\b(?:đối|đồi|doi)\s+(?:với|voi)\s+(?:(?:các|cac)\s+)?"
+DEFENDANT_INTRO_FOLDED_RE = re.compile(
+    r"\bdoi\s+voi\s+(?:cac\s+)?bi\s+cao\s*[:：]",
+    re.IGNORECASE,
+)
+DEFENDANT_INTRO_VALUE_RE = re.compile(
+    r"\b(?:đối|đồi|đổi|doi)\s+(?:với|voi)\s+(?:(?:các|cac)\s+)?"
     r"(?:bị|bi)\s+(?:cáo|cao)\s*[:：]",
+    re.IGNORECASE,
+)
+EXPLICIT_DEFENDANT_LABEL_FOLDED_RE = re.compile(
+    r"^\s*(?:\d+[.)]\s*)?bi\s+cao\s*:\s*\S",
+    re.IGNORECASE,
+)
+EXPLICIT_DEFENDANT_LABEL_VALUE_RE = re.compile(
+    r"^\s*(?:\d+[.)]\s*)?(?:bị|bi)\s+(?:cáo|cao)\s*[:：]\s*(?P<value>.+)$",
     re.IGNORECASE,
 )
 
@@ -64,6 +76,20 @@ DEFENDANT_PROFILE_PREFIXES = (
     "cmnd",
     "can cuoc cong dan",
     "so dinh danh ca nhan",
+)
+IDENTITY_PROFILE_ANCHORS = (
+    "sinh ngay",
+    "sinh nam",
+    "gioi tinh",
+    "ho khau thuong tru",
+    "thuong tru",
+    "noi o",
+    "cho o",
+    "quoc tich",
+    "dan toc",
+    "ton giao",
+    "nghe nghiep",
+    "trinh do",
 )
 
 
@@ -141,6 +167,8 @@ def _metadata_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 *lines[:index],
                 *([_line_with_text(line, prefix)] if prefix else []),
             ]
+        if _is_explicit_defendant_label(_text(line)):
+            return lines[:index]
         if participant_role(_text(line)):
             return lines[:index]
     return lines
@@ -161,7 +189,12 @@ def _trial_panel_region(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     end = len(lines)
     for index in range(start + 1, len(lines)):
         folded = fold_text(_text(lines[index]))
-        if "xet xu so tham cong khai" in folded or "thu ly so" in folded or _is_defendant_intro(_text(lines[index])):
+        if (
+            "xet xu so tham cong khai" in folded
+            or "thu ly so" in folded
+            or _is_defendant_intro(_text(lines[index]))
+            or _is_explicit_defendant_label(_text(lines[index]))
+        ):
             end = index
             break
     return lines[start:end]
@@ -176,6 +209,10 @@ def _split_defendants(
     participant_blocks: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     intro = next((i for i, line in enumerate(lines) if _is_defendant_intro(_text(line))), None)
+    fallback_intro = False
+    if intro is None:
+        intro = _find_explicit_defendant_fallback(lines, trial_panel_lines)
+        fallback_intro = intro is not None
     region: dict[str, Any] = {
         "intro_found": intro is not None,
         "intro_line_id": _line_id(lines[intro]) if intro is not None else None,
@@ -199,10 +236,15 @@ def _split_defendants(
 
     starts: list[tuple[int, str]] = []
     intro_text = _text(lines[intro])
-    intro_value = _defendant_intro_value(intro_text)
-    inline_reason = _inline_defendant_reason(
-        intro_value,
-        lines[intro + 1:stop],
+    intro_value = (
+        _explicit_defendant_label_value(intro_text)
+        if fallback_intro
+        else _defendant_intro_value(intro_text)
+    )
+    inline_reason = (
+        "fallback_explicit_defendant_label"
+        if fallback_intro and intro_value
+        else _inline_defendant_reason(intro_value, lines[intro + 1:stop])
     )
     line_overrides: dict[int, dict[str, Any]] = {}
     if intro_value and inline_reason:
@@ -369,6 +411,8 @@ def _defendant_start_reason(
         return "full_name_label"
     if re.match(r"^(?:\d+[.)]\s*)?[^:;,]{3,100},?\s+sinh\s+(?:ngay|nam)\b", folded):
         return "name_birth_pattern"
+    if defendant_region_established and _numbered_person_with_inline_identity_profile(text):
+        return "numbered_person_with_inline_identity_profile"
     if (
         defendant_region_established
         and _looks_like_weak_numbered_person(text)
@@ -379,12 +423,16 @@ def _defendant_start_reason(
 
 
 def _is_defendant_intro(text: str) -> bool:
-    return bool(DEFENDANT_INTRO_RE.search(normalize_ocr_text(text)))
+    return bool(DEFENDANT_INTRO_FOLDED_RE.search(fold_text(text)))
+
+
+def _is_explicit_defendant_label(text: str) -> bool:
+    return bool(EXPLICIT_DEFENDANT_LABEL_FOLDED_RE.match(fold_text(text)))
 
 
 def _defendant_intro_value(text: str) -> str | None:
     normalized = normalize_ocr_text(text)
-    match = DEFENDANT_INTRO_RE.search(normalized)
+    match = DEFENDANT_INTRO_VALUE_RE.search(normalized)
     if not match:
         return None
     value = normalized[match.end():].strip(" -.;:")
@@ -393,7 +441,7 @@ def _defendant_intro_value(text: str) -> str | None:
 
 def _text_before_defendant_intro(text: str) -> str | None:
     normalized = normalize_ocr_text(text)
-    match = DEFENDANT_INTRO_RE.search(normalized)
+    match = DEFENDANT_INTRO_VALUE_RE.search(normalized)
     if not match:
         return None
     value = normalized[:match.start()].strip(" -.;:")
@@ -426,7 +474,26 @@ def _looks_like_weak_numbered_person(text: str) -> bool:
     return not any(prefix in remainder for prefix in DEFENDANT_PROFILE_PREFIXES)
 
 
+def _numbered_person_with_inline_identity_profile(text: str) -> bool:
+    folded = fold_text(text)
+    match = re.match(r"^\d+[.)]\s+(?P<value>.+)$", folded)
+    if match is None:
+        return False
+    value = match.group("value")
+    anchors = _identity_profile_anchor_count(value)
+    if not (re.search(r"\bsinh\s+(?:ngay|nam)\b", value) or anchors >= 2):
+        return False
+    first_anchor = re.search(
+        r"\b(?:" + "|".join(re.escape(anchor) for anchor in IDENTITY_PROFILE_ANCHORS) + r")\b",
+        value,
+    )
+    name = value[:first_anchor.start()] if first_anchor else value
+    name_tokens = re.findall(r"[a-z]+", name)
+    return len(name_tokens) >= 2
+
+
 def _following_has_identity_profile(lines: list[dict[str, Any]]) -> bool:
+    profile_lines: list[str] = []
     for line in lines:
         text = _text(line)
         if _is_page_number(text):
@@ -435,10 +502,8 @@ def _following_has_identity_profile(lines: list[dict[str, Any]]) -> bool:
             return False
         if _defendant_start_reason(text):
             return False
-        folded = fold_text(text)
-        if folded.startswith(DEFENDANT_PROFILE_PREFIXES):
-            return True
-        if re.search(r"\bsinh\s+(?:ngay|nam)\b", folded):
+        profile_lines.append(text)
+        if _has_identity_profile("\n".join(profile_lines)):
             return True
         if _looks_like_weak_numbered_person(text):
             return False
@@ -451,15 +516,69 @@ def _block_has_identity_evidence(lines: list[dict[str, Any]], reason: str) -> bo
         "full_name_label",
         "intro_inline_defendant_label",
         "intro_inline_full_name_label",
+        "fallback_explicit_defendant_label",
     }:
         return True
-    folded = "\n".join(fold_text(_text(line)) for line in lines)
+    return _has_identity_profile("\n".join(_text(line) for line in lines))
+
+
+def _find_explicit_defendant_fallback(
+    lines: list[dict[str, Any]],
+    trial_panel_lines: list[dict[str, Any]],
+) -> int | None:
+    trial_line_ids = {_line_id(line) for line in trial_panel_lines}
+    last_trial_index = max(
+        (index for index, line in enumerate(lines) if _line_id(line) in trial_line_ids),
+        default=-1,
+    )
+    for index, line in enumerate(lines):
+        if index <= last_trial_index or not _is_explicit_defendant_label(_text(line)):
+            continue
+        if participant_role(_text(line)):
+            return None
+        value = _explicit_defendant_label_value(_text(line))
+        if value and _fallback_has_identity_profile(value, lines[index + 1:]):
+            return index
+    return None
+
+
+def _explicit_defendant_label_value(text: str) -> str | None:
+    match = EXPLICIT_DEFENDANT_LABEL_VALUE_RE.match(normalize_ocr_text(text))
+    if match is None:
+        return None
+    value = match.group("value").strip(" -.;:")
+    return value or None
+
+
+def _has_identity_profile(value: str) -> bool:
+    folded = fold_text(value)
     return bool(
         re.search(r"\bsinh\s+(?:ngay|nam)\b", folded)
-        or any(
-            line.startswith(DEFENDANT_PROFILE_PREFIXES)
-            for line in folded.splitlines()
-        )
+        or _identity_profile_anchor_count(folded) >= 2
+    )
+
+
+def _fallback_has_identity_profile(
+    value: str,
+    following_lines: list[dict[str, Any]],
+) -> bool:
+    profile_lines = [value]
+    if _has_identity_profile(value):
+        return True
+    for line in following_lines:
+        text = _text(line)
+        if participant_role(text) or _is_defendant_intro(text) or _is_explicit_defendant_label(text):
+            break
+        profile_lines.append(text)
+        if _has_identity_profile("\n".join(profile_lines)):
+            return True
+    return False
+
+
+def _identity_profile_anchor_count(folded: str) -> int:
+    return sum(
+        bool(re.search(rf"\b{re.escape(anchor)}\b", folded))
+        for anchor in IDENTITY_PROFILE_ANCHORS
     )
 
 

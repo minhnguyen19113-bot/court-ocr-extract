@@ -13,8 +13,8 @@ def test_guardian_block_with_multiple_honorific_names_splits_safely() -> None:
     )
 
     assert [item["full_name"] for item in output["participants"]] == [
-        "Ông Synthetic A",
-        "bà Synthetic B",
+        "Synthetic A",
+        "Synthetic B",
     ]
     assert all(item["role"] == "Người giám hộ của bị cáo" for item in output["participants"])
     assert all(

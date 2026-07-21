@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from typing import Any
 
+from court_ocr_extract.charge_normalizer import canonicalize_charge, normalize_charge
 from court_ocr_extract.extractors.pre_content_anchor_segmenter import fold_text
 from court_ocr_extract.source_region_policy import DECISION_TAIL
 
@@ -22,12 +23,12 @@ _QUOTE_OPEN = "“\"‘'"
 _QUOTE_CLOSE = "”\"’'"
 _VERDICT_START_FOLDED_RE = re.compile(
     r"(?:^|\s)(?:\d+(?:\.\d+)*[.)]?\s*)?"
-    r"(?:(?:xu phat|tuyen)\s+(?:cac\s+)?bi cao|bi cao\s+.+?\s+pham toi)\b",
+    r"(?:(?:xu phat|tuyen(?: bo)?)\s+(?:cac\s+)?bi cao|bi cao\s+.+?\s+pham toi)\b",
     re.IGNORECASE,
 )
 _STRONG_VERDICT_START_FOLDED_RE = re.compile(
     r"(?:^|\s)(?:\d+(?:\.\d+)*[.)]?\s*)?"
-    r"(?:(?P<sentence>xu phat)|(?P<declare>tuyen))\s+"
+    r"(?:(?P<sentence>xu phat)|(?P<declare>tuyen(?: bo)?))\s+"
     r"(?:cac\s+)?bi cao\b",
     re.IGNORECASE,
 )
@@ -35,6 +36,7 @@ _DIRECT_VERDICT_START_FOLDED_RE = re.compile(
     r"^(?:\d+(?:\.\d+)*[.)]?\s*)?(?P<direct>bi cao)\b",
     re.IGNORECASE,
 )
+_BOUNDED_VERDICT_START_FOLDED_RE = re.compile(r"\bbi cao\b", re.IGNORECASE)
 _VE_TOI_FOLDED_RE = re.compile(r"\bve toi\b", re.IGNORECASE)
 _PHAM_TOI_FOLDED_RE = re.compile(r"\bpham toi\b", re.IGNORECASE)
 _DECISION_ITEM_RE = re.compile(r"^\s*\d+(?:\.\d+)*[.)]\s*(?:\S.*)?$")
@@ -64,6 +66,8 @@ class ChargeEvidence:
     charge: str
     raw_charge: str
     normalized_charge: str
+    canonical_charge: str
+    normalization_method: str
     defendant_entity_ids: list[str]
     defendant_names: list[str]
     source_region: str
@@ -267,7 +271,7 @@ def validate_charge_candidate(
     max_chars: int = DEFAULT_CHARGE_MAX_CHARS,
     max_words: int = DEFAULT_CHARGE_MAX_WORDS,
 ) -> bool:
-    charge = _normalize_charge(value)
+    charge = normalize_charge(value)
     if not charge or len(charge) > max_chars:
         return False
     if len(re.findall(r"\b\w+\b", charge, re.UNICODE)) > max_words:
@@ -336,20 +340,26 @@ def parse_explicit_decision_charges(
             continue
         seen_evidence.add(evidence_key)
 
-        charge_key = parsed.normalized_charge.casefold()
+        normalization = canonicalize_charge(parsed.raw_charge)
+        final_charge = normalization.canonical_charge
+        if normalization.warning:
+            warnings.append(normalization.warning)
+        charge_key = final_charge.casefold()
         if charge_key not in charge_keys:
             charge_keys.add(charge_key)
-            charges.append(parsed.normalized_charge)
+            charges.append(final_charge)
         for entity_id in parsed.defendant_entity_ids:
             mapped = defendant_charge_map.setdefault(entity_id, [])
-            if parsed.normalized_charge not in mapped:
-                mapped.append(parsed.normalized_charge)
+            if final_charge not in mapped:
+                mapped.append(final_charge)
 
         evidence.append(
             ChargeEvidence(
-                charge=parsed.normalized_charge,
+                charge=final_charge,
                 raw_charge=parsed.raw_charge,
                 normalized_charge=parsed.normalized_charge,
+                canonical_charge=normalization.canonical_charge,
+                normalization_method=normalization.normalization_method,
                 defendant_entity_ids=list(parsed.defendant_entity_ids),
                 defendant_names=list(parsed.defendant_names),
                 source_region=DECISION_TAIL,
@@ -579,18 +589,19 @@ def _coerce_defendant_refs(
 
 def _find_verdict_start(
     folded: str,
-) -> tuple[re.Match[str] | None, str, str]:
+) -> tuple[re.Match[str] | None, str, str | int]:
     match = _STRONG_VERDICT_START_FOLDED_RE.search(folded)
     if match is not None:
         if match.group("sentence"):
             return match, "sentence_for_charge", "sentence"
         return match, "declare_guilty", "declare"
     match = _DIRECT_VERDICT_START_FOLDED_RE.search(folded)
-    return (
-        (match, "defendant_guilty", "direct")
-        if match is not None
-        else (None, "", "")
-    )
+    if match is not None:
+        return match, "defendant_guilty", "direct"
+    fallback = _BOUNDED_VERDICT_START_FOLDED_RE.search(folded)
+    if fallback is not None and _is_bounded_verdict_candidate(folded, fallback):
+        return fallback, "bounded_defendant_charge", 0
+    return None, "", ""
 
 
 def _preferred_charge_anchor(
@@ -628,7 +639,7 @@ def _capture_charge_after_anchor(value: str) -> _ChargeCapture | None:
         raw_charge = quoted.group("charge").strip()
         return _ChargeCapture(
             raw_charge=raw_charge,
-            normalized_charge=_normalize_charge(raw_charge),
+            normalized_charge=normalize_charge(raw_charge),
             quoted=True,
             end_offset=cursor + quoted.end(),
         )
@@ -644,17 +655,10 @@ def _capture_charge_after_anchor(value: str) -> _ChargeCapture | None:
     raw_charge = unquoted.group("charge").strip()
     return _ChargeCapture(
         raw_charge=raw_charge,
-        normalized_charge=_normalize_charge(raw_charge),
+        normalized_charge=normalize_charge(raw_charge),
         quoted=False,
         end_offset=cursor + unquoted.end("charge"),
     )
-
-
-def _normalize_charge(value: object) -> str:
-    charge = unicodedata.normalize("NFC", str(value or ""))
-    charge = re.sub(r"\s+", " ", charge).strip()
-    charge = charge.strip(" “”“\"‘’'.,;:-")
-    return charge
 
 
 def _block_has_charge(text: str) -> bool:
@@ -662,7 +666,24 @@ def _block_has_charge(text: str) -> bool:
 
 
 def _is_verdict_start(text: str) -> bool:
-    return bool(_VERDICT_START_FOLDED_RE.search(fold_text(text)))
+    folded = fold_text(text)
+    if _VERDICT_START_FOLDED_RE.search(folded):
+        return True
+    fallback = _BOUNDED_VERDICT_START_FOLDED_RE.search(folded)
+    return bool(fallback and _is_bounded_verdict_candidate(folded, fallback))
+
+
+def _is_bounded_verdict_candidate(
+    folded: str,
+    defendant_match: re.Match[str],
+) -> bool:
+    anchor, anchor_name = _preferred_charge_anchor(folded, defendant_match.end())
+    if anchor is None:
+        return False
+    names_clause = folded[defendant_match.end():anchor.start()].strip(" ,;:-")
+    if anchor_name == "pham_toi" and names_clause.endswith(("hanh vi", "nguoi")):
+        return False
+    return len(re.findall(r"[a-z]+", names_clause)) >= 2
 
 
 def _is_strong_item_boundary(text: str) -> bool:

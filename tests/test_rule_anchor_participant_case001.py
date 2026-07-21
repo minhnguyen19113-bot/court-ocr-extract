@@ -40,8 +40,8 @@ def test_hierarchical_numbering_and_inline_roles_create_four_participants() -> N
     ]
     assert [item["full_name"] for item in output["participants"]] == [
         "Người Synthetic A",
-        "Bà Synthetic B",
-        "Ông Synthetic C",
+        "Synthetic B",
+        "Synthetic C",
         "Người Synthetic D",
     ]
     assert all(item["presence_status"] == "Có mặt" for item in output["participants"])
@@ -50,4 +50,3 @@ def test_hierarchical_numbering_and_inline_roles_create_four_participants() -> N
         output["participants"][2]["relationship_or_note"] or ""
     )
     assert all(len(block["line_ids"]) == 2 for block in anchor["participant_blocks"])
-
