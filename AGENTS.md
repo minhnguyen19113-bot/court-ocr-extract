@@ -93,3 +93,13 @@ If a task edits code, Codex must also:
 - Do not delete, mass-move, archive, or rewrite large areas of code without explicit Project Owner approval.
 - Phase 1B cleaned main defaults and canonical config/writer decisions. Do not delete or mass-move legacy files until a later cleanup phase is approved.
 - Cleanup candidates must be reported in `docs/CLEANUP_PLAN.md` before any destructive action.
+
+## Web Demo Runtime Boundary
+
+- Mọi agent làm việc trong `apps/web/`, `src/court_ocr_extract/web_api/`,
+  `ops/web_demo/` hoặc `docs/web_demo/` phải đọc
+  `docs/web_demo/CODEX_OPERATING_RULES.md`.
+- Codex chỉ sửa code/docs và chạy kiểm thử hữu hạn; Project Owner trực tiếp vận
+  hành Docker, PostgreSQL, FastAPI, Next.js, browser, port và network.
+- Không tự bind `0.0.0.0`; demo local mặc định dùng `127.0.0.1`.
+- Không dùng git diff trong web worktree vì gây chậm/khựng trên máy Project Owner.

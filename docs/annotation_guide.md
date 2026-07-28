@@ -2,12 +2,15 @@
 
 Tạo annotation bằng dữ liệu giả lập hoặc dữ liệu thật do người dùng tự xử lý ngoài Codex.
 
-Mỗi dòng final tương ứng một người tham gia tố tụng và dùng đúng 11 cột:
+Mỗi dòng final tương ứng một người tham gia tố tụng thuộc phạm vi output và dùng đúng 14 cột:
 
 - `LOẠI ÁN`
+- `SỐ BẢN ÁN`
+- `NGÀY TUYÊN ÁN (DD/MM/YYYY)`
 - `SỐ THỤ LÝ`
 - `NGÀY THỤ LÝ (DD/MM/YYYY)`
 - `QUAN HỆ PHÁP LUẬT`
+- `HÌNH PHẠT`
 - `TƯ CÁCH TỐ TỤNG`
 - `HỌ TÊN ĐƯƠNG SỰ`
 - `NĂM SINH`

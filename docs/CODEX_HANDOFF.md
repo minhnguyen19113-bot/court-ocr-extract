@@ -1,5 +1,15 @@
 # Codex Handoff
 
+## Bàn giao Web Demo Platform Phase 0
+
+Nền tảng web Phase 0 nằm trên branch `demo-web-platform`. Bộ tài liệu kiến trúc tại `docs/web_demo/`; code mới tách thành `domain`, `database`, `services`, `web_api` và `apps/web`. Core OCR/parser vẫn là owner của extraction logic; web chỉ derive canonical 14-column contract và chuẩn bị adapter boundary.
+
+API hiện cố ý read-only với đúng năm GET operations. Persistence models và Alembic baseline là foundation, chưa phải production migration hoàn chỉnh. Publish service đã có fail-closed guards và transaction boundary qua unit-of-work, nhưng chưa nối PostgreSQL thật. Form engine chỉ công bố contract: `.doc` chưa có adapter, DOCX/PDF mới khai báo, generation chính thức bị khóa.
+
+Frontend có application shell và route scaffold đầy đủ, nhưng máy hiện không có Node/npm nên chưa chạy Vitest, TypeScript hoặc Next build. Python static checks bảo vệ route/API/schema/import contract. `tests/web` đạt `60 passed`, full suite đạt `484 passed`; compileall, repo/architecture guardrails và Alembic head check đều đạt. Phase tiếp theo cần cài Node.js phù hợp, chạy frontend gate, sau đó mới triển khai authentication/RBAC, PostgreSQL integration và mutation theo từng vertical slice.
+
+Không dùng dữ liệu thật, không mở protected artifact, không chạy OCR/Surya/Docker/LLM/cloud và không commit/push/merge/rebase.
+
 ## Bàn Giao Sentence Aggregate Completeness, Clause Evidence và Name Audit Fix
 
 Sentence completeness hiện chạy sau khi merge toàn bộ evidence theo defendant entity. Anchor chưa parse ở một clause không còn tạo warning nếu clause sau đã điền được field; release clause không kéo theo sentence-start warning. Evidence thuộc administrative tail bị loại trước scanner, còn instruction UBND/vi phạm/nghĩa vụ/thay đổi nơi cư trú là probation boundary và không được suy thành duration.
@@ -326,3 +336,108 @@ Codex chỉ chạy synthetic tests, không chạy PDF, Surya inference, Local LL
 `final_preprocessed` không còn là stage cố định trước suppression. Bản trước selection nằm ở `final_preprocessed_candidate`; selected output được ghi vào `final_preprocessed` và `ocr_input_stamp_suppressed`. Review `object_seed_mask`, `candidate_scores`, `final_selected_stage` và `ocr_input_source_stage`. Nếu lowest-residual candidate không an toàn cho text, metadata phải ghi warning/fallback.
 
 Codex không chạy dữ liệu thật. Project Owner cần xác nhận dấu ngang chính xuất hiện trong object mask và selected final thực sự không tệ hơn `stamp_object_erased` trên page 1.
+
+## Bàn giao Web Demo Platform Phase 0.5
+
+Database acceptance đã đạt trên PostgreSQL 16.4 synthetic với hai revision Alembic
+explicit, 39 bảng và 81 foreign key. Upgrade/check/downgrade/upgrade/check đều pass.
+Web/database/Surya targeted tests và full Python suite 490 tests đều pass; chỉ còn một
+Starlette/httpx deprecation warning.
+
+Core parser/OCR production và Surya pin không đổi. Không chạy real PDF, OCR inference,
+GPU, LLM hoặc cloud. Frontend acceptance vẫn bị chặn vì không có npm; không có
+`package-lock.json` và chưa chạy Vitest/typecheck/lint/build. Bước tiếp theo là Phase
+0.6 frontend toolchain acceptance, không phải Phase 1.
+
+## Bàn giao Web Demo Platform Phase 0.6
+
+System Node/npm vẫn không tồn tại. Codex không dùng bundled Node, không cài runtime,
+không tạo lockfile thủ công và không chạy npm validation. Phase 0.6 giữ
+`PARTIAL — ENVIRONMENT BLOCKED`.
+
+Runtime ownership đã được khóa: Project Owner trực tiếp start/stop Docker,
+PostgreSQL, FastAPI, Next.js, browser và network; Codex chỉ sửa code/docs và chạy
+test hữu hạn. Local default là `127.0.0.1`; PostgreSQL compose đã bind explicit
+loopback. Public/network deployment chưa được phê duyệt.
+
+Đã có operating rules, operations runbook từng bước, ports/network guide,
+troubleshooting catalog và prerequisite helper read-only. Static/frontend Python
+tests 70/70 và full suite 494/494 pass; một Starlette/httpx deprecation warning còn
+lại. Core parser/OCR không đổi; không chạy Docker, service, browser, OCR, Surya,
+LLM, cloud hoặc dữ liệu thật.
+
+Blocker tiếp theo duy nhất: Project Owner cung cấp system Node/npm tương thích để
+tiếp tục đúng Phase 0.6 toolchain acceptance. Không mở Phase 1.
+
+## Bàn giao Web Demo Platform Phase 0.6 Continuation
+
+- System runtime: Node `v24.18.0`, npm `11.16.0`; không dùng bundled runtime.
+- `package-lock.json` v3 và `npm ci` pass; registry duy nhất
+  `registry.npmjs.org`, không có local dependency/secret/path leak.
+- Frontend pass: Vitest 6/6, TypeScript, ESLint `--max-warnings=0`, Next build 14
+  trang. Build độc lập backend.
+- Local API contract: browser `/api/v1`; Next rewrite tới server-only
+  `WEB_API_ORIGIN=http://127.0.0.1:8000`; exact loopback only, không CORS.
+- Python/guardrails: compileall pass, `tests/web` 71 pass, full suite 495 pass,
+  repo guard và architecture guard pass.
+- Runtime boundary giữ nguyên: Project Owner tự chạy database/migration/backend/
+  frontend/browser; Codex không mở service/port/process nền.
+- Blocker duy nhất: production npm audit còn 2 high ở `next`/`postcss`; fix đầy
+  đủ là major upgrade cần task riêng. Quyết định:
+  `PARTIAL — FRONTEND ENVIRONMENT OR VALIDATION BLOCKED`.
+
+## Bàn giao Web Demo Platform Phase 0.7
+
+- Dependency-security baseline ngày `2026-07-27` có 38 GHSA trong 21 vulnerable
+  package-node; chi tiết nằm ở
+  `docs/web_demo/FRONTEND_DEPENDENCY_SECURITY.md`.
+- Final frontend dùng exact Next `15.5.21`, React/React DOM `19.2.8`,
+  Vitest `3.2.6`, ESLint `10.8.0` native flat config.
+- Exact overrides còn active: `esbuild@0.28.1`, `postcss@8.5.23`,
+  `sharp@0.35.0`; không có blind RSC/minimatch override.
+- Full/production audit đều `0 vulnerabilities`; npm ci, Vitest 6/6, typecheck,
+  lint và Next build pass.
+- Python compileall pass; `tests/web` 71 pass; full suite 495 pass; một
+  Starlette/httpx deprecation warning đã biết.
+- Runtime boundary không đổi: Project Owner tự chạy database, migration,
+  backend, frontend và browser; Codex không mở service/port.
+- Quyết định: `PASS — READY FOR PROJECT OWNER LOCAL RUN AND VISUAL QA`.
+  Public deployment và Phase 1 feature work chưa được phê duyệt.
+
+## Bàn giao Web Demo Platform Phase 0.8
+
+- Frontend typography dùng system font stack Windows-safe; không remote
+  font/image hoặc official emblem/logo.
+- Sidebar đúng 10 mục nghiệp vụ, top bar một trial badge, dashboard bốn summary
+  card và hai section phụ.
+- Exact `lucide-react@1.27.0` sở hữu icon system. Shared components mới:
+  `EnvironmentBadge`, `UserMenuPlaceholder`, `PrimaryAction`, `SectionCard`,
+  `SummaryCard` và `NavigationIcon`.
+- Placeholder pages dùng copy phổ thông, một primary action và next step; action
+  chưa khả dụng disabled.
+- UI contracts/docs canonical nằm tại `tests/web/frontend/` và
+  `docs/web_demo/UI_DESIGN_SYSTEM.md`, `LEGAL_UI_REFERENCE_PRINCIPLES.md`,
+  `VISUAL_QA_CHECKLIST.md`.
+- Main-workspace frontend gate pass; Python web 108/full 532 và guardrails pass.
+  Initial Next SWC file lock từ dev server có trước task đã hết mà Codex không
+  dừng process; rerun/cleanup sau đó đạt.
+- Project Owner tự start/stop runtime, mở browser và gửi screenshot/issues theo
+  checklist. Codex không chạy visual QA, service hoặc port.
+
+## Bàn giao Web Demo Platform Phase 0.9
+
+- Local automation canonical gồm prerequisite/backend/frontend/start/status/stop;
+  start có install/skip flags, state/log ngoài Git và fail-fast cleanup.
+- Knowledge base có 10 known-error ID; local guide có luồng một lệnh và 14 bước.
+- Static contracts parse toàn bộ PowerShell, cấm launcher động/unsafe command; text
+  hygiene kiểm tra changed text bằng Git listing nhẹ.
+- Không dùng git diff trong web worktree vì gây chậm/khựng trên máy Project Owner.
+- Codex không chạy runtime. Project Owner tự gọi scripts và thực hiện visual QA.
+- Checkpoint Phase 0.9 chỉ hoàn tất sau finite validation, một commit và normal push
+  branch `demo-web-platform`.
+- Gate đạt: `npm.cmd ci`, hai audit `0 vulnerabilities`, Vitest `6/6`, typecheck,
+  lint, build 14 trang, static `19 passed`, Python web/full `123/547 passed`,
+  compileall, guardrails và text hygiene PASS.
+- SWC lock được Project Owner giải phóng; Codex không dừng process và không chạy runtime.
+- Phase 0 checkpoint được tạo và normal-push trên riêng `demo-web-platform`; quyết định
+  `PASS — PHASE 0 CHECKPOINT COMMITTED AND PUSHED`.

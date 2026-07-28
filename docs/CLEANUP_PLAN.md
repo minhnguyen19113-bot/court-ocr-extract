@@ -92,7 +92,7 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 | `src/court_ocr_extract/extraction/base.py`, `extraction/local_llm_extractor.py`, `extraction/rule_support.py`, `extractor.py`, `llm.py` | removed_in_phase1f | Duplicate/unimported paths đã migrate vào canonical `extractors/`. | Đã xóa; restore bằng Git history trước Phase 1F nếu cần. |
 | `src/court_ocr_extract/validation.py`, `validator.py`, `extraction/validators.py` | duplicate_conflict | Validation split across modules. | Choose canonical validation package. |
 | `src/court_ocr_extract/excel_writer.py` | main_candidate | Canonical Excel writer duy nhất sau Phase 1E; hỗ trợ draft records và typed `ExtractionResult`. | Keep; chỉ mở rộng schema qua phase được duyệt. |
-| `src/court_ocr_extract/final_excel_schema.py`, `final_excel_builder.py` | main_candidate | Canonical 11-column final schema và rule-anchor row mapping; không chứa debug columns. | Keep; mọi final exporter dùng chung contract này. |
+| `src/court_ocr_extract/final_excel_schema.py`, `final_excel_builder.py` | main_candidate | Canonical 14-column final schema và rule-anchor row mapping; không chứa debug columns. | Keep; mọi final exporter dùng chung contract này. |
 | `src/court_ocr_extract/excel.py`, `src/court_ocr_extract/export/excel_writer.py` | removed_in_phase1e | Caller đã migrate sang canonical path; không cần compatibility wrapper. | Đã xóa; restore bằng Git history trước Phase 1E nếu cần. |
 | `src/court_ocr_extract/qa.py`, `scripts/qa_output.py`, `scripts/qa_batch_output.py` | main_candidate | QA output pieces exist. | Keep and align report schema. |
 | `src/court_ocr_extract/visual_debug.py`, `review_html.py`, `evidence_viewer.py`, `extraction_preview.py` | main_candidate | Debug/review UI pieces. | Keep and connect bbox/evidence views. |
@@ -174,3 +174,64 @@ Counts are planning counts by grouped file/folder rows below, not exact file tot
 ## No-Delete Rule
 
 Ngoài các cleanup slice Phase 1D, Phase 1E và Phase 1F đã được Project Owner phê duyệt rõ, mọi tracked source/docs row còn lại chỉ là candidate classification. Không xóa hoặc move thêm tracked source/docs nếu chưa có approval riêng. Generated local cache folders có thể được dọn trong cleanup an toàn.
+
+## Web Demo Platform Phase 0.5 structure
+
+- `ops/web_demo/docker-compose.postgres.yml`: `config_keep`, local-only PostgreSQL
+  smoke helper; không chứa OCR/GPU/LLM service.
+- `ops/web_demo/.postgres-data/`: `generated_junk`, đã ignore; phải xóa sau smoke.
+- `alembic/versions/0002_phase0_tables.py`: `main_candidate`, explicit reviewed migration
+  cho 39 Phase 0 tables; không archive/delete khi Phase 0 còn active.
+- Không có tracked file bị xóa, mass-move hoặc archive trong Phase 0.5.
+
+## Web Demo Platform Phase 0.6 structure
+
+- `docs/web_demo/CODEX_OPERATING_RULES.md`, `OPERATIONS_RUNBOOK.md`,
+  `PORTS_AND_NETWORK.md`, `TROUBLESHOOTING.md`: `docs_memory`, giữ làm operational
+  boundary và Project Owner handoff.
+- `scripts/web_demo/check_prerequisites.ps1`: `main_candidate`, helper read-only;
+  không start/stop service hoặc thay đổi máy.
+- `tests/web/frontend/test_operator_runtime_contract.py`: `tests_keep`, static
+  protection cho docs, loopback mapping, troubleshooting codes và helper boundary.
+- `apps/web/node_modules/`, `.next/`, coverage và Python cache vẫn là
+  `generated_junk`; không track và dọn sau validation.
+- Không xóa, mass-move hoặc archive tracked source trong Phase 0.6.
+
+## Web Demo Platform Phase 0.6 continuation structure
+
+- `apps/web/package-lock.json`: `config_keep`, lockfile v3 do npm `11.16.0` tạo;
+  không sửa thủ công hoặc xóa sau validation.
+- `apps/web/.eslintrc.json`: `removed_in_phase0_7`; được thay sau khi
+  `eslint.config.mjs` native flat config đã pass, tránh hai nguồn cấu hình.
+- `apps/web/node_modules/`, `.next/`, `.npm-cache/`, coverage,
+  `tsconfig.tsbuildinfo` và Python cache: `generated_junk`; không track và dọn sau
+  test/build.
+- Không xóa, mass-move hoặc archive tracked source trong continuation.
+
+## Web Demo Platform Phase 0.7 structure
+
+- `apps/web/eslint.config.mjs`: `config_keep`, native ESLint 10 flat config cho
+  JS, TypeScript, React Hooks và Next rules.
+- `apps/web/package.json`, `apps/web/package-lock.json`: `config_keep`, exact
+  direct pins và ba transitive security overrides có removal condition.
+- `docs/web_demo/FRONTEND_DEPENDENCY_SECURITY.md`: `docs_memory`, canonical
+  frontend advisory baseline, remediation và cadence record.
+- `apps/web/node_modules/`, `.next/`, `.npm-cache/`, coverage và
+  `tsconfig.tsbuildinfo`: `generated_junk`; dọn sau acceptance.
+- Phase 0.7 chỉ xóa một deprecated config file sau khi replacement pass; không
+  mass-move/archive source hoặc đụng core parser/OCR.
+
+## Web Demo Platform Phase 0.8 structure
+
+- `apps/web/components/icons.tsx`, `environment-badge.tsx`,
+  `user-menu-placeholder.tsx`, `primary-action.tsx`, `section-card.tsx` và
+  `summary-card.tsx`: `main_candidate`, shared UI primitives cho shell/routes.
+- `lucide-react@1.27.0`: `config_keep`, exact icon dependency; review/gỡ nếu
+  framework cung cấp icon system tương đương và full validation vẫn pass.
+- `docs/web_demo/UI_DESIGN_SYSTEM.md`,
+  `LEGAL_UI_REFERENCE_PRINCIPLES.md`, `VISUAL_QA_CHECKLIST.md`: `docs_memory`.
+- `tests/web/frontend/test_phase08_ui_contract.py`: `tests_keep`, static UI/UX
+  acceptance, không phải browser visual test.
+- `apps/web/node_modules/`, `.next/`, coverage, `.npm-cache/` và
+  `tsconfig.tsbuildinfo`: `generated_junk`; dọn sau validation.
+- Không xóa/mass-move/archive tracked source và không đụng core parser/OCR.

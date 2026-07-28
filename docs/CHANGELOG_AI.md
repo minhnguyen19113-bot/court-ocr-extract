@@ -1,5 +1,56 @@
 # AI Changelog
 
+## 2026-07-28 - WEB DEMO PLATFORM PHASE 0.8
+
+- Chuyển typography sang system font stack an toàn cho tiếng Việt; chuẩn hóa
+  scale, spacing, radius, shadow và legal/public-service palette.
+- Rút sidebar từ 11 xuống 10 mục, bỏ visible `Kiểm tra OCR`; giữ 13 business
+  routes và same-origin API rewrite.
+- Tối giản top bar và dashboard; dashboard còn đúng bốn summary card, một note
+  minh họa và hai section phụ.
+- Thêm exact `lucide-react@1.27.0`, shared UI components và plain-language
+  placeholder actions/empty states; không remote font/image hoặc official logo.
+- Thêm hơn 25 static UI contracts, cập nhật Vitest contracts và ba canonical UI
+  docs cho design system, legal-reference principles và Project Owner visual QA.
+- Main-workspace frontend gate pass: audit full/production sạch, Vitest
+  6/6, typecheck, lint và Next build 14 trang. Python web 108/full 532 pass;
+  guardrails pass.
+- Lần đầu `npm ci` gặp Next SWC file lock từ dev server có trước task; Codex
+  không dừng process, rerun sau khi process tự kết thúc rồi dọn generated files.
+- Không sửa core OCR/parser/database/migration; không chạy service/browser/port,
+  dữ liệu thật, OCR/LLM/cloud hoặc commit/push.
+
+## 2026-07-27 - WEB DEMO PLATFORM PHASE 0.7
+
+- Chạy lại baseline npm audit: 21 vulnerable package-node, gồm 1 critical,
+  17 high, 3 moderate; production có 2 high. Ghi 38 GHSA/CVE, dependency path
+  và reachability vào `FRONTEND_DEPENDENCY_SECURITY.md`.
+- Nâng exact Next `15.5.21`, React/React DOM `19.2.8`, Vitest `3.2.6`; đồng bộ
+  React/Node types và Node engine contract.
+- Thay ESLint 8 + `.eslintrc.json` bằng ESLint 10 native `eslint.config.mjs`;
+  giữ JS/TypeScript/React Hooks/Next lint rules, loại vulnerable minimatch tree.
+- Thêm exact overrides `esbuild@0.28.1`, `postcss@8.5.23`, `sharp@0.35.0`, kèm
+  rationale và removal condition.
+- Migrate ba dynamic App Router pages sang async params của Next 15; không đổi
+  business routes/navigation/API rewrite.
+- Final full và production audit đều `0 vulnerabilities`; npm ci, Vitest 6/6,
+  TypeScript, ESLint và Next build pass.
+- Python compileall pass; `tests/web` 71 pass; full suite 495 pass, không thêm
+  skip/xfail.
+- Không chạy service/browser/database/OCR/cloud, không mở port và không commit/push.
+
+## 2026-07-24 - Web Demo Platform Phase 0
+
+- Thêm 12 tài liệu kiến trúc web local-only và decision log cho platform criminal-first, domain-extensible.
+- Thêm domain contracts cho workflow, field status, canonical 14-column schema, publishing, audit và form engine.
+- Thêm SQLAlchemy/PostgreSQL six-schema foundation, repository ports và Alembic baseline.
+- Thêm service layer cùng đúng năm FastAPI GET endpoints dưới `/api/v1`; không có mutation.
+- Thêm Next.js application shell, 13 route files, 11 navigation items, feature scaffold và capability UI fail-closed.
+- Thêm synthetic tests cho domain/database/service/API/frontend structure; không dùng dữ liệu thật.
+- Realign các tài liệu contract hiện hành từ schema 11 cột cũ sang canonical 14 cột.
+- Verification đạt `60 passed` cho `tests/web`, `484 passed` cho full Python suite; compileall, repo/architecture guardrails và Alembic head check đều đạt.
+- Không chạy PDF/OCR/Surya/Docker/LLM/cloud, không deploy và không commit/push/merge/rebase.
+
 ## 2026-07-21 - Sentence Aggregate Completeness, Clause Evidence và Name Audit Fix
 
 - Mở rộng sentence-start parser cho `được tính từ`, `được tính kể từ`, full execution prefix và hai OCR variant hẹp; canonical output giữ nguyên contract cũ.
@@ -306,3 +357,54 @@
 - Thêm `object_seed_mask`, candidate scoring và selected final/OCR stage metadata.
 - Ngăn text-enhanced candidate làm residual đậm hoặc làm mất foreground được chọn làm final.
 - Thêm synthetic selection tests; không chạy PDF/OCR thật.
+
+## 2026-07-24 - WEB DEMO PLATFORM PHASE 0.5
+
+- Audit acceptance 140 file Phase 0, canonical 14-column schema và core compatibility.
+- Thêm PostgreSQL 16.4 local-only compose helper và ignore generated bind data.
+- Thêm explicit Alembic `0002_phase0_tables` cho 39 bảng; rút gọn tên check constraint
+  PostgreSQL và xác nhận 81 foreign key.
+- Mở rộng publish guard tests cho mọi pre-approval state; targeted/full suite pass.
+- Không chạy OCR/Surya inference/GPU/LLM/cloud hoặc real data.
+- Frontend toolchain chưa được xác nhận vì môi trường không có npm; không tạo lockfile thủ công.
+
+## 2026-07-24 - WEB DEMO PLATFORM PHASE 0.6
+
+- Thêm web runtime boundary: Codex chỉ sửa/test hữu hạn; Project Owner tự vận hành
+  mọi service, browser, port và network.
+- Thêm `CODEX_OPERATING_RULES.md`, `OPERATIONS_RUNBOOK.md`,
+  `PORTS_AND_NETWORK.md`, `TROUBLESHOOTING.md`.
+- Thêm prerequisite helper PowerShell read-only và bốn static contract tests.
+- PostgreSQL compose bind explicit `127.0.0.1`; không chạy Docker/PostgreSQL.
+- `tests/web` 70 pass, full Python suite 494 pass, compileall pass.
+- System Node/npm vẫn thiếu; không tạo lockfile, không chạy npm hoặc thêm ESLint
+  chưa thể validate.
+
+## 2026-07-24 - WEB DEMO PLATFORM PHASE 0.6 CONTINUATION
+
+- Xác nhận system Node `v24.18.0`, npm `11.16.0`; tạo npm lockfile v3 và chạy
+  `npm ci`.
+- Thêm ESLint gate, Vitest JSX automatic, sửa hai assertion accessibility và
+  loại generated dependency tree khỏi Python frontend static scanner.
+- Thêm Next same-origin rewrite `/api/v1` tới server-only loopback
+  `WEB_API_ORIGIN`; FastAPI không bật CORS.
+- Frontend đạt 6 Vitest tests, typecheck, lint và production build 14 trang;
+  Python đạt `tests/web` 71 pass, full suite 495 pass.
+- Npm audit còn 10 advisory; production-only còn 2 high. Không chạy audit fix
+  hoặc major upgrade ngoài phạm vi.
+- Không chạy service/database/browser, không đọc dữ liệu thật, không commit/push.
+
+## 2026-07-28 - WEB DEMO PLATFORM PHASE 0.9
+
+- Thêm PowerShell local prerequisite/backend/frontend/start/status/stop automation
+  dành riêng cho Project Owner.
+- Thêm runtime state/log ngoài Git, exact-PID cleanup, PowerShell AST/static tests và
+  changed-file text hygiene.
+- Thêm `LOCAL_RUN_GUIDE.md`, `KNOWN_ISSUES_AND_RECOVERY.md` và cập nhật runbook/handoff.
+- Khóa Git performance policy dùng status/listing nhẹ trong web worktree.
+- Không chạy Docker/database/migration runtime/server/browser/OCR/LLM/cloud hoặc dữ
+  liệu thật.
+- Sau khi Project Owner giải phóng Next SWC lock, `npm.cmd ci`, hai audit, Vitest,
+  typecheck, lint, build, Python/static và guardrails đều đạt; chuyển sang Git checkpoint.
+- Tạo một commit Phase 0 và normal-push riêng branch `demo-web-platform`; không merge,
+  force-push hoặc tác động branch core.

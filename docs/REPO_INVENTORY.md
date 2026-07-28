@@ -51,7 +51,7 @@ Script nguồn: `python -m scripts.repo_inventory`.
 
 ## Final Excel schema first
 
-- Thêm `final_excel_schema.py` làm canonical 11-column contract.
+- Thêm `final_excel_schema.py` làm canonical 14-column contract.
 - Thêm `final_excel_builder.py` để map rule-anchor output thành final rows.
 - `excel_writer.py` vẫn là workbook writer duy nhất; không tạo duplicate writer.
 
@@ -63,7 +63,7 @@ Script nguồn: `python -m scripts.repo_inventory`.
 | `src/court_ocr_extract/ocr_backends/surya_ocr.py` | main candidate | Surya runtime path hiện tại. |
 | `src/court_ocr_extract/ocr_cache.py` | main candidate | Contract OCR cache. |
 | `src/court_ocr_extract/excel_writer.py` | canonical | Excel writer duy nhất sau Phase 1E; chứa draft-record và typed-result APIs. |
-| `src/court_ocr_extract/final_excel_schema.py`, `final_excel_builder.py` | canonical | Final 11-column schema và row builder dùng chung cho rule-anchor/export. |
+| `src/court_ocr_extract/final_excel_schema.py`, `final_excel_builder.py` | canonical | Final 14-column schema và row builder dùng chung cho rule-anchor/export. |
 | `src/court_ocr_extract/extraction_pipeline.py` | canonical | Extraction orchestrator sau Phase 1F. |
 | `src/court_ocr_extract/extractors/` | canonical | Backend factory/base, Local LLM, rule support và opt-in benchmark adapters. |
 | `src/court_ocr_extract/local_llm/` | main candidate | Local LLM client/parser/prompt builder. |

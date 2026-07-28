@@ -16,7 +16,7 @@ Focused regression sau hardening: 8/8 passed. Full suite cuối task: 226/226 pa
 
 ## Final Excel schema tests
 
-Năm modules `test_final_excel_*.py` kiểm đúng 11 cột/thứ tự, final row builder, cấu trúc synthetic 6 defendant + 4 participant, sheet đầu `FINAL_EXCEL`, không có cột thừa, HTML preview đứng trước debug, rule-only/rule-then strategy và missing-data notes. Fixtures chỉ dùng identity/case/address synthetic; không đọc PDF/cache/Excel/output thật và không gọi LLM/Surya/Docker/cloud.
+Năm modules `test_final_excel_*.py` kiểm đúng 14 cột/thứ tự, final row builder, cấu trúc synthetic 6 defendant + 4 participant, sheet đầu `FINAL_EXCEL`, không có cột thừa, HTML preview đứng trước debug, rule-only/rule-then strategy và missing-data notes. Fixtures chỉ dùng identity/case/address synthetic; không đọc PDF/cache/Excel/output thật và không gọi LLM/Surya/Docker/cloud.
 
 Kết quả full suite sau realignment: 199/199 test passed; có một warning deprecation từ dependency `surya`/Pydantic, không có test failure.
 

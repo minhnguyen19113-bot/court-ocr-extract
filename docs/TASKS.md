@@ -1,5 +1,39 @@
 # Tasks
 
+## WEB DEMO PLATFORM PHASE 0.8
+
+- [x] Audit typography, navigation, top bar, dashboard, jargon, icon và accessibility.
+- [x] Chuyển sang Windows-safe system font stack, scale/spacing/color tokens.
+- [x] Rút sidebar từ 11 xuống 10 mục và bỏ visible `Kiểm tra OCR`.
+- [x] Tối giản top bar còn một trial badge, notification và user placeholder.
+- [x] Rút dashboard còn bốn card, một note minh họa và hai section phụ.
+- [x] Chuẩn hóa shared components và exact Lucide icon dependency.
+- [x] Viết lại placeholder pages theo non-tech usability contract.
+- [x] Thêm tối thiểu 25 static UI contracts và cập nhật DOM tests.
+- [x] Tạo design-system, legal-reference và visual-QA docs.
+- [x] Chạy frontend gate trong main workspace: audit sạch, 6 Vitest,
+  typecheck, lint và build 14 trang pass.
+- [x] Chạy Python compileall, `tests/web` 108 pass, full suite 532 pass và
+  repo/architecture guardrails pass.
+- [x] Dọn `node_modules`, `.next`, `tsconfig.tsbuildinfo` sau validation.
+- [ ] Project Owner tự chạy browser visual QA và gửi screenshot/issues.
+- [ ] Không mở Phase 1 hoặc public deployment nếu chưa có approval riêng.
+
+## WEB DEMO PLATFORM PHASE 0
+
+- [x] Xác nhận branch/worktree `demo-web-platform`, không commit/push/merge/rebase.
+- [x] Lập bộ tài liệu scope, architecture, database, workflow, API, UI, form engine, security, core integration và runbook.
+- [x] Derive web schema contract từ canonical `FINAL_EXCEL_COLUMNS` 14 cột.
+- [x] Tạo workflow, field-status, immutable audit và publish guard contracts.
+- [x] Tạo SQLAlchemy metadata/model/repository foundation cho sáu PostgreSQL logical schema và Alembic baseline.
+- [x] Tạo service boundary và năm FastAPI endpoint GET an toàn dưới `/api/v1`.
+- [x] Tạo Next.js application shell, 11 navigation items, route scaffold và form capability warnings.
+- [x] Tạo synthetic tests cho domain, database, service, API và frontend structure.
+- [x] Realign tài liệu contract hiện hành còn ghi schema 11 cột sang canonical 14 cột.
+- [ ] Cài Node.js phù hợp và chạy `npm test`/`npm run build` trong môi trường frontend.
+- [ ] Chạy Alembic/PostgreSQL integration test trên database tạm ở phase kế tiếp.
+- [ ] Chỉ mở mutation sau khi authentication, authorization, persistence và audit transaction đã được triển khai/test.
+
 ## SENTENCE AGGREGATE COMPLETENESS, CLAUSE EVIDENCE AND NAME-AUDIT FIX
 
 - [x] Mở rộng sentence-start grammar và canonicalization cho bốn dạng chuẩn cùng hai OCR variant hẹp.
@@ -378,3 +412,65 @@ Do not start without Project Owner / ChatGPT approval.
 - Gold dataset workflow outside Codex for real quality assessment.
 - Ezycloudx runtime checks for GPU, Surya, vLLM/Ollama, and transfer server.
 - Cleanup/archive slice theo `docs/LEGACY_ARCHIVE_PLAN.md` sau khi reviewer duyệt.
+
+## Web Demo Platform Phase 0.5
+
+- [x] Audit đúng branch/worktree và 140 file Phase 0.
+- [x] Xác nhận core parser/OCR production không đổi; Surya production pin giữ `0.20.0`.
+- [x] Audit canonical 14-column schema và không có frontend duplicate hard-code.
+- [x] Audit 39 SQLAlchemy table, 81 foreign key và các machine-to-core/form/audit guard.
+- [x] Tạo explicit Alembic migration `0002_phase0_tables`.
+- [x] Smoke PostgreSQL 16.4 synthetic: upgrade/check/downgrade/upgrade/check.
+- [x] Chạy web/database/Surya targeted tests và full Python suite.
+- [x] Phase 0.6: cung cấp npm, tạo/review `package-lock.json`, chạy dependency audit,
+  Vitest, TypeScript, lint và Next production build.
+- [x] Không mở Phase 1 trước khi frontend gate đạt.
+
+## Web Demo Platform Phase 0.6
+
+- [x] Xác nhận đúng branch/worktree và không có Git operation dang dở.
+- [x] Xác nhận system Node/npm vẫn thiếu; không dùng bundled Node hoặc package
+  manager thay thế.
+- [x] Tạo `CODEX_OPERATING_RULES.md` và tích hợp vào root `AGENTS.md`.
+- [x] Tạo operations runbook theo từng bước start/stop dành cho Project Owner.
+- [x] Tạo port/network boundary loopback-only và troubleshooting catalog đủ 16 mã.
+- [x] Harden PostgreSQL compose bind explicit `127.0.0.1`.
+- [x] Tạo prerequisite helper read-only và static contract tests.
+- [x] Xác nhận `tests/web` 70 pass, full Python suite 494 pass và compileall pass.
+- [x] Xác nhận system Node `v24.18.0` và npm `11.16.0`; không dùng bundled Node.
+- [x] Tạo/review `package-lock.json` v3 và xác nhận `npm ci`.
+- [x] Thêm exact ESLint contract; chạy Vitest/typecheck/lint/Next build thành công.
+- [x] Thêm same-origin `/api/v1` rewrite tới exact loopback `WEB_API_ORIGIN`;
+  không bật CORS và build không cần backend.
+- [x] Xác nhận Python `tests/web` 71 pass và full suite 495 pass.
+- [x] Tạo task dependency security upgrade/review: production audit còn 2 high
+  qua `next`/`postcss`; không dùng `npm audit fix --force`.
+- [x] Không mở Phase 1 trước khi frontend toolchain gate đạt.
+
+## Web Demo Platform Phase 0.7
+
+- [x] Chạy lại baseline full/production audit và phân tích 38 GHSA/CVE theo
+  dependency path, reachability và fix availability.
+- [x] Nâng exact Next `15.5.21`, React/React DOM `19.2.8`, Vitest `3.2.6`.
+- [x] Migrate dynamic route params theo Next 15; giữ 13 routes và 11 sidebar
+  destinations.
+- [x] Chuyển sang ESLint `10.8.0` native flat config, loại legacy vulnerable tree.
+- [x] Thêm và kiểm chứng exact overrides cho esbuild, PostCSS và sharp.
+- [x] Xác nhận full/production npm audit đều `0 vulnerabilities`.
+- [x] Xác nhận `npm ci`, Vitest 6/6, typecheck, lint và Next build pass.
+- [x] Xác nhận Python compileall, `tests/web` 71 pass và full suite 495 pass.
+- [x] Tạo security record, cập nhật decisions, phases, runbooks và handoff.
+- [ ] Project Owner tự chạy local services và browser visual QA.
+- [ ] Không public/LAN deploy hoặc mở Phase 1 feature work nếu chưa có phê duyệt riêng.
+
+## Web Demo Platform Phase 0.9
+
+- [x] Thêm PowerShell prerequisite/backend/frontend/start/status/stop scripts.
+- [x] Thêm static AST/safety contracts và changed-file text hygiene.
+- [x] Thêm known-error knowledge base và local run guide một lệnh/14 bước.
+- [x] Khóa policy Git nhẹ, không tạo patch trong web worktree.
+- [x] Chạy đủ frontend, Python và guardrail gates.
+- [x] Tạo một commit checkpoint và push normal `demo-web-platform`.
+- [ ] Project Owner tự chạy local runtime và browser visual QA.
+- [x] Project Owner đã giải phóng Next SWC lock; `npm.cmd ci` và toàn bộ frontend gate
+  đã PASS.

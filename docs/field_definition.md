@@ -1,11 +1,14 @@
 # Field Definition
 
-Sheet đầu `FINAL_EXCEL` là output chính và có đúng 11 cột:
+Sheet đầu `FINAL_EXCEL` là output chính và có đúng 14 cột:
 
 - `LOẠI ÁN`
+- `SỐ BẢN ÁN`
+- `NGÀY TUYÊN ÁN (DD/MM/YYYY)`
 - `SỐ THỤ LÝ`
 - `NGÀY THỤ LÝ (DD/MM/YYYY)`
 - `QUAN HỆ PHÁP LUẬT`
+- `HÌNH PHẠT`
 - `TƯ CÁCH TỐ TỤNG`
 - `HỌ TÊN ĐƯƠNG SỰ`
 - `NĂM SINH`

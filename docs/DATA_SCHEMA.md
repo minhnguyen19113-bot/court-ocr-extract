@@ -59,7 +59,7 @@ Every non-null value must have evidence unless a reviewer-approved rule says oth
 
 ## Final Excel Row
 
-`src/court_ocr_extract/final_excel_schema.py` là nguồn canonical cho đúng 11 cột final. Sheet đầu của mọi final workbook là `FINAL_EXCEL`; mỗi entity có primary role là một dòng và case metadata được lặp lại.
+`src/court_ocr_extract/final_excel_schema.py` là nguồn canonical cho đúng 14 cột final. Sheet đầu của mọi final workbook là `FINAL_EXCEL`; mỗi entity thuộc role policy hiện hành là một dòng và case metadata được lặp lại.
 
 Không thêm `SOURCE_CASE_ID`, `SOURCE_PAGE`, `SOURCE_LINE_IDS`, OCR/extraction confidence, evidence, technical warnings hoặc `NEEDS_REVIEW` vào `FINAL_EXCEL`. Các field này thuộc debug sheets/QA report. `DATA` và `Trich xuat` là contract lịch sử trước final-schema realignment, không còn là tên sheet final.
 

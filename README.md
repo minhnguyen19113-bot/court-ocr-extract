@@ -135,7 +135,7 @@ python -m court_ocr_extract.cli extract --ocr-cache outputs\ocr_cache --output o
 python -m scripts.qa_output --excel outputs\excel\pilot_10.xlsx
 ```
 
-Excel output chính là sheet đầu `FINAL_EXCEL`, chỉ có đúng 11 cột nghiệp vụ trong `FINAL_EXCEL_COLUMNS` và chỉ chứa primary procedural roles. Sheet thứ hai `NGUOI_THAM_GIA_KHAC` giữ guardian/representative/defense/protection/witness/support roles cho người dùng; court roles chỉ nằm trong debug. `SOURCE_CASE_ID`, source page/line IDs, confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` không được thêm vào final sheet.
+Excel output chính là sheet đầu `FINAL_EXCEL`, có đúng 14 cột nghiệp vụ trong `FINAL_EXCEL_COLUMNS` và mặc định chỉ chứa `Bị cáo` cùng `Bị hại`. Sheet `NGUOI_THAM_GIA_KHAC` chỉ xuất khi bật `include_other_participants_output`; court roles chỉ nằm trong debug. `SOURCE_CASE_ID`, source page/line IDs, confidence, evidence, warnings kỹ thuật và `NEEDS_REVIEW` không được thêm vào final sheet.
 
 Với án hình sự, `QUAN HỆ PHÁP LUẬT` để trống cho đến khi có explicit charge phrase từ decision-tail cache; không fallback thành `Hình sự`. Quy trình VM từng case và safe preprocess flags nằm trong `docs/RUNBOOK_EZYCLOUDX.md`.
 
@@ -167,7 +167,7 @@ python -m court_ocr_extract.cli zip-debug-visual --run-id latest --output output
 - Preprocess does not remove text or Vietnamese marks.
 - Surya OCR text matches page images and bbox overlays.
 - Marker detection is reasonable.
-- `FINAL EXCEL PREVIEW` khớp đúng 11 cột của sheet đầu `FINAL_EXCEL`; evidence/debug hiển thị ở section riêng phía sau.
+- `FINAL EXCEL PREVIEW` khớp đúng 14 cột của sheet đầu `FINAL_EXCEL`; evidence/debug hiển thị ở section riêng phía sau.
 - Excel does not mistake status phrases for names.
 - QA report does not expose sensitive data.
 

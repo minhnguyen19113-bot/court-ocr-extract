@@ -1,5 +1,40 @@
 # Project State
 
+## Web Demo Platform Phase 0.8 — Typography và non-tech UX
+
+- Frontend dùng system font stack `"Segoe UI", "Noto Sans", Arial, sans-serif`,
+  body `16px/1.56`, H1 `38–44px` và eyebrow tracking `0.06em`; không remote
+  font/image.
+- Sidebar rộng `264px`, đúng 10 mục nghiệp vụ; mục “Kiểm tra OCR” không còn
+  visible nhưng 13 business route và internal processing capability vẫn giữ.
+- Top bar chỉ còn một `Bản thử nghiệm`, notification control accessible và
+  `Người dùng thử nghiệm`; không còn local/phase/role placeholder lặp.
+- Dashboard có đúng bốn summary card, một `Dữ liệu minh họa` và hai section phụ.
+- Placeholder routes có đúng một primary action, action chưa khả dụng disabled,
+  wording phổ thông và empty-state next step.
+- Icon chuẩn hóa bằng exact `lucide-react@1.27.0`; không official emblem/logo.
+- UI docs canonical: `UI_DESIGN_SYSTEM.md`, `VISUAL_QA_CHECKLIST.md`,
+  `LEGAL_UI_REFERENCE_PRINCIPLES.md`, `UI_INFORMATION_ARCHITECTURE.md`.
+- Main-workspace frontend gate đạt: `npm ci`, full/production audit
+  `0 vulnerabilities`, Vitest `6/6`, typecheck, lint và Next build 14 trang.
+  Lần đầu `npm ci` gặp file lock từ dev server có trước task; Codex không dừng
+  process và chỉ rerun sau khi process đó tự kết thúc.
+- Python compileall pass; `tests/web` `108 passed`; full suite `532 passed`, còn
+  một Starlette/httpx deprecation warning đã biết. Repo/architecture guard pass.
+- Codex không chạy service/browser/port; Project Owner sở hữu visual QA và
+  screenshot theo checklist. Generated frontend artifacts đã được dọn.
+
+## Web Demo Platform Phase 0 — Architecture Foundation
+
+- Branch `demo-web-platform` có nền tảng web local-only, không sửa business logic OCR/parser và không triển khai mutation giả.
+- `src/court_ocr_extract/domain/` định nghĩa workflow 9 trạng thái, field-status 8 trạng thái, audit contract, publish guard, form-engine contract và schema web derive trực tiếp từ canonical `FINAL_EXCEL_COLUMNS` 14 cột.
+- `src/court_ocr_extract/database/` dùng SQLAlchemy với một PostgreSQL và sáu logical schema `ingest`, `processing`, `review`, `core`, `forms`, `audit`; Alembic baseline chỉ tạo schema, còn table migration được defer có chủ đích.
+- FastAPI Phase 0 có đúng năm endpoint GET dưới `/api/v1`: health, capabilities, canonical schema, workflows và form capabilities. Không có upload/OCR/review/publish/generate endpoint ghi dữ liệu.
+- `apps/web/` là Next.js application shell chung cho dashboard, intake, jobs/OCR review, data review, publishing, exports, forms, audit, admin và help; frontend không copy danh sách 14 cột.
+- Form capability fail-closed: `legacy_doc=NOT_IMPLEMENTED`, `docx/pdf=DECLARED`, `official_generation_available=false`.
+- Verification local: `tests/web` đạt `60 passed`; full Python suite đạt `484 passed`; compileall, repo guardrail, architecture guardrail và Alembic head check đều đạt. Cảnh báo duy nhất là deprecation từ `FastAPI TestClient`.
+- Chưa chạy PostgreSQL thật, Node/Vitest/Next build, browser QA, OCR, Surya, Docker, LLM hoặc cloud.
+
 ## Sentence Aggregate Completeness, Clause Evidence và Name Audit Fix
 
 - Sentence start nhận các dạng `được tính từ`, `được tính kể từ`, `thời hạn chấp hành hình phạt tù tính từ` cùng hai OCR variant hẹp `tỉnh từ`/`tính tử`; output luôn canonical về `thời hạn tù tính từ ngày ...`, không dùng metadata fallback.
@@ -352,3 +387,98 @@ Codex may inspect code, config, docs, prompts, and synthetic tests/fixtures. Cod
 ## Next Gate
 
 Project Owner rerun extraction từ OCR cache cũ cho đúng 1 case bằng `rule_anchor_only`, không OCR và không bật LLM. Review cả `FINAL_EXCEL` lẫn `NGUOI_THAM_GIA_KHAC`; chỉ khi boundary/role/metadata đạt mới chạy `ocr-decision-tail` cho case đó, rồi rerun extraction với tail cache. Không tăng lên 3/9 PDF trước khi case đầu được chấp nhận.
+
+## Latest Web Demo Platform Phase 0.5
+
+- Audit Phase 0 xác nhận 140 file trong scope, không có real-data artifact, secret
+  hoặc absolute user path và không sửa core parser/OCR production.
+- SQLAlchemy foundation có 39 bảng, 81 foreign key trong sáu logical schema.
+- Alembic gồm `0001_phase0_foundation` và `0002_phase0_tables`; smoke PostgreSQL 16.4
+  synthetic đã pass upgrade/check/downgrade/upgrade/check.
+- `tests/web` 66 pass, database targeted 11 pass, Surya targeted 12 pass và full
+  Python suite 490 pass.
+- Frontend acceptance chưa chạy vì không có npm; không tạo lockfile thủ công.
+- Trạng thái Phase 0.5: `PARTIAL — ENVIRONMENT BLOCKED`; gate kế tiếp là Phase 0.6
+  frontend toolchain acceptance, chưa mở Phase 1.
+
+## Latest Web Demo Platform Phase 0.6
+
+- System `node` và `npm` vẫn không tồn tại; không dùng Codex bundled runtime, không
+  cài Node, không tạo lockfile thủ công và không thêm ESLint chưa thể validate.
+- Root `AGENTS.md` đã tích hợp web runtime boundary qua
+  `docs/web_demo/CODEX_OPERATING_RULES.md`.
+- Đã tạo operations runbook, ports/network guide, troubleshooting catalog và
+  `scripts/web_demo/check_prerequisites.ps1` read-only.
+- Project Owner là người duy nhất start/stop Docker, PostgreSQL, FastAPI, Next.js,
+  browser và network. Codex không chạy service hoặc process nền.
+- PostgreSQL compose bind explicit `127.0.0.1`; public/network deployment là
+  `NOT APPROVED IN PHASE 0.6`.
+- Static frontend contract giữ 13 route files, 11 sidebar items, `/api/v1`,
+  synthetic-only UI và accessibility foundation.
+- Python validation: `tests/web` 70 pass; full suite 494 pass; compileall pass.
+- Trạng thái Phase 0.6: `PARTIAL — ENVIRONMENT BLOCKED`; chưa mở Phase 1 hoặc local
+  visual QA.
+
+## Latest Web Demo Platform Phase 0.6 Continuation
+
+- Xác nhận system Node `v24.18.0` và npm `11.16.0` tại
+  `C:\Program Files\nodejs`; prerequisite helper có fallback read-only khi shell
+  chưa refresh PATH. Không dùng Codex bundled Node.
+- npm tạo `apps/web/package-lock.json` v3; `npm ci` pass. Lock chỉ dùng
+  `registry.npmjs.org`, không có local dependency, credential hoặc absolute path.
+- Frontend gates pass: 6 Vitest tests, TypeScript, ESLint
+  `--max-warnings=0`, Next production build 14 trang. Build không gọi backend.
+- Browser dùng same-origin `/api/v1`; Next rewrite tới server-only
+  `WEB_API_ORIGIN=http://127.0.0.1:8000`, fail-closed với non-loopback origin.
+  FastAPI không bật CORS.
+- Python validation: compileall pass, `tests/web` 71 pass, full suite 495 pass;
+  một Starlette/httpx deprecation warning đã biết.
+- Không chạy Docker/PostgreSQL/Alembic runtime, backend/frontend server, browser,
+  OCR/LLM/cloud hoặc process nền.
+- Full npm audit còn 1 critical, 6 high, 3 moderate; production-only còn 2 high
+  ở `next`/`postcss`. Fix đầy đủ yêu cầu major upgrade nên chưa tự áp dụng.
+- Trạng thái continuation:
+  `PARTIAL — FRONTEND ENVIRONMENT OR VALIDATION BLOCKED`. Gate kế tiếp chỉ là
+  dependency security upgrade/review riêng; chưa mở Phase 1 hoặc local visual QA.
+
+## Latest Web Demo Platform Phase 0.7
+
+- Baseline audit chạy lại ngày `2026-07-27`: 21 vulnerable package-node trong
+  full graph (1 critical, 17 high, 3 moderate), production có 2 high; 38 GHSA
+  đã được phân tích trong `docs/web_demo/FRONTEND_DEPENDENCY_SECURITY.md`.
+- Frontend pin exact Next `15.5.21`, React/React DOM `19.2.8`, Vitest `3.2.6`;
+  Node engine chuyển thành `^20.19.0 || ^22.13.0 || >=24`.
+- ESLint 8/legacy config được thay bằng ESLint `10.8.0` native flat config với
+  JS, TypeScript, React Hooks và Next plugin rules. Legacy `minimatch@3`/
+  `brace-expansion@1` tree không còn.
+- Exact overrides `esbuild@0.28.1`, `postcss@8.5.23`, `sharp@0.35.0` xử lý các
+  transitive advisory còn lại; mỗi override có compatibility evidence và điều
+  kiện gỡ.
+- Ba dynamic App Router pages dùng async `params`; 13 business routes, 11
+  sidebar destinations và `/api/v1` loopback rewrite giữ nguyên.
+- Full và production npm audit đều exit `0`, `0 vulnerabilities`; `npm ci`,
+  Vitest 6/6, typecheck, lint và Next production build pass.
+- Python compileall pass; `tests/web` 71 pass; full suite 495 pass, một
+  Starlette/httpx deprecation warning đã biết.
+- Không chạy Docker/PostgreSQL/Alembic runtime, server, browser, OCR/LLM/cloud
+  hoặc mở port. Local visual QA chưa chạy và thuộc Project Owner.
+- Trạng thái Phase 0.7:
+  `PASS — READY FOR PROJECT OWNER LOCAL RUN AND VISUAL QA`; chưa phê duyệt public
+  deployment hoặc Phase 1 feature work.
+
+## Latest Web Demo Platform Phase 0.9
+
+- Đã thêm local automation cố định, state/log ngoài Git, exact-PID stop và knowledge
+  base recovery cho Project Owner.
+- Codex không gọi launcher start, Docker, database, migration runtime, server,
+  browser, port, OCR/LLM/cloud hoặc dữ liệu thật.
+- Git performance policy của web worktree dùng status/listing nhẹ và
+  `scripts/check_text_hygiene.py`; không tạo patch Git.
+- Validation: `npm.cmd ci` exit `0`; hai npm audit `0 vulnerabilities`; Vitest `6/6`,
+  typecheck, lint và Next build 14 trang PASS. PowerShell/static contract `19 passed`,
+  `tests/web` `123 passed`, full Python `547 passed`; compileall, repo guard,
+  architecture guard và text hygiene PASS.
+- SWC lock ban đầu đã được Project Owner giải phóng; Codex không dò hoặc kill process.
+- Phase 0.9 đạt validation gate; checkpoint được tạo và normal-push trên riêng branch
+  `demo-web-platform`, không tác động `current-rebuild-state`.
+- Quyết định: `PASS — PHASE 0 CHECKPOINT COMMITTED AND PUSHED`.

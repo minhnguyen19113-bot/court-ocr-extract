@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16.4-bookworm
+    environment:
+      POSTGRES_DB: ${WEB_POSTGRES_DB:-court_ocr_web_synthetic}
+      POSTGRES_USER: ${WEB_POSTGRES_USER:-web_demo_synthetic}
+      POSTGRES_PASSWORD: ${WEB_POSTGRES_PASSWORD:-local_development_only}
+    ports:
+      - "127.0.0.1:${WEB_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - ./.postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready
+          -U ${WEB_POSTGRES_USER:-web_demo_synthetic}
+          -d ${WEB_POSTGRES_DB:-court_ocr_web_synthetic}
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"

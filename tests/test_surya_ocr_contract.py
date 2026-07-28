@@ -19,6 +19,10 @@ from court_ocr_extract.settings import PipelineSettings
 
 def test_surya_check_available_reports_install_hint_when_missing(monkeypatch) -> None:
     real_import_module = importlib.import_module
+    monkeypatch.setattr(
+        "court_ocr_extract.ocr_backends.surya_ocr.installed_surya_ocr_version",
+        lambda: "0.20.0",
+    )
 
     def fake_import_module(name: str, *args, **kwargs):
         if name == "surya":

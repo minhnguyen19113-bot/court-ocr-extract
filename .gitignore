@@ -38,6 +38,17 @@ court_ocr_gpu_worker/
 *.sqlite
 *.db
 
+# Front-end build and local environment artifacts
+apps/web/node_modules/
+apps/web/.next/
+apps/web/coverage/
+apps/web/.npm-cache/
+apps/web/*.tsbuildinfo
+apps/web/.env*.local
+
+# Local-only PostgreSQL bind volume for the web demo migration smoke
+ops/web_demo/.postgres-data/
+
 # File tam / upload cuc bo
 *.tmp
 *.log

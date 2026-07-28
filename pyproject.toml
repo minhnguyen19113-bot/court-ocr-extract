@@ -28,7 +28,11 @@ dev = [
 web = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
-    "python-multipart>=0.0.9"
+    "python-multipart>=0.0.9",
+    "sqlalchemy>=2.0,<2.1",
+    "alembic>=1.13,<2",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic-settings>=2,<3",
 ]
 gpu = [
     "torch",
